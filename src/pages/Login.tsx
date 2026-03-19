@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useNavigate, Link } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,23 +34,29 @@ export function Login() {
         throw new Error('Please select a role to continue.');
       }
 
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      // Demo mode — no Supabase configured
+      if (!isSupabaseConfigured) {
+        localStorage.setItem('demo_role', selectedRole);
+        localStorage.setItem('demo_email', email);
+        localStorage.setItem('demo_name', email.split('@')[0]);
+        window.location.href = '/';
+        return;
+      }
+
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
 
       if (error) {
-        // Fallback for demo purposes if Supabase is not configured yet or rate limited
+        // Network / config errors → fall back to demo
         if (
-          error.message.includes('FetchError') || 
-          error.message.includes('API key') || 
-          error.message.includes('rate limit') || 
-          error.message.includes('Invalid login credentials') ||
-          error.status === 429
+          error.message.includes('fetch') ||
+          error.message.includes('FetchError') ||
+          error.message.includes('API key') ||
+          error.message.includes('Invalid URL')
         ) {
-          console.warn('Supabase not configured or rate limited. Using demo mode.');
           localStorage.setItem('demo_role', selectedRole);
-          navigate('/', { replace: true });
+          localStorage.setItem('demo_email', email);
+          localStorage.setItem('demo_name', email.split('@')[0]);
+          window.location.href = '/';
           return;
         }
         throw error;
@@ -90,21 +96,21 @@ export function Login() {
               <Stethoscope className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">MedVisit Connect</h1>
-              <p className="text-[10px] font-semibold tracking-widest uppercase text-emerald-100/80">KSA Digital Health</p>
+              <h1 className="text-xl font-bold tracking-tight">LOMIXA</h1>
+              <p className="text-[10px] font-semibold tracking-widest uppercase text-emerald-100/80">KSA Pharma Connect</p>
             </div>
           </div>
 
           <div className="max-w-md">
             <h2 className="text-5xl lg:text-6xl font-extrabold leading-tight mb-6 tracking-tight">
-              Connect Pharma & Healthcare,<br />
+              Bridging Pharma &<br />
               <span className="relative inline-block">
-                Seamlessly.
+                Healthcare.
                 <div className="absolute bottom-2 left-0 w-full h-2 bg-emerald-400/50 -z-10"></div>
               </span>
             </h2>
             <p className="text-lg text-emerald-50/90 leading-relaxed mb-12">
-              The premium platform bridging pharmaceutical innovators and healthcare providers through intelligent, encrypted data systems.
+              LOMIXA is the premium platform connecting pharmaceutical companies and healthcare professionals across Saudi Arabia.
             </p>
           </div>
         </div>

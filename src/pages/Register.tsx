@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,7 +29,25 @@ export function Register() {
       if (!selectedRole) {
         throw new Error('Please select a role to continue.');
       }
+      if (!name.trim()) {
+        throw new Error('Please enter your full name.');
+      }
+      if (!email.trim()) {
+        throw new Error('Please enter your email.');
+      }
 
+      // --- DEMO MODE (no Supabase configured) ---
+      if (!isSupabaseConfigured) {
+        localStorage.setItem('demo_role', selectedRole);
+        localStorage.setItem('demo_email', email);
+        localStorage.setItem('demo_name', name);
+        localStorage.setItem('demo_mobile', mobile);
+        localStorage.setItem('demo_org', dynamicField);
+        window.location.href = '/';
+        return;
+      }
+
+      // --- SUPABASE MODE ---
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -37,28 +55,29 @@ export function Register() {
           data: {
             full_name: name,
             role: selectedRole,
-            mobile: mobile,
-            dynamic_field: dynamicField,
+            mobile,
+            organization: dynamicField,
           }
         }
       });
 
       if (error) {
+        // Network/config errors → demo mode fallback
         if (
-          error.message.includes('FetchError') || 
-          error.message.includes('API key') || 
-          error.message.includes('rate limit') || 
-          error.message.includes('User already registered') ||
-          error.status === 429
+          error.message.toLowerCase().includes('fetch') ||
+          error.message.includes('FetchError') ||
+          error.message.includes('API key') ||
+          error.message.includes('Invalid URL')
         ) {
-          console.warn('Supabase not configured or rate limited. Using demo mode.');
           localStorage.setItem('demo_role', selectedRole);
-          navigate('/', { replace: true });
+          localStorage.setItem('demo_email', email);
+          localStorage.setItem('demo_name', name);
+          window.location.href = '/';
           return;
         }
         throw error;
       }
-      
+
       navigate('/', { replace: true });
     } catch (err: any) {
       setError(err.message || 'Failed to register');
@@ -104,8 +123,8 @@ export function Register() {
               <Stethoscope className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">MedVisit Connect</h1>
-              <p className="text-[10px] font-semibold tracking-widest uppercase text-emerald-100/80">KSA Digital Health</p>
+              <h1 className="text-xl font-bold tracking-tight">LOMIXA</h1>
+              <p className="text-[10px] font-semibold tracking-widest uppercase text-emerald-100/80">KSA Pharma Connect</p>
             </div>
           </div>
 

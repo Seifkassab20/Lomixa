@@ -7,35 +7,63 @@ import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
 
-// Placeholder components for other routes
-const Placeholder = ({ title }: { title: string }) => (
-  <div className="p-6 bg-white dark:bg-slate-900 rounded-lg border dark:border-slate-800 shadow-sm h-full flex items-center justify-center">
-    <h2 className="text-2xl font-semibold text-gray-500 dark:text-gray-400">{title} Page Coming Soon</h2>
-  </div>
-);
+// Shared pages
+import { NotificationsPage } from './pages/shared/NotificationsPage';
+import { SettingsPage } from './pages/shared/SettingsPage';
+import { BookingsPage } from './pages/shared/BookingsPage';
+
+// Pharma pages
+import { PharmaSubordinates } from './pages/pharma/PharmaSubordinates';
+import { PharmaAnalytics } from './pages/pharma/PharmaAnalytics';
+import { PharmaBundles } from './pages/pharma/PharmaBundles';
+
+// Hospital pages
+import { ManageDoctors } from './pages/hospital/ManageDoctors';
+import { HospitalAnalytics } from './pages/hospital/HospitalAnalytics';
+
+// Doctor pages
+import { DoctorSchedule } from './pages/doctor/DoctorSchedule';
+import { DoctorBookings } from './pages/doctor/DoctorBookings';
+
+// Rep pages
+import { RepBookVisit } from './pages/rep/RepBookVisit';
+import { RepMyVisits } from './pages/rep/RepMyVisits';
 
 export default function App() {
   return (
-    <ThemeProvider defaultTheme="dark" storageKey="medvisit-theme">
+    <ThemeProvider defaultTheme="dark" storageKey="lomixa-theme">
       <BrowserRouter>
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            
+
             <Route path="/" element={<Layout />}>
               <Route index element={<Dashboard />} />
-              <Route path="subordinates" element={<Placeholder title="Subordinates" />} />
-              <Route path="doctors" element={<Placeholder title="Manage Doctors" />} />
-              <Route path="analytics" element={<Placeholder title="Analytics" />} />
-              <Route path="bundles" element={<Placeholder title="Buy Bundle" />} />
-              <Route path="bookings" element={<Placeholder title="Bookings" />} />
-              <Route path="schedule" element={<Placeholder title="My Schedule" />} />
-              <Route path="book" element={<Placeholder title="Book Visit" />} />
-              <Route path="visits" element={<Placeholder title="My Visits" />} />
-              <Route path="settings" element={<Placeholder title="Settings" />} />
+
+              {/* Pharma */}
+              <Route path="subordinates" element={<PharmaSubordinates />} />
+              <Route path="analytics" element={<PharmaAnalytics />} />
+              <Route path="bundles" element={<PharmaBundles />} />
+
+              {/* Hospital */}
+              <Route path="doctors" element={<ManageDoctors />} />
+              <Route path="hospital-analytics" element={<HospitalAnalytics />} />
+
+              {/* Doctor */}
+              <Route path="schedule" element={<DoctorSchedule />} />
+              <Route path="my-bookings" element={<DoctorBookings />} />
+
+              {/* Rep */}
+              <Route path="book" element={<RepBookVisit />} />
+              <Route path="visits" element={<RepMyVisits />} />
+
+              {/* Shared */}
+              <Route path="bookings" element={<BookingsPage />} />
+              <Route path="notifications" element={<NotificationsPage />} />
+              <Route path="settings" element={<SettingsPage />} />
             </Route>
-            
+
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </AuthProvider>

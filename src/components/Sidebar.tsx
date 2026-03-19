@@ -1,96 +1,149 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { 
-  LayoutDashboard, 
-  Users, 
-  Calendar, 
-  CreditCard, 
-  Settings, 
-  Activity,
-  Stethoscope,
-  Clock
+  LayoutDashboard, Users, Calendar, CreditCard, Settings, Activity,
+  Stethoscope, Clock, BookOpen, Bell, Plus, History, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { getNotifications } from '@/lib/store';
 
 export function Sidebar() {
-  const { role } = useAuth();
+  const { role, userId } = useAuth();
   const location = useLocation();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const [notifCount, setNotifCount] = useState(0);
+  const [collapsed, setCollapsed] = useState(false);
+  const isRTL = i18n.language === 'ar';
+
+  useEffect(() => {
+    const refresh = () => {
+      const n = getNotifications().filter(n => !n.read && (!n.userId || n.userId === userId)).length;
+      setNotifCount(n);
+    };
+    refresh();
+    const interval = setInterval(refresh, 3000);
+    return () => clearInterval(interval);
+  }, [userId]);
 
   const getLinks = () => {
+    const base = [
+      { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    ];
+
     switch (role) {
-      case 'pharma':
-        return [
-          { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-          { name: 'Subordinates', href: '/subordinates', icon: Users },
-          { name: 'Manage Doctors', href: '/doctors', icon: Stethoscope },
-          { name: 'Analytics', href: '/analytics', icon: Activity },
-          { name: 'Buy Bundle', href: '/bundles', icon: CreditCard },
-          { name: 'Settings', href: '/settings', icon: Settings },
-        ];
-      case 'hospital':
-        return [
-          { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-          { name: 'Manage Doctors', href: '/doctors', icon: Stethoscope },
-          { name: 'Analytics', href: '/analytics', icon: Activity },
-          { name: 'All Bookings', href: '/bookings', icon: Calendar },
-          { name: 'Settings', href: '/settings', icon: Settings },
-        ];
-      case 'doctor':
-        return [
-          { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-          { name: 'My Bookings', href: '/bookings', icon: Calendar },
-          { name: 'My Schedule', href: '/schedule', icon: Clock },
-          { name: 'Settings', href: '/settings', icon: Settings },
-        ];
-      case 'rep':
-        return [
-          { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-          { name: 'Book Visit', href: '/book', icon: Calendar },
-          { name: 'My Visits', href: '/visits', icon: Clock },
-          { name: 'Settings', href: '/settings', icon: Settings },
-        ];
-      default:
-        return [];
+      case 'pharma': return [
+        ...base,
+        { name: 'Subordinates', href: '/subordinates', icon: Users },
+        { name: 'Manage Doctors', href: '/doctors', icon: Stethoscope },
+        { name: 'Analytics', href: '/analytics', icon: Activity },
+        { name: 'Buy Bundle', href: '/bundles', icon: CreditCard },
+        { name: 'Bookings', href: '/bookings', icon: Calendar },
+        { name: 'Notifications', href: '/notifications', icon: Bell, badge: notifCount },
+        { name: 'Settings', href: '/settings', icon: Settings },
+      ];
+      case 'hospital': return [
+        ...base,
+        { name: 'Manage Doctors', href: '/doctors', icon: Stethoscope },
+        { name: 'Analytics', href: '/hospital-analytics', icon: Activity },
+        { name: 'All Bookings', href: '/bookings', icon: Calendar },
+        { name: 'Notifications', href: '/notifications', icon: Bell, badge: notifCount },
+        { name: 'Settings', href: '/settings', icon: Settings },
+      ];
+      case 'doctor': return [
+        ...base,
+        { name: 'My Bookings', href: '/my-bookings', icon: BookOpen },
+        { name: 'My Schedule', href: '/schedule', icon: Clock },
+        { name: 'Notifications', href: '/notifications', icon: Bell, badge: notifCount },
+        { name: 'Settings', href: '/settings', icon: Settings },
+      ];
+      case 'rep': return [
+        ...base,
+        { name: 'Book Visit', href: '/book', icon: Plus },
+        { name: 'My Visits', href: '/visits', icon: Calendar },
+        { name: 'Notifications', href: '/notifications', icon: Bell, badge: notifCount },
+        { name: 'Settings', href: '/settings', icon: Settings },
+      ];
+      default: return base;
     }
   };
 
   const links = getLinks();
+  const roleLabels: Record<string, string> = {
+    pharma: 'Pharma Company',
+    hospital: 'Hospital / Clinic',
+    doctor: 'Doctor',
+    rep: 'Sales Rep',
+  };
 
   return (
-    <div className="w-64 bg-white dark:bg-[#0f172a] border-r border-gray-200 dark:border-slate-800 flex flex-col transition-colors">
-      <div className="h-16 flex items-center px-6 border-b border-gray-200 dark:border-slate-800">
-        <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold text-xl">
-          <Activity className="h-6 w-6" />
-          <span>MedVisit Connect</span>
+    <div className={cn(
+      'relative bg-white dark:bg-[#0f172a] border-r border-gray-200 dark:border-slate-800 flex flex-col transition-all duration-300',
+      collapsed ? 'w-16' : 'w-64'
+    )}>
+      {/* Logo */}
+      <div className={cn('h-16 flex items-center border-b border-gray-200 dark:border-slate-800', collapsed ? 'px-4 justify-center' : 'px-5 gap-3')}>
+        <div className="h-8 w-8 rounded-lg bg-emerald-500 flex items-center justify-center shrink-0">
+          <Stethoscope className="h-4 w-4 text-white" />
         </div>
+        {!collapsed && (
+          <div className="overflow-hidden">
+            <div className="text-sm font-bold text-gray-900 dark:text-white leading-tight whitespace-nowrap tracking-widest">LOMIXA</div>
+            <div className="text-[10px] text-gray-400 dark:text-slate-500 whitespace-nowrap">{roleLabels[role || ''] || 'Portal'}</div>
+          </div>
+        )}
       </div>
-      <nav className="flex-1 overflow-y-auto py-4">
-        <ul className="space-y-1 px-3">
+
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto py-4 scrollbar-hide">
+        <ul className={cn('space-y-0.5', collapsed ? 'px-2' : 'px-3')}>
           {links.map((link) => {
             const Icon = link.icon;
-            const isActive = location.pathname === link.href;
+            const isActive = location.pathname === link.href || (link.href !== '/' && location.pathname.startsWith(link.href));
+            const badge = (link as any).badge;
             return (
               <li key={link.name}>
                 <Link
                   to={link.href}
+                  title={collapsed ? link.name : undefined}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                    isActive 
-                      ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-transparent dark:border-emerald-500/20" 
-                      : "text-gray-700 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800/50 dark:hover:text-slate-200"
+                    'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 relative group',
+                    collapsed ? 'justify-center' : '',
+                    isActive
+                      ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 shadow-sm'
+                      : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800/60 hover:text-gray-900 dark:hover:text-slate-200'
                   )}
                 >
-                  <Icon className="h-5 w-5" />
-                  {t(link.name)}
+                  <Icon className={cn('h-5 w-5 shrink-0', isActive ? 'text-emerald-600 dark:text-emerald-400' : '')} />
+                  {!collapsed && <span className="truncate">{link.name}</span>}
+                  {badge > 0 && (
+                    <span className={cn(
+                      'bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shrink-0',
+                      collapsed ? 'absolute top-1 right-1 h-4 w-4' : 'ml-auto h-5 px-1.5 min-w-5'
+                    )}>
+                      {badge > 9 ? '9+' : badge}
+                    </span>
+                  )}
+                  {collapsed && (
+                    <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none">
+                      {link.name}
+                    </div>
+                  )}
                 </Link>
               </li>
             );
           })}
         </ul>
       </nav>
+
+      {/* Collapse toggle */}
+      <button
+        onClick={() => setCollapsed(!collapsed)}
+        className="absolute -right-3 top-20 h-6 w-6 rounded-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors shadow-sm z-10"
+      >
+        {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
+      </button>
     </div>
   );
 }

@@ -1,132 +1,128 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Users, Activity, Calendar as CalendarIcon, Video, Phone, MapPin, Stethoscope } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-
-const doctors = [
-  { id: 1, name: 'Dr. Ahmed Ali', specialty: 'Cardiology', experience: '15 years', status: 'Active' },
-  { id: 2, name: 'Dr. Fatima Hassan', specialty: 'Neurology', experience: '8 years', status: 'Active' },
-  { id: 3, name: 'Dr. Youssef Omar', specialty: 'Pediatrics', experience: '12 years', status: 'Inactive' },
-];
-
-const bookings = [
-  { id: 1, doctor: 'Dr. Ahmed Ali', company: 'Pfizer', rep: 'Sarah Johnson', date: '2026-03-20 10:00 AM', type: 'In Person', status: 'Confirmed' },
-  { id: 2, doctor: 'Dr. Fatima Hassan', company: 'Novartis', rep: 'Mohammed Khalid', date: '2026-03-21 02:30 PM', type: 'Video', status: 'Pending' },
-];
+import React, { useEffect, useState } from 'react';
+import { useAuth } from '@/lib/auth';
+import { getVisits, getDoctors, getHospitals, saveHospital, generateId } from '@/lib/store';
+import { Stethoscope, Calendar, Activity, Users } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export function HospitalDashboard() {
-  const [activeTab, setActiveTab] = useState('all');
+  const { userId, user } = useAuth();
+  const navigate = useNavigate();
+  const [doctors, setDoctors] = useState<ReturnType<typeof getDoctors>>([]);
+  const [visits, setVisits] = useState<ReturnType<typeof getVisits>>([]);
+
+  useEffect(() => {
+    // Ensure hospital record exists
+    const hospitals = getHospitals();
+    let mine = hospitals.find(h => h.userId === userId);
+    if (!mine && userId) {
+      mine = {
+        id: generateId(),
+        name: user?.user_metadata?.organization || 'My Hospital',
+        location: user?.user_metadata?.location || 'Riyadh',
+        userId,
+      };
+      saveHospital(mine);
+    }
+
+    const allDoctors = getDoctors().filter(d => d.hospitalId === mine?.id);
+    setDoctors(allDoctors);
+
+    const allVisits = getVisits().filter(v => v.hospitalId === mine?.id);
+    setVisits(allVisits);
+  }, [userId]);
+
+  const monthlyData = (() => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+    return months.map((name, i) => ({
+      name,
+      visits: visits.filter(v => new Date(v.date).getMonth() === i).length,
+    }));
+  })();
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 dark:text-slate-400">Total Doctors</CardTitle>
-            <Stethoscope className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">45</div>
-            <p className="text-xs text-emerald-600 dark:text-emerald-400">+3 this month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 dark:text-slate-400">Visits This Week</CardTitle>
-            <CalendarIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">28</div>
-            <p className="text-xs text-emerald-600 dark:text-emerald-400">12 Pending</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 dark:text-slate-400">Pharma Engagement</CardTitle>
-            <Activity className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">High</div>
-            <p className="text-xs text-gray-500 dark:text-slate-400">15 active companies</p>
-          </CardContent>
-        </Card>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Doctors', value: doctors.length, sub: 'In your facility', icon: Stethoscope, color: 'emerald' },
+          { label: 'Visits This Week', value: visits.filter(v => { const d = new Date(v.date); const now = new Date(); const diff = (now.getTime() - d.getTime()) / 86400000; return diff <= 7; }).length, sub: `${visits.filter(v => v.status === 'Pending').length} pending`, icon: Calendar, color: 'blue' },
+          { label: 'Completed Visits', value: visits.filter(v => v.status === 'Completed').length, sub: 'All time', icon: Activity, color: 'amber' },
+          { label: 'Pharma Engagement', value: [...new Set(visits.map(v => v.pharmaId))].length, sub: 'Active companies', icon: Users, color: 'purple' },
+        ].map(({ label, value, sub, icon: Icon, color }) => (
+          <div key={label} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-medium text-gray-500 dark:text-slate-400">{label}</span>
+              <div className={`h-8 w-8 rounded-lg bg-${color}-100 dark:bg-${color}-500/20 flex items-center justify-center`}>
+                <Icon className={`h-4 w-4 text-${color}-600 dark:text-${color}-400`} />
+              </div>
+            </div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{value}</div>
+            <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">{sub}</div>
+          </div>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Manage Doctors</CardTitle>
-              <CardDescription>Overview of registered doctors</CardDescription>
-            </div>
-            <Button size="sm">Add Doctor</Button>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {doctors.map((doc) => (
-                <div key={doc.id} className="flex items-center justify-between p-4 border dark:border-slate-800 rounded-lg">
-                  <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold">
-                      {doc.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+        {/* Doctor List Preview */}
+        <div className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold dark:text-white">Doctors Overview</h3>
+            <button onClick={() => navigate('/doctors')} className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline">Manage All</button>
+          </div>
+          {doctors.length === 0 ? (
+            <div className="py-8 text-center text-sm text-gray-400 dark:text-slate-500">No doctors added yet. Go to Manage Doctors to add them.</div>
+          ) : (
+            <div className="space-y-3">
+              {doctors.slice(0, 4).map(doc => (
+                <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg border dark:border-slate-700">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-full bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-sm">
+                      {doc.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900 dark:text-slate-100">{doc.name}</h4>
-                      <p className="text-sm text-gray-500 dark:text-slate-400">{doc.specialty} • {doc.experience}</p>
+                      <div className="text-sm font-medium dark:text-white">{doc.name}</div>
+                      <div className="text-xs text-gray-500 dark:text-slate-400">{doc.specialty}</div>
                     </div>
                   </div>
-                  <Badge variant={doc.status === 'Active' ? 'default' : 'secondary'}>
-                    {doc.status}
-                  </Badge>
+                  <div className="text-xs text-emerald-600 dark:text-emerald-400">
+                    {doc.availability.filter(s => !s.isBooked).length} open
+                  </div>
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Bookings</CardTitle>
-            <CardDescription>Latest visit requests from pharma companies</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="mb-4">
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="pending">Pending</TabsTrigger>
-                <TabsTrigger value="confirmed">Confirmed</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value={activeTab} className="space-y-4">
-                {bookings.map((visit) => (
-                  <div key={visit.id} className="flex items-center justify-between p-4 border dark:border-slate-800 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
-                    <div className="flex items-start gap-4">
-                      <div className="bg-emerald-100 dark:bg-emerald-500/20 p-2 rounded-full text-emerald-600 dark:text-emerald-400">
-                        {visit.type === 'In Person' ? <MapPin className="h-5 w-5" /> : 
-                         visit.type === 'Video' ? <Video className="h-5 w-5" /> : 
-                         <Phone className="h-5 w-5" />}
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-gray-900 dark:text-slate-100">{visit.doctor}</h4>
-                        <p className="text-sm text-gray-500 dark:text-slate-400">{visit.company} ({visit.rep})</p>
-                        <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-slate-400">
-                          <CalendarIcon className="h-3 w-3" />
-                          {visit.date}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <Badge variant={visit.status === 'Confirmed' ? 'default' : 'secondary'}>
-                        {visit.status}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+        {/* Visit Chart */}
+        <div className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
+          <h3 className="font-semibold dark:text-white mb-4">Monthly Visit Activity</h3>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={monthlyData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+              <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, color: '#fff' }} />
+              <Bar dataKey="visits" fill="#059669" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        {[
+          { label: 'Manage Doctors', href: '/doctors', icon: Stethoscope },
+          { label: 'All Bookings', href: '/bookings', icon: Calendar },
+          { label: 'Analytics', href: '/analytics', icon: Activity },
+        ].map(({ label, href, icon: Icon }) => (
+          <button key={label} onClick={() => navigate(href)} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5 flex flex-col items-center gap-3 hover:border-emerald-500/50 hover:shadow-md transition-all group">
+            <div className="h-11 w-11 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
+              <Icon className="h-6 w-6" />
+            </div>
+            <span className="text-sm font-medium dark:text-slate-300">{label}</span>
+          </button>
+        ))}
       </div>
     </div>
   );
