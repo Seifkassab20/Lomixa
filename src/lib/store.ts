@@ -35,6 +35,7 @@ export interface SalesRep {
   userId?: string;
   visitsThisMonth: number;
   target: number;
+  credits: number; // For booking appointments
 }
 
 export interface Hospital {
@@ -241,14 +242,16 @@ function mapRepToDB(r: SalesRep) {
     id: r.id, user_id: r.userId, 
     pharma_id: r.pharmaId === 'default' || !r.pharmaId ? null : r.pharmaId, 
     pharma_name: r.pharmaName,
-    name: r.name, email: r.email, phone: r.phone, target: r.target, visits_this_month: r.visitsThisMonth
+    name: r.name, email: r.email, phone: r.phone, target: r.target, 
+    visits_this_month: r.visitsThisMonth, credits: r.credits || 0
   };
 }
 
 function mapRepFromDB(db: any): SalesRep {
   return {
     id: db.id, userId: db.user_id, pharmaId: db.pharma_id, pharmaName: db.pharma_name,
-    name: db.name, email: db.email, phone: db.phone, target: db.target, visitsThisMonth: db.visits_this_month
+    name: db.name, email: db.email, phone: db.phone, target: db.target, 
+    visitsThisMonth: db.visits_this_month, credits: db.credits || 0
   };
 }
 
@@ -261,10 +264,20 @@ function mapNotifFromDB(db: any): Notification {
 }
 
 
+let lastMutationTime = 0;
+
+function notifyMutation() {
+  lastMutationTime = Date.now();
+}
+
 // BACKGROUND SYNC POLLER
 // We poll Supabase silently to pull remote changes down into local memory so the UI remains instantly responsive.
 export async function syncCloudData() {
   if (!isSupabaseConfigured) return;
+
+  // Guard: If we just made a local change, don't overwrite from cloud for 5s 
+  // to allow the cloud to catch up and avoid "disappearing" optimistic updates.
+  if (Date.now() - lastMutationTime < 5000) return;
 
   try {
     const [hospitals, doctors, reps, pharma, visits, notifications] = await Promise.all([
@@ -276,6 +289,9 @@ export async function syncCloudData() {
       supabase.from('notifications').select('*'),
     ]);
 
+    // Check again after fetch to avoid race condition during the async call
+    if (Date.now() - lastMutationTime < 5000) return;
+
     if (hospitals.data) save('hospitals', hospitals.data.map(mapHospitalFromDB));
     if (doctors.data) save('doctors', doctors.data.map(mapDoctorFromDB));
     if (reps.data) save('sales_reps', reps.data.map(mapRepFromDB));
@@ -285,7 +301,7 @@ export async function syncCloudData() {
 
     // Fetch availability slots separately
     const slots = await supabase.from('availability_slots').select('*');
-    if (slots.data) {
+    if (slots.data && Date.now() - lastMutationTime > 5000) {
       const slotsByDoc = slots.data.reduce((acc: any, row: any) => {
         if (!acc[row.doctor_id]) acc[row.doctor_id] = [];
         acc[row.doctor_id].push({
@@ -318,7 +334,8 @@ export function saveHospital(hospital: Hospital) {
   const idx = list.findIndex(h => h.id === hospital.id);
   if (idx >= 0) list[idx] = hospital; else list.push(hospital);
   save('hospitals', list);
-  if (isSupabaseConfigured) supabase.from('hospitals').upsert(mapHospitalToDB(hospital)).then();
+  notifyMutation();
+  if (isSupabaseConfigured) supabase.from('hospitals').upsert(mapHospitalToDB(hospital)).then(({error}) => error && console.error("Cloud push failed:", error));
 }
 
 // ---- DOCTORS ----
@@ -331,11 +348,13 @@ export function saveDoctor(doctor: Doctor) {
   const idx = list.findIndex(d => d.id === doctor.id);
   if (idx >= 0) list[idx] = doctor; else list.push(doctor);
   save('doctors', list);
-  if (isSupabaseConfigured) supabase.from('doctors').upsert(mapDoctorToDB(doctor)).then();
+  notifyMutation();
+  if (isSupabaseConfigured) supabase.from('doctors').upsert(mapDoctorToDB(doctor)).then(({error}) => error && console.error("Cloud push failed:", error));
 }
 export function deleteDoctor(id: string) {
   save('doctors', getDoctors().filter(d => d.id !== id));
-  if (isSupabaseConfigured) supabase.from('doctors').delete().eq('id', id).then();
+  notifyMutation();
+  if (isSupabaseConfigured) supabase.from('doctors').delete().eq('id', id).then(({error}) => error && console.error("Cloud delete failed:", error));
 }
 
 // ---- SALES REPS ----
@@ -345,11 +364,47 @@ export function saveSalesRep(rep: SalesRep) {
   const idx = list.findIndex(r => r.id === rep.id);
   if (idx >= 0) list[idx] = rep; else list.push(rep);
   save('sales_reps', list);
-  if (isSupabaseConfigured) supabase.from('sales_reps').upsert(mapRepToDB(rep)).then();
+  notifyMutation();
+  if (isSupabaseConfigured) supabase.from('sales_reps').upsert(mapRepToDB(rep)).then(({error}) => error && console.error("Cloud push failed:", error));
 }
 export function deleteSalesRep(id: string) {
   save('sales_reps', getSalesReps().filter(r => r.id !== id));
-  if (isSupabaseConfigured) supabase.from('sales_reps').delete().eq('id', id).then();
+  notifyMutation();
+  if (isSupabaseConfigured) supabase.from('sales_reps').delete().eq('id', id).then(({error}) => error && console.error("Cloud delete failed:", error));
+}
+
+export function allocateCreditsToRep(repId: string, amount: number): boolean {
+  if (amount <= 0) return false;
+  const reps = getSalesReps();
+  const repIdx = reps.findIndex(r => r.id === repId);
+  if (repIdx < 0) return false;
+
+  const pharmaId = reps[repIdx].pharmaId;
+  const companies = getPharmaCompanies();
+  const companyIdx = companies.findIndex(c => c.id === pharmaId);
+  if (companyIdx < 0) return false;
+
+  // Check if enough company credits
+  if (companies[companyIdx].credits < amount) return false;
+
+  // Perform transfer
+  companies[companyIdx].credits -= amount;
+  reps[repIdx].credits = (reps[repIdx].credits || 0) + amount;
+
+  // Update company
+  save('pharma_companies', companies);
+  if (isSupabaseConfigured) {
+    supabase.from('pharma_companies').update({ credits: companies[companyIdx].credits }).eq('id', pharmaId).then();
+  }
+
+  // Update rep
+  save('sales_reps', reps);
+  if (isSupabaseConfigured) {
+    supabase.from('sales_reps').update({ credits: reps[repIdx].credits }).eq('id', repId).then();
+  }
+
+  notifyMutation();
+  return true;
 }
 
 // ---- PHARMA COMPANIES ----
@@ -359,7 +414,8 @@ export function savePharmaCompany(company: PharmaCompany) {
   const idx = list.findIndex(c => c.id === company.id);
   if (idx >= 0) list[idx] = company; else list.push(company);
   save('pharma_companies', list);
-  if (isSupabaseConfigured) supabase.from('pharma_companies').upsert(mapPharmaToDB(company)).then();
+  notifyMutation();
+  if (isSupabaseConfigured) supabase.from('pharma_companies').upsert(mapPharmaToDB(company)).then(({error}) => error && console.error("Cloud push failed:", error));
 }
 
 // ---- VISITS ----
@@ -370,7 +426,8 @@ export function saveVisit(visit: Visit) {
   const idx = list.findIndex(v => v.id === visit.id);
   if (idx >= 0) list[idx] = visit; else list.push(visit);
   save('visits', list);
-  if (isSupabaseConfigured) supabase.from('visits').upsert(mapVisitToDB(visit)).then();
+  notifyMutation();
+  if (isSupabaseConfigured) supabase.from('visits').upsert(mapVisitToDB(visit)).then(({error}) => error && console.error("Cloud push failed:", error));
 }
 export function updateVisitStatus(id: string, status: VisitStatus, extra?: Partial<Visit>) {
   const list = getVisits();
@@ -378,14 +435,16 @@ export function updateVisitStatus(id: string, status: VisitStatus, extra?: Parti
   if (idx >= 0) {
     list[idx] = { ...list[idx], status, ...extra };
     save('visits', list);
-    if (isSupabaseConfigured) supabase.from('visits').upsert(mapVisitToDB(list[idx])).then();
+    notifyMutation();
+    if (isSupabaseConfigured) supabase.from('visits').upsert(mapVisitToDB(list[idx])).then(({error}) => error && console.error("Cloud push failed:", error));
     return list[idx];
   }
   return null;
 }
 export function deleteVisit(id: string) {
   save('visits', getVisits().filter(v => v.id !== id));
-  if (isSupabaseConfigured) supabase.from('visits').delete().eq('id', id).then();
+  notifyMutation();
+  if (isSupabaseConfigured) supabase.from('visits').delete().eq('id', id).then(({error}) => error && console.error("Cloud delete failed:", error));
 }
 export function getVisitsByRep(repId: string): Visit[] { return getVisits().filter(v => v.repId === repId); }
 export function getVisitsByDoctor(doctorId: string): Visit[] { return getVisits().filter(v => v.doctorId === doctorId); }
@@ -398,16 +457,19 @@ export function saveNotification(n: Notification) {
   const list = getNotifications();
   list.unshift(n);
   save('notifications', list.slice(0, 50));
-  if (isSupabaseConfigured) supabase.from('notifications').upsert(mapNotifToDB(n)).then();
+  notifyMutation();
+  if (isSupabaseConfigured) supabase.from('notifications').upsert(mapNotifToDB(n)).then(({error}) => error && console.error("Cloud push failed:", error));
 }
 export function markNotificationRead(id: string) {
   const list = getNotifications().map(n => n.id === id ? { ...n, read: true } : n);
   save('notifications', list);
-  if (isSupabaseConfigured) supabase.from('notifications').update({ read: true }).eq('id', id).then();
+  notifyMutation();
+  if (isSupabaseConfigured) supabase.from('notifications').update({ read: true }).eq('id', id).then(({error}) => error && console.error("Cloud push failed:", error));
 }
 export function markAllNotificationsRead() {
   const list = getNotifications().map(n => ({ ...n, read: true }));
   save('notifications', list);
+  notifyMutation();
 }
 
 // ---- TRANSACTIONS ----
@@ -416,6 +478,7 @@ export function saveTransaction(t: Transaction) {
   const list = getTransactions();
   list.unshift(t);
   save('transactions', list);
+  notifyMutation();
 }
 
 // ---- BUNDLES ----
@@ -423,7 +486,10 @@ export function getBundles(): Bundle[] { return BUNDLES; }
 
 // ---- PROFILE ----
 export function getProfile(userId: string) { return load<Record<string, any>>(`profile_${userId}`, {}); }
-export function saveProfile(userId: string, profile: Record<string, any>) { save(`profile_${userId}`, profile); }
+export function saveProfile(userId: string, profile: Record<string, any>) { 
+  save(`profile_${userId}`, profile); 
+  notifyMutation();
+}
 
 // ---- AVAILABILITY ----
 export function getDoctorAvailability(doctorId: string): AvailabilitySlot[] {
@@ -431,6 +497,7 @@ export function getDoctorAvailability(doctorId: string): AvailabilitySlot[] {
 }
 export function saveDoctorAvailability(doctorId: string, slots: AvailabilitySlot[]) {
   save(`availability_${doctorId}`, slots);
+  notifyMutation();
   
   if (isSupabaseConfigured) {
     // Basic sync: delete old slots for this doctor, insert new
@@ -498,7 +565,7 @@ export function ensureUserEntityExists(user: any) {
       saveSalesRep({
         id: generateId(), userId: uid, name, email, phone,
         pharmaId: null as any, pharmaName: org || 'Independent Pharma',
-        target: 500, visitsThisMonth: 0
+        target: 500, visitsThisMonth: 0, credits: 0
       });
     }
   } else if (role === 'hospital') {

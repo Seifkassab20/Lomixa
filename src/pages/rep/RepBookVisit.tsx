@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   getDoctors, saveVisit, saveDoctor, getSalesReps, getPharmaCompanies, savePharmaCompany,
-  generateId, Visit, VisitType, pushNotification, Doctor
+  generateId, Visit, VisitType, pushNotification, Doctor, saveSalesRep
 } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -45,9 +45,7 @@ export function RepBookVisit() {
     const myRep = reps.find(r => r.userId === userId);
     if (myRep) {
       setRepData({ id: myRep.id, pharmaId: myRep.pharmaId, pharmaName: myRep.pharmaName, name: myRep.name });
-      const companies = getPharmaCompanies();
-      const company = companies.find(c => c.id === myRep.pharmaId);
-      setCredits(company?.credits || 0);
+      setCredits(myRep.credits || 0);
     }
   };
 
@@ -108,11 +106,11 @@ export function RepBookVisit() {
     );
     saveDoctor({ ...selectedDoctor, availability: updatedAvail });
 
-    const companies = getPharmaCompanies();
-    const mine = companies.find(c => c.id === repData.pharmaId);
-    if (mine) {
-      savePharmaCompany({ ...mine, credits: mine.credits - 1 });
-      setCredits(c => c - 1);
+    const reps = getSalesReps();
+    const myRep = reps.find(r => r.id === repData.id);
+    if (myRep) {
+      saveSalesRep({ ...myRep, credits: Math.max((myRep.credits || 0) - 1, 0) });
+      setCredits(c => Math.max(c - 1, 0));
     }
 
     if (userId) {
@@ -381,7 +379,7 @@ export function RepBookVisit() {
 
               {credits < 1 && (
                 <p className="text-xs text-center text-amber-600 dark:text-amber-400">
-                  {t('outOfCreditsMsg') || 'Your company is out of visit credits. Ask your manager to purchase a bundle.'}
+                  {t('outOfPersonalCreditsMsg') || 'You are out of visit credits. Contact your manager to allocate more credits to your account.'}
                 </p>
               )}
               {credits > 0 && credits <= 5 && (

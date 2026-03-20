@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getSalesReps, saveSalesRep, deleteSalesRep, generateId, SalesRep, getPharmaCompanies, getVisits } from '@/lib/store';
+import { getSalesReps, saveSalesRep, deleteSalesRep, generateId, SalesRep, getPharmaCompanies, getVisits, allocateCreditsToRep } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,15 +7,19 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Users, Plus, Trash2, Edit2, X, Phone, Mail, Target, TrendingUp, Trophy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useToast } from '@/components/ui/Toast';
 
 export function PharmaSubordinates() {
   const { userId } = useAuth();
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [reps, setReps] = useState<SalesRep[]>([]);
   const [repVisitCounts, setRepVisitCounts] = useState<Record<string, number>>({});
   const [showForm, setShowForm] = useState(false);
   const [editingRep, setEditingRep] = useState<SalesRep | null>(null);
   const [form, setForm] = useState({ name: '', email: '', phone: '', target: 25 });
+  const [allocationRep, setAllocationRep] = useState<SalesRep | null>(null);
+  const [allocationAmount, setAllocationAmount] = useState(10);
 
   const pharmaCompanies = getPharmaCompanies();
   const myCompany = pharmaCompanies.find(c => c.userId === userId);
@@ -53,12 +57,14 @@ export function PharmaSubordinates() {
       pharmaName: myCompany.name,
       visitsThisMonth: editingRep?.visitsThisMonth || 0,
       target: form.target,
+      credits: editingRep?.credits || 0,
     };
     saveSalesRep(rep);
     loadData();
     setShowForm(false);
     setEditingRep(null);
     setForm({ name: '', email: '', phone: '', target: 25 });
+    toast(editingRep ? t('repUpdated') || 'Representative updated successfully' : t('repAdded') || 'Representative added successfully', 'success');
   };
 
   const handleEdit = (rep: SalesRep) => {
@@ -71,6 +77,20 @@ export function PharmaSubordinates() {
     if (confirm(t('removeRepConfirm') || 'Remove this sales representative?')) {
       deleteSalesRep(id);
       setReps(prev => prev.filter(r => r.id !== id));
+      toast(t('repDeleted') || 'Representative removed', 'success');
+    }
+  };
+
+  const handleAllocateCredits = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!allocationRep) return;
+    const success = allocateCreditsToRep(allocationRep.id, allocationAmount);
+    if (success) {
+      toast(t('creditsAllocated') || `Allocated ${allocationAmount} credits to ${allocationRep.name}`, 'success');
+      setAllocationRep(null);
+      loadData();
+    } else {
+      toast(t('allocationFailed') || 'Allocation failed (insufficient company credits)', 'error');
     }
   };
 
@@ -158,6 +178,25 @@ export function PharmaSubordinates() {
         </div>
       )}
 
+      {allocationRep && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-sm border dark:border-slate-700 shadow-2xl">
+            <h2 className="text-xl font-bold dark:text-white mb-4">{t('allocateCreditsTo') || 'Allocate Credits to'} {allocationRep.name}</h2>
+            <form onSubmit={handleAllocateCredits} className="space-y-4">
+              <div>
+                <Label className="dark:text-slate-300">{t('amount') || 'Amount'}</Label>
+                <Input type="number" value={allocationAmount} onChange={e => setAllocationAmount(parseInt(e.target.value) || 0)} min={1} required className="mt-1 dark:bg-slate-800 dark:border-slate-600 dark:text-white" />
+                <p className="text-xs text-gray-500 mt-2">{t('companyCreditsAvailable') || 'Company Credits'}: {myCompany?.credits}</p>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <Button type="button" variant="outline" onClick={() => setAllocationRep(null)} className="flex-1 dark:border-slate-600 dark:text-slate-300">{t('cancel') || 'Cancel'}</Button>
+                <Button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">{t('allocate') || 'Allocate'}</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {reps.length === 0 ? (
         <div className="bg-white dark:bg-slate-800/30 border dark:border-slate-700 rounded-xl p-12 flex flex-col items-center justify-center text-center">
           <Users className="h-12 w-12 text-gray-300 dark:text-slate-600 mb-4" />
@@ -200,6 +239,15 @@ export function PharmaSubordinates() {
                 <div className="space-y-2 text-sm text-gray-500 dark:text-slate-400 mb-4">
                   {rep.email && <div className="flex items-center gap-2"><Mail className="h-3.5 w-3.5" />{rep.email}</div>}
                   {rep.phone && <div className="flex items-center gap-2"><Phone className="h-3.5 w-3.5" />{rep.phone}</div>}
+                </div>
+                <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl mb-4 border dark:border-slate-700">
+                  <div>
+                    <div className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">{t('availableCredits') || 'Available Credits'}</div>
+                    <div className="text-lg font-bold text-gray-900 dark:text-white leading-none mt-1">{rep.credits || 0}</div>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => setAllocationRep(rep)} className="h-8 text-xs gap-1.5 border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10">
+                    <Plus className="h-3 w-3" /> {t('giveCredits') || 'Give Credits'}
+                  </Button>
                 </div>
                 <div>
                   <div className="flex justify-between text-xs mb-1">
