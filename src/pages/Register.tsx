@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Stethoscope, Building2, Activity, Briefcase, Eye, ArrowRight, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
+import { useToast } from '@/components/ui/Toast';
 
 export function Register() {
   const [email, setEmail] = useState('');
@@ -19,6 +20,7 @@ export function Register() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
+  const { toast } = useToast();
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,13 +29,16 @@ export function Register() {
 
     try {
       if (!selectedRole) {
+        toast('Please identify your identity first.', 'error');
         throw new Error('Please select a role to continue.');
       }
       if (!name.trim()) {
+        toast('Your full name or organization name is required.', 'error');
         throw new Error('Please enter your full name.');
       }
-      if (!email.trim()) {
-        throw new Error('Please enter your email.');
+      if (!email.trim() || !password.trim()) {
+        toast('Email and security key are necessary to create your network.', 'error');
+        throw new Error('Essential field empty.');
       }
 
       // --- DEMO MODE (no Supabase configured) ---
@@ -46,6 +51,9 @@ export function Register() {
         window.location.href = '/';
         return;
       }
+
+      // Signal the intended role for the AuthProvider
+      localStorage.setItem('lomixa_target_role', selectedRole);
 
       // --- SUPABASE MODE ---
       const { data, error } = await supabase.auth.signUp({
@@ -78,9 +86,21 @@ export function Register() {
         throw error;
       }
 
+      // Fetch the canonical user data to ensure metadata is synced correctly
+      const { data: { user: freshUser } } = await supabase.auth.getUser();
+
+      // Check if user already exists with a different role
+      const actualRole = freshUser?.user_metadata?.role;
+      if (actualRole && actualRole !== selectedRole) {
+        await supabase.auth.signOut();
+        throw new Error(`This email is already registered as a ${actualRole}. Please log in using the correct role.`);
+      }
+
       navigate('/', { replace: true });
     } catch (err: any) {
-      setError(err.message || 'Failed to register');
+      const msg = err.message || 'Failed to register';
+      setError(msg);
+      toast(msg, 'error');
     } finally {
       setLoading(false);
     }

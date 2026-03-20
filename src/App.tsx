@@ -29,45 +29,49 @@ import { DoctorBookings } from './pages/doctor/DoctorBookings';
 import { RepBookVisit } from './pages/rep/RepBookVisit';
 import { RepMyVisits } from './pages/rep/RepMyVisits';
 
+import { ToastProvider } from './components/ui/Toast';
+
 export default function App() {
   return (
     <ThemeProvider defaultTheme="dark" storageKey="lomixa-theme">
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
+      <ToastProvider>
+        <BrowserRouter>
+          <AuthProvider>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
 
-            <Route path="/" element={<Layout />}>
-              <Route index element={<Dashboard />} />
+              <Route path="/" element={<Layout />}>
+                <Route index element={<Dashboard />} />
 
-              {/* Pharma */}
-              <Route path="subordinates" element={<PharmaSubordinates />} />
-              <Route path="analytics" element={<PharmaAnalytics />} />
-              <Route path="bundles" element={<PharmaBundles />} />
+                {/* Pharma */}
+                <Route path="subordinates" element={<PharmaSubordinates />} />
+                <Route path="analytics" element={<PharmaAnalytics />} />
+                <Route path="bundles" element={<PharmaBundles />} />
 
-              {/* Hospital */}
-              <Route path="doctors" element={<ManageDoctors />} />
-              <Route path="hospital-analytics" element={<HospitalAnalytics />} />
+                {/* Hospital */}
+                <Route path="doctors" element={<ManageDoctors />} />
+                <Route path="hospital-analytics" element={<HospitalAnalytics />} />
 
-              {/* Doctor */}
-              <Route path="schedule" element={<DoctorSchedule />} />
-              <Route path="my-bookings" element={<DoctorBookings />} />
+                {/* Doctor */}
+                <Route path="schedule" element={<DoctorSchedule />} />
+                <Route path="my-bookings" element={<DoctorBookings />} />
 
-              {/* Rep */}
-              <Route path="book" element={<RepBookVisit />} />
-              <Route path="visits" element={<RepMyVisits />} />
+                {/* Rep */}
+                <Route path="book" element={<RepBookVisit />} />
+                <Route path="visits" element={<RepMyVisits />} />
 
-              {/* Shared */}
-              <Route path="bookings" element={<BookingsPage />} />
-              <Route path="notifications" element={<NotificationsPage />} />
-              <Route path="settings" element={<SettingsPage />} />
-            </Route>
+                {/* Shared */}
+                <Route path="bookings" element={<BookingsPage />} />
+                <Route path="notifications" element={<NotificationsPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+              </Route>
 
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </AuthProvider>
+        </BrowserRouter>
+      </ToastProvider>
     </ThemeProvider>
   );
 }

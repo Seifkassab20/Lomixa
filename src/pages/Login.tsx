@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Stethoscope, Building2, Activity, Briefcase, Eye, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
+import { useToast } from '@/components/ui/Toast';
 
 export function Login() {
   const [email, setEmail] = useState('');
@@ -18,11 +19,13 @@ export function Login() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { t, i18n } = useTranslation();
+  const { toast } = useToast();
 
-  if (user) {
-    navigate('/', { replace: true });
-    return null;
-  }
+  React.useEffect(() => {
+    if (user && !loading) {
+      navigate('/', { replace: true });
+    }
+  }, [user, loading, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +34,12 @@ export function Login() {
 
     try {
       if (!selectedRole) {
+        toast('Please identify your role first.', 'error');
         throw new Error('Please select a role to continue.');
+      }
+      if (!email.trim() || !password.trim()) {
+        toast('Please enter both your email and security key.', 'error');
+        throw new Error('Credential mismatch check failed.');
       }
 
       // Demo mode — no Supabase configured
@@ -43,7 +51,10 @@ export function Login() {
         return;
       }
 
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      // Signal the intended role for the AuthProvider to enforce
+      localStorage.setItem('lomixa_target_role', selectedRole);
+
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
       if (error) {
         // Network / config errors → fall back to demo
@@ -61,9 +72,21 @@ export function Login() {
         }
         throw error;
       }
+
+      // Force-fetch the latest user data to ensure metadata is sync'd
+      const { data: { user: freshUser } } = await supabase.auth.getUser();
+      
+      const actualRole = freshUser?.user_metadata?.role;
+      if (actualRole && actualRole !== selectedRole) {
+        await supabase.auth.signOut();
+        throw new Error(`Invalid role. This account is registered as a ${actualRole}. Please select the ${actualRole} role to sign in.`);
+      }
+
       navigate('/', { replace: true });
     } catch (err: any) {
-      setError(err.message || 'Failed to login');
+      const msg = err.message || 'Failed to login';
+      setError(msg);
+      toast(msg, 'error');
     } finally {
       setLoading(false);
     }
