@@ -29,52 +29,53 @@ export function Sidebar() {
 
   const getLinks = () => {
     const base = [
-      { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+      { key: 'dashboard', name: t('dashboard'), href: '/', icon: LayoutDashboard },
     ];
 
     switch (role) {
       case 'pharma': return [
         ...base,
-        { name: 'Subordinates', href: '/subordinates', icon: Users },
-        { name: 'Manage Doctors', href: '/doctors', icon: Stethoscope },
-        { name: 'Analytics', href: '/analytics', icon: Activity },
-        { name: 'Buy Bundle', href: '/bundles', icon: CreditCard },
-        { name: 'Bookings', href: '/bookings', icon: Calendar },
-        { name: 'Notifications', href: '/notifications', icon: Bell, badge: notifCount },
-        { name: 'Settings', href: '/settings', icon: Settings },
+        { key: 'subordinates', name: t('subordinates'), href: '/subordinates', icon: Users },
+        { key: 'manageDoctors', name: t('manageDoctors'), href: '/doctors', icon: Stethoscope },
+        { key: 'analytics', name: t('analytics'), href: '/analytics', icon: Activity },
+        { key: 'buyBundle', name: t('buyBundle'), href: '/bundles', icon: CreditCard },
+        { key: 'allBookings', name: t('allBookings'), href: '/bookings', icon: Calendar },
+        { key: 'notifications', name: t('notifications'), href: '/notifications', icon: Bell, badge: notifCount },
+        { key: 'settings', name: t('settings'), href: '/settings', icon: Settings },
       ];
       case 'hospital': return [
         ...base,
-        { name: 'Manage Doctors', href: '/doctors', icon: Stethoscope },
-        { name: 'Analytics', href: '/hospital-analytics', icon: Activity },
-        { name: 'All Bookings', href: '/bookings', icon: Calendar },
-        { name: 'Notifications', href: '/notifications', icon: Bell, badge: notifCount },
-        { name: 'Settings', href: '/settings', icon: Settings },
+        { key: 'manageDoctors', name: t('manageDoctors'), href: '/doctors', icon: Stethoscope },
+        { key: 'analytics', name: t('analytics'), href: '/hospital-analytics', icon: Activity },
+        { key: 'allBookings', name: t('allBookings'), href: '/bookings', icon: Calendar },
+        { key: 'notifications', name: t('notifications'), href: '/notifications', icon: Bell, badge: notifCount },
+        { key: 'settings', name: t('settings'), href: '/settings', icon: Settings },
       ];
       case 'doctor': return [
         ...base,
-        { name: 'My Bookings', href: '/my-bookings', icon: BookOpen },
-        { name: 'My Schedule', href: '/schedule', icon: Clock },
-        { name: 'Notifications', href: '/notifications', icon: Bell, badge: notifCount },
-        { name: 'Settings', href: '/settings', icon: Settings },
+        { key: 'myBookings', name: t('myBookings'), href: '/my-bookings', icon: BookOpen },
+        { key: 'mySchedule', name: t('mySchedule'), href: '/schedule', icon: Clock },
+        { key: 'notifications', name: t('notifications'), href: '/notifications', icon: Bell, badge: notifCount },
+        { key: 'settings', name: t('settings'), href: '/settings', icon: Settings },
       ];
       case 'rep': return [
         ...base,
-        { name: 'Book Visit', href: '/book', icon: Plus },
-        { name: 'My Visits', href: '/visits', icon: Calendar },
-        { name: 'Notifications', href: '/notifications', icon: Bell, badge: notifCount },
-        { name: 'Settings', href: '/settings', icon: Settings },
+        { key: 'bookVisit', name: t('bookVisit'), href: '/book', icon: Plus },
+        { key: 'myVisits', name: t('myVisits'), href: '/visits', icon: Calendar },
+        { key: 'notifications', name: t('notifications'), href: '/notifications', icon: Bell, badge: notifCount },
+        { key: 'settings', name: t('settings'), href: '/settings', icon: Settings },
       ];
       default: return base;
     }
   };
 
   const links = getLinks();
-  const roleLabels: Record<string, string> = {
-    pharma: 'Pharma Company',
-    hospital: 'Hospital / Clinic',
-    doctor: 'Doctor',
-    rep: 'Sales Rep',
+
+  const roleSubtitleKey: Record<string, string> = {
+    pharma: 'pharmaCompany',
+    hospital: 'hospital',
+    doctor: 'doctor',
+    rep: 'salesRepShort',
   };
 
   return (
@@ -84,13 +85,17 @@ export function Sidebar() {
     )}>
       {/* Logo */}
       <div className={cn('h-16 flex items-center border-b border-gray-200 dark:border-slate-800', collapsed ? 'px-4 justify-center' : 'px-5 gap-3')}>
-        <div className="h-8 w-8 rounded-lg bg-emerald-500 flex items-center justify-center shrink-0">
-          <Stethoscope className="h-4 w-4 text-white" />
+        <div className="h-8 w-8 rounded-full bg-white flex items-center justify-center shrink-0 border border-emerald-500/20 shadow-sm overflow-hidden">
+          <img src="/logo.png" alt="Logo" className="h-full w-full object-cover" />
         </div>
         {!collapsed && (
           <div className="overflow-hidden">
-            <div className="text-sm font-bold text-gray-900 dark:text-white leading-tight whitespace-nowrap tracking-widest">LOMIXA</div>
-            <div className="text-[10px] text-gray-400 dark:text-slate-500 whitespace-nowrap">{roleLabels[role || ''] || 'Portal'}</div>
+            <div className="text-sm font-bold text-gray-900 dark:text-white leading-tight whitespace-nowrap tracking-widest">
+              {t('appName')}
+            </div>
+            <div className="text-[10px] text-gray-400 dark:text-slate-500 whitespace-nowrap">
+              {role ? t(roleSubtitleKey[role] || 'dashboard') : 'Portal'}
+            </div>
           </div>
         )}
       </div>
@@ -103,7 +108,7 @@ export function Sidebar() {
             const isActive = location.pathname === link.href || (link.href !== '/' && location.pathname.startsWith(link.href));
             const badge = (link as any).badge;
             return (
-              <li key={link.name}>
+              <li key={link.key}>
                 <Link
                   to={link.href}
                   title={collapsed ? link.name : undefined}
@@ -126,7 +131,10 @@ export function Sidebar() {
                     </span>
                   )}
                   {collapsed && (
-                    <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none">
+                    <div className={cn(
+                      'absolute px-2 py-1 bg-gray-900 text-white text-xs rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none',
+                      isRTL ? 'right-full mr-2' : 'left-full ml-2'
+                    )}>
                       {link.name}
                     </div>
                   )}
@@ -140,9 +148,15 @@ export function Sidebar() {
       {/* Collapse toggle */}
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="absolute -right-3 top-20 h-6 w-6 rounded-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors shadow-sm z-10"
+        className={cn(
+          'absolute top-20 h-6 w-6 rounded-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors shadow-sm z-10',
+          isRTL ? '-left-3' : '-right-3'
+        )}
       >
-        {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
+        {isRTL
+          ? (collapsed ? <ChevronLeft className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />)
+          : (collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />)
+        }
       </button>
     </div>
   );

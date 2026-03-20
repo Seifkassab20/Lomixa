@@ -118,13 +118,9 @@ export function Register() {
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-black/10 rounded-full blur-3xl translate-y-1/3 -translate-x-1/3"></div>
 
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-16">
-            <div className="h-12 w-12 rounded-xl border border-white/20 flex items-center justify-center bg-white/10 backdrop-blur-sm">
-              <Stethoscope className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight">LOMIXA</h1>
-              <p className="text-[10px] font-semibold tracking-widest uppercase text-emerald-100/80">KSA Pharma Connect</p>
+          <div className="mb-16">
+            <div className="bg-white rounded-full p-2 w-32 h-32 flex items-center justify-center shadow-xl border-4 border-white/20">
+              <img src="/logo.png" alt="Lomixa Logo" className="w-full h-full object-contain rounded-full" />
             </div>
           </div>
 

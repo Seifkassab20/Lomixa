@@ -1,7 +1,30 @@
 @import "tailwindcss";
 
+/* ── Dark mode: triggered by .dark class on <html> ── */
+@variant dark (&:where(.dark, .dark *));
+
+/* ── Smooth color transitions on theme switch ── */
 @layer base {
+  *, *::before, *::after {
+    transition-property: background-color, border-color, color, fill, stroke;
+    transition-duration: 200ms;
+    transition-timing-function: ease;
+  }
+
+  /* Scrollbar styling */
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* Light Mode defaults */
+  :root {
+    color-scheme: light;
+  }
+
+  /* Dark Mode defaults */
   .dark {
+    color-scheme: dark;
+
+    /* FullCalendar dark overrides */
     --fc-page-bg-color: #0f172a;
     --fc-neutral-bg-color: #1e293b;
     --fc-neutral-text-color: #94a3b8;

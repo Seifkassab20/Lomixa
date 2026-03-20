@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
-import { getVisits, getDoctors, saveDoctor, generateId, getDoctorAvailability } from '@/lib/store';
+import { getVisits, getDoctors, saveDoctor, generateId } from '@/lib/store';
 import { Calendar, Clock, CheckCircle2, DollarSign, Video, Phone, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { JitsiMeeting } from '@/components/JitsiMeeting';
 import { cn } from '@/lib/utils';
+import { useTranslation } from 'react-i18next';
 
 export function DoctorDashboard() {
   const { userId, user } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [visits, setVisits] = useState<ReturnType<typeof getVisits>>([]);
   const [doctorId, setDoctorId] = useState('');
   const [meetingRoom, setMeetingRoom] = useState<string | null>(null);
@@ -46,6 +48,10 @@ export function DoctorDashboard() {
 
   const TYPE_ICONS = { 'In Person': MapPin, Video, Call: Phone, Text: Clock };
 
+  const statusLabel: Record<string, string> = {
+    Pending: t('pending'), Confirmed: t('confirmed'), Completed: t('completed'), Cancelled: t('cancelled'),
+  };
+
   return (
     <div className="space-y-6">
       {meetingRoom && <JitsiMeeting roomName={meetingRoom} displayName="Doctor" onClose={() => setMeetingRoom(null)} />}
@@ -53,10 +59,10 @@ export function DoctorDashboard() {
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Visits Today", value: todayVisits.length, sub: `${confirmedToday.length} confirmed`, icon: Calendar, color: 'emerald' },
-          { label: "Pending Requests", value: pendingVisits.length, sub: "Need your action", icon: Clock, color: 'amber' },
-          { label: "Total Visits", value: visits.length, sub: `${visits.filter(v => v.status === 'Completed').length} completed`, icon: CheckCircle2, color: 'blue' },
-          { label: "Earnings (SAR)", value: `﷼${(visits.filter(v => v.status === 'Completed').length * 150).toLocaleString()}`, sub: "Est. from visits", icon: DollarSign, color: 'purple' },
+          { label: t('visitsTodayLabel'), value: todayVisits.length, sub: `${confirmedToday.length} ${t('confirmed')}`, icon: Calendar, color: 'emerald' },
+          { label: t('pendingRequests'), value: pendingVisits.length, sub: t('needYourAction'), icon: Clock, color: 'amber' },
+          { label: t('totalVisitsLabel'), value: visits.length, sub: `${visits.filter(v => v.status === 'Completed').length} ${t('completedVisitsStat')}`, icon: CheckCircle2, color: 'blue' },
+          { label: t('earnings'), value: `﷼${(visits.filter(v => v.status === 'Completed').length * 150).toLocaleString()}`, sub: t('estFromVisits'), icon: DollarSign, color: 'purple' },
         ].map(({ label, value, sub, icon: Icon, color }) => (
           <div key={label} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
             <div className="flex items-center justify-between mb-3">
@@ -75,11 +81,11 @@ export function DoctorDashboard() {
         {/* Pending Requests */}
         <div className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold dark:text-white">Pending Requests</h3>
-            <button onClick={() => navigate('/bookings')} className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline">View All</button>
+            <h3 className="font-semibold dark:text-white">{t('pendingRequests')}</h3>
+            <button onClick={() => navigate('/my-bookings')} className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline">{t('viewAll')}</button>
           </div>
           {pendingVisits.length === 0 ? (
-            <div className="py-8 text-center text-sm text-gray-400 dark:text-slate-500">No pending requests. Update your schedule to receive visits.</div>
+            <div className="py-8 text-center text-sm text-gray-400 dark:text-slate-500">{t('noPendingRequests')}</div>
           ) : (
             <div className="space-y-3">
               {pendingVisits.slice(0, 3).map(visit => {
@@ -89,12 +95,12 @@ export function DoctorDashboard() {
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-sm font-medium dark:text-white">{visit.pharmaName}</div>
-                        <div className="text-xs text-gray-500 dark:text-slate-400">Rep: {visit.repName} • {visit.visitType}</div>
+                        <div className="text-xs text-gray-500 dark:text-slate-400">{t('rep')}: {visit.repName} • {visit.visitType}</div>
                         <div className="text-xs text-gray-400 dark:text-slate-500 mt-1">{visit.date} at {visit.time}</div>
                       </div>
                       <div className="flex flex-col gap-1">
-                        <Button size="sm" className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => navigate('/bookings')}>
-                          Review
+                        <Button size="sm" className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => navigate('/my-bookings')}>
+                          {t('review')}
                         </Button>
                       </div>
                     </div>
@@ -108,11 +114,11 @@ export function DoctorDashboard() {
         {/* Today's Schedule */}
         <div className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold dark:text-white">Today's Visits</h3>
+            <h3 className="font-semibold dark:text-white">{t('todayVisits')}</h3>
             <span className="text-xs text-gray-400 dark:text-slate-500">{new Date().toLocaleDateString('en-SA', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
           </div>
           {todayVisits.length === 0 ? (
-            <div className="py-8 text-center text-sm text-gray-400 dark:text-slate-500">No visits scheduled for today.</div>
+            <div className="py-8 text-center text-sm text-gray-400 dark:text-slate-500">{t('noVisitsToday')}</div>
           ) : (
             <div className="space-y-3">
               {todayVisits.map(visit => {
@@ -130,7 +136,7 @@ export function DoctorDashboard() {
                     </div>
                     {visit.status === 'Confirmed' && visit.visitType === 'Video' && (
                       <Button size="sm" onClick={() => setMeetingRoom(`lomixa_${visit.id}`)} className="h-7 text-xs gap-1 bg-blue-600 hover:bg-blue-700 text-white">
-                        <Video className="h-3 w-3" /> Join
+                        <Video className="h-3 w-3" /> {t('join')}
                       </Button>
                     )}
                   </div>
@@ -144,9 +150,9 @@ export function DoctorDashboard() {
       {/* Quick Actions */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {[
-          { label: 'My Bookings', href: '/bookings', icon: Calendar },
-          { label: 'My Schedule', href: '/schedule', icon: Clock },
-          { label: 'Settings', href: '/settings', icon: CheckCircle2 },
+          { label: t('myBookings'), href: '/my-bookings', icon: Calendar },
+          { label: t('mySchedule'), href: '/schedule', icon: Clock },
+          { label: t('settings'), href: '/settings', icon: CheckCircle2 },
         ].map(({ label, href, icon: Icon }) => (
           <button key={label} onClick={() => navigate(href)} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5 flex flex-col items-center gap-3 hover:border-emerald-500/50 hover:shadow-md transition-all group">
             <div className="h-11 w-11 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">

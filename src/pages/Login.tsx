@@ -70,16 +70,18 @@ export function Login() {
   };
 
   const roles = [
-    { id: 'pharma', title: 'Pharma Company', desc: 'Manage reps, bundles & analytics', icon: Building2 },
-    { id: 'hospital', title: 'Hospital / Clinic', desc: 'Manage doctors & bookings', icon: Activity },
-    { id: 'doctor', title: 'Doctor', desc: 'Control schedule & accept visits', icon: Stethoscope },
-    { id: 'rep', title: 'Sales Representative', desc: 'Book visits with doctors', icon: Briefcase },
+    { id: 'pharma', title: t('pharmaCompanyFull'), desc: t('pharmaDesc'), icon: Building2 },
+    { id: 'hospital', title: t('hospital'), desc: t('hospitalDesc'), icon: Activity },
+    { id: 'doctor', title: t('doctor'), desc: t('doctorDesc'), icon: Stethoscope },
+    { id: 'rep', title: t('salesRep'), desc: t('salesRepDesc'), icon: Briefcase },
   ];
 
   const toggleLanguage = () => {
     const newLang = i18n.language === 'en' ? 'ar' : 'en';
     i18n.changeLanguage(newLang);
     document.documentElement.dir = newLang === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.lang = newLang;
+    localStorage.setItem('lomixa_lang', newLang);
   };
 
   return (
@@ -91,26 +93,22 @@ export function Login() {
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-black/10 rounded-full blur-3xl translate-y-1/3 -translate-x-1/3"></div>
 
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-16">
-            <div className="h-12 w-12 rounded-xl border border-white/20 flex items-center justify-center bg-white/10 backdrop-blur-sm">
-              <Stethoscope className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight">LOMIXA</h1>
-              <p className="text-[10px] font-semibold tracking-widest uppercase text-emerald-100/80">KSA Pharma Connect</p>
+          <div className="mb-16">
+            <div className="bg-white rounded-full p-2 w-32 h-32 flex items-center justify-center shadow-xl border-4 border-white/20">
+              <img src="/logo.png" alt="Lomixa Logo" className="w-full h-full object-contain rounded-full" />
             </div>
           </div>
 
           <div className="max-w-md">
             <h2 className="text-5xl lg:text-6xl font-extrabold leading-tight mb-6 tracking-tight">
-              Bridging Pharma &<br />
+              {t('bridgingPharma')} <br />
               <span className="relative inline-block">
-                Healthcare.
+                {t('healthcare')}
                 <div className="absolute bottom-2 left-0 w-full h-2 bg-emerald-400/50 -z-10"></div>
               </span>
             </h2>
             <p className="text-lg text-emerald-50/90 leading-relaxed mb-12">
-              LOMIXA is the premium platform connecting pharmaceutical companies and healthcare professionals across Saudi Arabia.
+              {t('platformDesc')}
             </p>
           </div>
         </div>
@@ -118,19 +116,19 @@ export function Login() {
         <div className="grid grid-cols-2 gap-4 relative z-10">
           <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-6">
             <div className="text-4xl font-bold mb-1">500+</div>
-            <div className="text-xs font-bold tracking-wider uppercase text-emerald-100">Active Doctors</div>
+            <div className="text-xs font-bold tracking-wider uppercase text-emerald-100">{t('activeDoctors')}</div>
           </div>
           <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-6">
             <div className="text-4xl font-bold mb-1">48</div>
-            <div className="text-xs font-bold tracking-wider uppercase text-emerald-100">Pharma Companies</div>
+            <div className="text-xs font-bold tracking-wider uppercase text-emerald-100">{t('pharmaCompanies')}</div>
           </div>
           <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-6">
             <div className="text-4xl font-bold mb-1">12K+</div>
-            <div className="text-xs font-bold tracking-wider uppercase text-emerald-100">Visits Scheduled</div>
+            <div className="text-xs font-bold tracking-wider uppercase text-emerald-100">{t('visitsScheduled')}</div>
           </div>
           <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-6">
             <div className="text-4xl font-bold mb-1">98%</div>
-            <div className="text-xs font-bold tracking-wider uppercase text-emerald-100">Satisfaction Rate</div>
+            <div className="text-xs font-bold tracking-wider uppercase text-emerald-100">{t('satisfactionRate')}</div>
           </div>
         </div>
       </div>
@@ -141,16 +139,16 @@ export function Login() {
           onClick={toggleLanguage}
           className="absolute top-8 right-8 text-slate-400 hover:text-white text-sm font-medium transition-colors"
         >
-          {i18n.language === 'en' ? 'عربي' : 'English'}
+          {i18n.language === 'en' ? t('switchToArabic') : t('switchToEnglish')}
         </button>
 
         <div className="w-full max-w-md bg-[#0f172a] rounded-[2rem] p-8 lg:p-10 border border-slate-800 shadow-2xl">
           <div className="mb-8">
             <h2 className="text-3xl font-bold text-white mb-2 flex items-center gap-2">
-              Welcome back <span className="text-2xl">👋</span>
+              {t('welcomeBack')}
             </h2>
             <p className="text-slate-400 text-sm">
-              Secure access to your global healthcare dashboard
+              {t('secureAccess')}
             </p>
           </div>
 
@@ -162,7 +160,7 @@ export function Login() {
             )}
 
             <div className="space-y-3">
-              <Label className="text-xs font-bold tracking-widest uppercase text-slate-500">Identify Your Role</Label>
+              <Label className="text-xs font-bold tracking-widest uppercase text-slate-500">{t('identifyRole')}</Label>
               <div className="grid grid-cols-2 gap-3">
                 {roles.map((r) => {
                   const Icon = r.icon;
@@ -199,7 +197,7 @@ export function Login() {
 
             <div className="space-y-4 pt-2">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium text-slate-300">Email Workspace</Label>
+                <Label htmlFor="email" className="text-sm font-medium text-slate-300">{t('emailWorkspace')}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -212,7 +210,7 @@ export function Login() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium text-slate-300">Security Key</Label>
+                <Label htmlFor="password" className="text-sm font-medium text-slate-300">{t('securityKey')}</Label>
                 <div className="relative">
                   <Input
                     id="password"
@@ -235,16 +233,16 @@ export function Login() {
               className="w-full h-12 rounded-xl bg-[#0d7a5b] hover:bg-[#0a6148] text-white font-medium flex items-center justify-center gap-2 transition-all"
               disabled={loading}
             >
-              {loading ? 'Connecting...' : 'Establish Connection'}
+              {loading ? t('connecting') : t('establishConnection')}
               {!loading && <ArrowRight className="h-4 w-4" />}
             </Button>
           </form>
 
           <div className="mt-8 text-center">
             <p className="text-sm text-slate-400">
-              New to the platform?{' '}
+              {t('newToPlatform')}{' '}
               <Link to="/register" className="font-medium text-emerald-400 hover:text-emerald-300 transition-colors">
-                Initiate Registration
+                {t('initiateRegistration')}
               </Link>
             </p>
           </div>

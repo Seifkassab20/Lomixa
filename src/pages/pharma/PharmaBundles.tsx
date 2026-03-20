@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CreditCard, Zap, Shield, Star, CheckCircle2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const BUNDLE_ICONS = [Zap, Star, Shield];
 const BUNDLE_COLORS = [
@@ -14,6 +15,7 @@ const BUNDLE_COLORS = [
 
 export function PharmaBundles() {
   const { userId } = useAuth();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [credits, setCredits] = useState(0);
@@ -30,7 +32,6 @@ export function PharmaBundles() {
     if (!bundle) return;
     setLoading(bundleId);
 
-    // Simulate payment processing
     await new Promise(r => setTimeout(r, 1500));
 
     const companies = getPharmaCompanies();
@@ -50,8 +51,8 @@ export function PharmaBundles() {
       if (userId) {
         pushNotification({
           userId,
-          title: 'Bundle Purchased',
-          message: `Successfully added ${bundle.credits} visit credits (${bundle.name} plan). Total: ${updated.credits} credits.`,
+          title: t('bundlePurchased') || 'Bundle Purchased',
+          message: `${t('successfullyAdded')} ${bundle.credits} ${t('visitCreditsLabel')} (${bundle.name} ${t('plan')}). ${t('total')}: ${updated.credits} ${t('credits')}.`,
           type: 'info',
         });
       }
@@ -66,16 +67,15 @@ export function PharmaBundles() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Buy Visit Bundles</h1>
-          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Purchase visit credits for your sales team</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('buyVisitBundles') || 'Buy Visit Bundles'}</h1>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">{t('purchaseCreditsTeam') || 'Purchase visit credits for your sales team'}</p>
         </div>
         <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-xl px-4 py-2">
           <CreditCard className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-          <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">{credits.toLocaleString()} credits available</span>
+          <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">{credits.toLocaleString()} {t('creditsAvailableLabel') || 'credits available'}</span>
         </div>
       </div>
 
-      {/* Bundles */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {bundles.map((bundle, i) => {
           const Icon = BUNDLE_ICONS[i];
@@ -91,7 +91,7 @@ export function PharmaBundles() {
             >
               {isPopular && (
                 <div className="absolute top-4 right-4">
-                  <Badge className="bg-emerald-500 text-white text-xs">Most Popular</Badge>
+                  <Badge className="bg-emerald-500 text-white text-xs">{t('mostPopular') || 'Most Popular'}</Badge>
                 </div>
               )}
               <div className="mb-6">
@@ -101,16 +101,16 @@ export function PharmaBundles() {
                 <h3 className="text-xl font-bold text-white">{bundle.name}</h3>
                 <div className="flex items-baseline gap-1 mt-2">
                   <span className="text-4xl font-bold text-white">﷼{bundle.price.toLocaleString()}</span>
-                  <span className="text-white/60 text-sm">SAR</span>
+                  <span className="text-white/60 text-sm">{t('sarCurrency') || 'SAR'}</span>
                 </div>
-                <div className="text-emerald-300 text-sm font-medium mt-1">{bundle.credits} Visit Credits</div>
+                <div className="text-emerald-300 text-sm font-medium mt-1">{bundle.credits} {t('visitCreditsLabel') || 'Visit Credits'}</div>
               </div>
 
               <ul className="space-y-3 mb-6">
                 {bundle.features.map(f => (
                   <li key={f} className="flex items-center gap-2 text-sm text-white/80">
                     <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                    {f}
+                    {t(f.replace(/\s+/g, '')) || f}
                   </li>
                 ))}
               </ul>
@@ -123,15 +123,15 @@ export function PharmaBundles() {
                 {isPurchasing ? (
                   <span className="flex items-center gap-2">
                     <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Processing...
+                    {t('processing') || 'Processing...'}
                   </span>
                 ) : justBought ? (
                   <span className="flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4" />
-                    Purchased!
+                    {t('purchased') || 'Purchased!'}
                   </span>
                 ) : (
-                  `Purchase ${bundle.name}`
+                  `${t('purchaseBtnPrefix') || 'Purchase'} ${bundle.name}`
                 )}
               </Button>
             </div>
@@ -139,14 +139,13 @@ export function PharmaBundles() {
         })}
       </div>
 
-      {/* Info */}
       <div className="bg-white dark:bg-slate-800/30 border dark:border-slate-700 rounded-xl p-6">
-        <h2 className="text-lg font-semibold dark:text-white mb-4">How Visit Credits Work</h2>
+        <h2 className="text-lg font-semibold dark:text-white mb-4">{t('howVisitCreditsWork') || 'How Visit Credits Work'}</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
-            { step: '1', title: 'Purchase a Bundle', desc: 'Buy visit credits for your pharma company using SAR' },
-            { step: '2', title: 'Assign to Reps', desc: 'Your sales representatives can use credits to book doctor visits' },
-            { step: '3', title: 'Track ROI', desc: 'Monitor performance and conversion rates in your analytics dashboard' },
+            { step: '1', title: t('purchaseABundle') || 'Purchase a Bundle', desc: t('buyVisitCreditsCompany') || 'Buy visit credits for your pharma company using SAR' },
+            { step: '2', title: t('assignToReps') || 'Assign to Reps', desc: t('salesRepsCanUseCredits') || 'Your sales representatives can use credits to book doctor visits' },
+            { step: '3', title: t('trackRoi') || 'Track ROI', desc: t('monitorPerformance') || 'Monitor performance and conversion rates in your analytics dashboard' },
           ].map(({ step, title, desc }) => (
             <div key={step} className="flex items-start gap-4">
               <div className="h-8 w-8 rounded-full bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-sm shrink-0">{step}</div>

@@ -4,15 +4,17 @@ import { getVisits, getDoctors, getHospitals, saveHospital, generateId } from '@
 import { Stethoscope, Calendar, Activity, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useTranslation } from 'react-i18next';
 
 export function HospitalDashboard() {
   const { userId, user } = useAuth();
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
+  const isRTL = i18n.language === 'ar';
   const [doctors, setDoctors] = useState<ReturnType<typeof getDoctors>>([]);
   const [visits, setVisits] = useState<ReturnType<typeof getVisits>>([]);
 
   useEffect(() => {
-    // Ensure hospital record exists
     const hospitals = getHospitals();
     let mine = hospitals.find(h => h.userId === userId);
     if (!mine && userId) {
@@ -24,31 +26,28 @@ export function HospitalDashboard() {
       };
       saveHospital(mine);
     }
-
-    const allDoctors = getDoctors().filter(d => d.hospitalId === mine?.id);
-    setDoctors(allDoctors);
-
-    const allVisits = getVisits().filter(v => v.hospitalId === mine?.id);
-    setVisits(allVisits);
+    setDoctors(getDoctors().filter(d => d.hospitalId === mine?.id));
+    setVisits(getVisits().filter(v => v.hospitalId === mine?.id));
   }, [userId]);
 
-  const monthlyData = (() => {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    return months.map((name, i) => ({
-      name,
-      visits: visits.filter(v => new Date(v.date).getMonth() === i).length,
-    }));
-  })();
+  const months = isRTL
+    ? ['يناير','فبراير','مارس','أبريل','مايو','يونيو']
+    : ['Jan','Feb','Mar','Apr','May','Jun'];
+
+  const monthlyData = months.map((name, i) => ({
+    name,
+    visits: visits.filter(v => new Date(v.date).getMonth() === i).length,
+  }));
 
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Doctors', value: doctors.length, sub: 'In your facility', icon: Stethoscope, color: 'emerald' },
-          { label: 'Visits This Week', value: visits.filter(v => { const d = new Date(v.date); const now = new Date(); const diff = (now.getTime() - d.getTime()) / 86400000; return diff <= 7; }).length, sub: `${visits.filter(v => v.status === 'Pending').length} pending`, icon: Calendar, color: 'blue' },
-          { label: 'Completed Visits', value: visits.filter(v => v.status === 'Completed').length, sub: 'All time', icon: Activity, color: 'amber' },
-          { label: 'Pharma Engagement', value: [...new Set(visits.map(v => v.pharmaId))].length, sub: 'Active companies', icon: Users, color: 'purple' },
+          { label: t('totalDoctors'), value: doctors.length, sub: t('inYourFacility'), icon: Stethoscope, color: 'emerald' },
+          { label: t('visitsThisWeek'), value: visits.filter(v => { const d = new Date(v.date); const now = new Date(); const diff = (now.getTime() - d.getTime()) / 86400000; return diff <= 7; }).length, sub: `${visits.filter(v => v.status === 'Pending').length} ${t('pendingCount')}`, icon: Calendar, color: 'blue' },
+          { label: t('completedVisits'), value: visits.filter(v => v.status === 'Completed').length, sub: t('completedVisitsAll'), icon: Activity, color: 'amber' },
+          { label: t('pharmaEngagement'), value: [...new Set(visits.map(v => v.pharmaId))].length, sub: t('activeCompanies'), icon: Users, color: 'purple' },
         ].map(({ label, value, sub, icon: Icon, color }) => (
           <div key={label} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
             <div className="flex items-center justify-between mb-3">
@@ -67,11 +66,11 @@ export function HospitalDashboard() {
         {/* Doctor List Preview */}
         <div className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold dark:text-white">Doctors Overview</h3>
-            <button onClick={() => navigate('/doctors')} className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline">Manage All</button>
+            <h3 className="font-semibold dark:text-white">{t('doctorsOverview')}</h3>
+            <button onClick={() => navigate('/doctors')} className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline">{t('manageAll')}</button>
           </div>
           {doctors.length === 0 ? (
-            <div className="py-8 text-center text-sm text-gray-400 dark:text-slate-500">No doctors added yet. Go to Manage Doctors to add them.</div>
+            <div className="py-8 text-center text-sm text-gray-400 dark:text-slate-500">{t('noDoctorsAdded')}</div>
           ) : (
             <div className="space-y-3">
               {doctors.slice(0, 4).map(doc => (
@@ -86,7 +85,7 @@ export function HospitalDashboard() {
                     </div>
                   </div>
                   <div className="text-xs text-emerald-600 dark:text-emerald-400">
-                    {doc.availability.filter(s => !s.isBooked).length} open
+                    {doc.availability.filter(s => !s.isBooked).length} {t('open')}
                   </div>
                 </div>
               ))}
@@ -96,7 +95,7 @@ export function HospitalDashboard() {
 
         {/* Visit Chart */}
         <div className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
-          <h3 className="font-semibold dark:text-white mb-4">Monthly Visit Activity</h3>
+          <h3 className="font-semibold dark:text-white mb-4">{t('monthlyVisitActivity')}</h3>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={monthlyData}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
@@ -112,9 +111,9 @@ export function HospitalDashboard() {
       {/* Quick Actions */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {[
-          { label: 'Manage Doctors', href: '/doctors', icon: Stethoscope },
-          { label: 'All Bookings', href: '/bookings', icon: Calendar },
-          { label: 'Analytics', href: '/analytics', icon: Activity },
+          { label: t('manageDoctors'), href: '/doctors', icon: Stethoscope },
+          { label: t('allBookings'), href: '/bookings', icon: Calendar },
+          { label: t('analytics'), href: '/hospital-analytics', icon: Activity },
         ].map(({ label, href, icon: Icon }) => (
           <button key={label} onClick={() => navigate(href)} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5 flex flex-col items-center gap-3 hover:border-emerald-500/50 hover:shadow-md transition-all group">
             <div className="h-11 w-11 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">

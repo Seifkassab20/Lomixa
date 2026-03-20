@@ -9,7 +9,7 @@ import { getNotifications } from '@/lib/store';
 
 export function Topbar() {
   const { user, signOut, role, userId } = useAuth();
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const [notifCount, setNotifCount] = useState(0);
@@ -29,24 +29,25 @@ export function Topbar() {
     i18n.changeLanguage(newLang);
     document.documentElement.dir = newLang === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.lang = newLang;
+    localStorage.setItem('lomixa_lang', newLang);
   };
 
   const toggleTheme = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark');
   };
 
-  const roleLabels: Record<string, string> = {
-    pharma: 'Pharma Company Portal',
-    hospital: 'Hospital Portal',
-    doctor: 'Doctor Portal',
-    rep: 'Sales Representative Portal',
+  const rolePortalKey: Record<string, string> = {
+    pharma: 'pharmaPortal',
+    hospital: 'hospitalPortal',
+    doctor: 'doctorPortal',
+    rep: 'repPortal',
   };
 
   return (
     <header className="h-16 bg-white dark:bg-[#0f172a] border-b border-gray-200 dark:border-slate-800 flex items-center justify-between px-6 transition-colors shrink-0">
       <div className="flex items-center gap-4">
         <h2 className="text-sm font-semibold text-gray-700 dark:text-slate-300">
-          {roleLabels[role || ''] || 'Dashboard'}
+          {role ? t(rolePortalKey[role] || 'dashboard') : t('dashboard')}
         </h2>
       </div>
       <div className="flex items-center gap-2">
@@ -58,13 +59,14 @@ export function Topbar() {
         {/* Language toggle */}
         <Button variant="ghost" size="sm" onClick={toggleLanguage} className="h-9 px-2 gap-1.5 text-slate-600 dark:text-slate-300 text-xs font-medium">
           <Globe className="h-4 w-4" />
-          {i18n.language === 'en' ? 'عربي' : 'EN'}
+          {i18n.language === 'en' ? t('switchToArabic') : t('switchToEnglish')}
         </Button>
 
         {/* Notifications */}
         <button
           onClick={() => navigate('/notifications')}
           className="relative h-9 w-9 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
+          title={t('notifications')}
         >
           <Bell className="h-5 w-5" />
           {notifCount > 0 && (
@@ -87,7 +89,7 @@ export function Topbar() {
             size="sm"
             onClick={signOut}
             className="h-8 w-8 p-0 text-gray-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400"
-            title="Sign out"
+            title={t('signOut')}
           >
             <LogOut className="h-4 w-4" />
           </Button>

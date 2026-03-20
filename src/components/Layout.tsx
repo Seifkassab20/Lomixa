@@ -4,11 +4,25 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { useTranslation } from 'react-i18next';
+import { useEffect } from 'react';
 
 export function Layout() {
-  const { user, loading } = useAuth();
-  const { i18n } = useTranslation();
+  const { user, role, loading } = useAuth();
+  const { t, i18n } = useTranslation();
   const isRTL = i18n.language === 'ar';
+
+  useEffect(() => {
+    const portalNames: Record<string, string> = {
+      pharma: t('pharmaCompanyFull'),
+      hospital: t('hospital'),
+      doctor: t('doctor'),
+      rep: t('salesRep')
+    };
+    
+    document.title = role 
+      ? `LOMIXA - ${portalNames[role] || 'Portal'}` 
+      : 'LOMIXA';
+  }, [role, i18n.language, t]);
 
   if (loading) {
     return (

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase, isSupabaseConfigured } from './supabase';
+import { ensureUserEntityExists } from './store';
 import { User } from '@supabase/supabase-js';
 
 type Role = 'pharma' | 'hospital' | 'doctor' | 'rep' | null;
@@ -29,18 +30,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user);
-        fetchUserRole(session.user.id);
+        const userRole = session.user.user_metadata?.role as Role;
+        if (userRole) {
+          setRole(userRole);
+          ensureUserEntityExists(session.user);
+          setLoading(false);
+        } else {
+          loadDemoSession();
+        }
       } else {
         loadDemoSession();
       }
-    }).catch(() => {
-      loadDemoSession();
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setUser(session.user);
-        fetchUserRole(session.user.id);
+        const userRole = session.user.user_metadata?.role as Role;
+        if (userRole) {
+          setRole(userRole);
+          ensureUserEntityExists(session.user);
+          setLoading(false);
+        } else {
+          loadDemoSession();
+        }
       } else {
         loadDemoSession();
       }
@@ -69,22 +82,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
   };
 
-  const fetchUserRole = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .single();
-      if (error) throw error;
-      setRole(data.role as Role);
-    } catch {
-      const storedRole = localStorage.getItem('demo_role') as Role;
-      if (storedRole) setRole(storedRole);
-    } finally {
+    // This is no longer needed since role is in user_metadata, 
+    // but we keep the stub to avoid runtime crashes if called elsewhere
+    const fetchUserRole = async (userId: string) => {
       setLoading(false);
-    }
-  };
+    };
 
   const signOut = async () => {
     if (isSupabaseConfigured) {

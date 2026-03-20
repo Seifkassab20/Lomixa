@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { getVisits, getSalesReps, Visit, VisitStatus } from '@/lib/store';
+import { getVisits, saveVisit, saveDoctor, getDoctors, getSalesReps, Visit, VisitStatus, pushNotification } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { JitsiMeeting } from '@/components/JitsiMeeting';
 import { Button } from '@/components/ui/button';
-import { Calendar, Video, Phone, MapPin, MessageSquare, Clock, History } from 'lucide-react';
+import { Calendar, Video, Phone, MapPin, MessageSquare, Clock, History, XCircle, FileText, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTranslation } from 'react-i18next';
 
 const STATUS_COLORS: Record<VisitStatus, string> = {
   Pending: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 border-amber-200 dark:border-amber-500/30',
@@ -17,12 +18,13 @@ const TYPE_ICONS = { 'In Person': MapPin, Video, Call: Phone, Text: MessageSquar
 
 export function RepMyVisits() {
   const { userId } = useAuth();
+  const { t, i18n } = useTranslation();
   const [visits, setVisits] = useState<Visit[]>([]);
   const [filter, setFilter] = useState('All');
   const [meetingRoom, setMeetingRoom] = useState<string | null>(null);
   const [repId, setRepId] = useState('');
 
-  useEffect(() => {
+  const loadVisits = () => {
     const reps = getSalesReps();
     const myRep = reps.find(r => r.userId === userId);
     setRepId(myRep?.id || '');
@@ -30,28 +32,58 @@ export function RepMyVisits() {
       const allVisits = getVisits().filter(v => v.repId === myRep.id);
       setVisits(allVisits.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
     }
+  };
+
+  useEffect(() => {
+    loadVisits();
+    const interval = setInterval(loadVisits, 10000);
+    return () => clearInterval(interval);
   }, [userId]);
+
+  const handleCancel = (visit: Visit) => {
+    if (!confirm(t('cancelVisitConfirm') || 'Cancel this visit booking?')) return;
+    const updated = { ...visit, status: 'Cancelled' as VisitStatus, cancelledByRep: true };
+    saveVisit(updated);
+    setVisits(prev => prev.map(v => v.id === visit.id ? updated : v));
+
+    const doctors = getDoctors();
+    const doc = doctors.find(d => d.id === visit.doctorId);
+    if (doc) {
+      const updatedSlots = doc.availability.map(s =>
+        s.date === visit.date && s.time === visit.time ? { ...s, isBooked: false } : s
+      );
+      saveDoctor({ ...doc, availability: updatedSlots });
+    }
+
+    if (userId) {
+      pushNotification({
+        userId,
+        title: t('visitCancelled') || 'Visit Cancelled',
+        message: `Your visit with ${visit.doctorName} on ${new Date(visit.date).toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-SA', { month: 'short', day: 'numeric' })} has been cancelled.`,
+        type: 'cancellation',
+      });
+    }
+  };
 
   const tabs = ['All', 'Pending', 'Confirmed', 'Completed', 'Cancelled'];
   const filtered = visits.filter(v => filter === 'All' || v.status === filter);
 
   return (
     <div className="space-y-6">
-      {meetingRoom && <JitsiMeeting roomName={meetingRoom} displayName="Sales Rep" onClose={() => setMeetingRoom(null)} />}
+      {meetingRoom && <JitsiMeeting roomName={meetingRoom} displayName={t('salesRep')} onClose={() => setMeetingRoom(null)} />}
 
       <div>
-        <h1 className="text-2xl font-bold dark:text-white">My Visits</h1>
-        <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">All your scheduled and past visits</p>
+        <h1 className="text-2xl font-bold dark:text-white">{t('myVisits')}</h1>
+        <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">{t('allYourVisits') || 'All your scheduled and past visits — updates every 10s'}</p>
       </div>
 
-      {/* Quick Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Total', value: visits.length, color: 'slate' },
-          { label: 'Pending', value: visits.filter(v => v.status === 'Pending').length, color: 'amber' },
-          { label: 'Confirmed', value: visits.filter(v => v.status === 'Confirmed').length, color: 'emerald' },
-          { label: 'Completed', value: visits.filter(v => v.status === 'Completed').length, color: 'blue' },
-        ].map(({ label, value, color }) => (
+          { label: t('all') || 'All', value: visits.length, color: 'slate' },
+          { label: t('pending') || 'Pending', value: visits.filter(v => v.status === 'Pending').length, color: 'amber' },
+          { label: t('confirmed') || 'Confirmed', value: visits.filter(v => v.status === 'Confirmed').length, color: 'emerald' },
+          { label: t('completed') || 'Completed', value: visits.filter(v => v.status === 'Completed').length, color: 'blue' },
+        ].map(({ label, value }) => (
           <div key={label} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-4">
             <div className="text-2xl font-bold dark:text-white">{value}</div>
             <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">{label}</div>
@@ -59,7 +91,6 @@ export function RepMyVisits() {
         ))}
       </div>
 
-      {/* Filter Tabs */}
       <div className="flex gap-1.5 flex-wrap">
         {tabs.map(tab => (
           <button
@@ -70,16 +101,15 @@ export function RepMyVisits() {
               filter === tab ? 'bg-emerald-600 text-white' : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-700'
             )}
           >
-            {tab} ({tab === 'All' ? visits.length : visits.filter(v => v.status === tab).length})
+            {t(tab.toLowerCase())} ({tab === 'All' ? visits.length : visits.filter(v => v.status === tab).length})
           </button>
         ))}
       </div>
 
-      {/* Visit List */}
       {filtered.length === 0 ? (
         <div className="bg-white dark:bg-slate-800/30 border dark:border-slate-700 rounded-xl p-12 text-center">
           <History className="h-10 w-10 text-gray-200 dark:text-slate-700 mx-auto mb-3" />
-          <p className="text-sm text-gray-500 dark:text-slate-400">No visits found in this category</p>
+          <p className="text-sm text-gray-500 dark:text-slate-400">{t('noVisitsCategory') || 'No visits found in this category'}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -87,7 +117,7 @@ export function RepMyVisits() {
             const TypeIcon = TYPE_ICONS[visit.visitType as keyof typeof TYPE_ICONS] || MapPin;
             return (
               <div key={visit.id} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                   <div className="flex items-start gap-4">
                     <div className="h-10 w-10 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
                       <TypeIcon className="h-5 w-5" />
@@ -96,20 +126,42 @@ export function RepMyVisits() {
                       <h4 className="font-semibold dark:text-white">{visit.doctorName}</h4>
                       <p className="text-sm text-gray-500 dark:text-slate-400">{visit.hospitalName}</p>
                       <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 dark:text-slate-500">
-                        <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{new Date(visit.date).toLocaleDateString('en-SA', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                        <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{new Date(visit.date).toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-SA', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
                         <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{visit.time}</span>
-                        <span>{visit.visitType}</span>
+                        <span>{t(visit.visitType.toLowerCase().replace(' ', '')) || visit.visitType}</span>
                       </div>
+                      {visit.notes && (
+                        <div className="mt-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 rounded-lg px-2.5 py-1.5 flex items-start gap-1.5 border dark:border-slate-700">
+                          <FileText className="h-3 w-3 mt-0.5 shrink-0" />
+                          <span className="italic">{visit.notes}</span>
+                        </div>
+                      )}
+                      {visit.outcomeNotes && (
+                        <div className="mt-2 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 rounded-lg px-2.5 py-1.5 flex items-start gap-1.5 border border-blue-200 dark:border-blue-500/20">
+                          <CheckCircle2 className="h-3 w-3 mt-0.5 shrink-0" />
+                          <span>{visit.outcomeNotes}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 shrink-0 mt-3 sm:mt-0">
                     {visit.status === 'Confirmed' && visit.visitType === 'Video' && (
                       <Button size="sm" onClick={() => setMeetingRoom(`lomixa_${visit.id}`)} className="gap-1 bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs">
-                        <Video className="h-3.5 w-3.5" /> Join
+                        <Video className="h-3.5 w-3.5" /> {t('join') || 'Join'}
                       </Button>
                     )}
-                    <span className={cn('px-3 py-1 text-xs rounded-full border font-medium', STATUS_COLORS[visit.status])}>
-                      {visit.status}
+                    {visit.status === 'Pending' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleCancel(visit)}
+                        className="gap-1 text-red-600 dark:text-red-400 border-red-200 dark:border-red-500/30 hover:bg-red-50 dark:hover:bg-red-500/10 h-8 text-xs"
+                      >
+                        <XCircle className="h-3.5 w-3.5" /> {t('cancelVisit') || 'Cancel'}
+                      </Button>
+                    )}
+                    <span className={cn('px-3 py-1 text-xs rounded-full border font-medium uppercase', STATUS_COLORS[visit.status])}>
+                      {t(visit.status.toLowerCase()) || visit.status}
                     </span>
                   </div>
                 </div>

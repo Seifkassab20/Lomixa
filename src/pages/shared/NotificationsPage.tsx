@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/auth';
 import { Bell, CheckCheck, Calendar, X, Info, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useTranslation } from 'react-i18next';
 
 const TYPE_ICONS = {
   booking: Calendar,
@@ -21,6 +22,7 @@ const TYPE_COLORS = {
 
 export function NotificationsPage() {
   const { userId } = useAuth();
+  const { t, i18n } = useTranslation();
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   const refresh = () => {
@@ -50,14 +52,14 @@ export function NotificationsPage() {
     <div className="space-y-6 max-w-2xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Notifications</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('notifications') || 'Notifications'}</h1>
           <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-            {unreadCount > 0 ? `${unreadCount} unread notifications` : 'All caught up!'}
+            {unreadCount > 0 ? t('nUnreadNotifications', { count: unreadCount }).replace('{{count}}', unreadCount.toString()) || `${unreadCount} unread notifications` : t('allCaughtUp') || 'All caught up!'}
           </p>
         </div>
         {unreadCount > 0 && (
           <Button variant="outline" size="sm" onClick={handleReadAll} className="gap-2 dark:border-slate-600 dark:text-slate-300">
-            <CheckCheck className="h-4 w-4" /> Mark all read
+            <CheckCheck className="h-4 w-4" /> {t('markAllRead') || 'Mark all read'}
           </Button>
         )}
       </div>
@@ -65,8 +67,8 @@ export function NotificationsPage() {
       {notifications.length === 0 ? (
         <div className="bg-white dark:bg-slate-800/30 border dark:border-slate-700 rounded-xl p-12 flex flex-col items-center text-center">
           <Bell className="h-12 w-12 text-gray-200 dark:text-slate-700 mb-4" />
-          <h3 className="text-base font-semibold text-gray-600 dark:text-slate-300">No notifications yet</h3>
-          <p className="text-sm text-gray-400 dark:text-slate-500">You'll see booking updates and alerts here</p>
+          <h3 className="text-base font-semibold text-gray-600 dark:text-slate-300">{t('noNotificationsYet') || 'No notifications yet'}</h3>
+          <p className="text-sm text-gray-400 dark:text-slate-500">{t('bookingUpdatesAlertsHere') || "You'll see booking updates and alerts here"}</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -88,13 +90,13 @@ export function NotificationsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <h4 className={cn('text-sm font-semibold', n.read ? 'text-gray-700 dark:text-slate-300' : 'text-gray-900 dark:text-white')}>
-                        {n.title}
+                        {t(n.title.toLowerCase().replace(/\s+/g, '')) || n.title}
                       </h4>
                       {!n.read && <div className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />}
                     </div>
                     <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5 leading-relaxed">{n.message}</p>
                     <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-1">
-                      {new Date(n.createdAt).toLocaleDateString('en-SA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      {new Date(n.createdAt).toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-SA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                 </div>
