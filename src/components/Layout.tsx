@@ -5,6 +5,7 @@ import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { useTranslation } from 'react-i18next';
 import { useEffect } from 'react';
+import { Copilot } from './Copilot';
 
 export function Layout() {
   const { user, role, loading } = useAuth();
@@ -47,11 +48,12 @@ export function Layout() {
       dir={isRTL ? 'rtl' : 'ltr'}
     >
       <Sidebar />
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden relative">
         <Topbar />
         <main className="flex-1 overflow-y-auto p-6">
           <Outlet />
         </main>
+        <Copilot />
       </div>
     </div>
   );

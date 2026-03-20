@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { JitsiMeeting } from '@/components/JitsiMeeting';
-import { Search, Video, Phone, MapPin, MessageSquare, Calendar, Clock, CheckCircle2, CreditCard, X, FileText } from 'lucide-react';
+import { Search, Video, Phone, MapPin, MessageSquare, Calendar, Clock, CheckCircle2, CreditCard, X, FileText, Sparkles, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 
@@ -62,6 +62,19 @@ export function RepBookVisit() {
   });
 
   const availableSlots = selectedDoctor?.availability.filter(s => !s.isBooked) || [];
+
+  // Lomixa Smart Matchmaker (AI Recommendation Engine)
+  const aiRecommendations = React.useMemo(() => {
+    if (search !== '' || specialtyFilter !== 'All') return [];
+    return [...filtered]
+      .filter(d => d.availability.some(s => !s.isBooked))
+      .sort((a, b) => {
+        const aSlots = a.availability.filter(s => !s.isBooked).length;
+        const bSlots = b.availability.filter(s => !s.isBooked).length;
+        return bSlots - aSlots; // Recommend doctors with the most open availability
+      })
+      .slice(0, 2);
+  }, [filtered, search, specialtyFilter]);
 
   const handleBook = () => {
     if (!selectedDoctor || !selectedSlot) return;
@@ -176,6 +189,58 @@ export function RepBookVisit() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-3">
+          
+          {/* AI RECOMMENDATIONS ENGINE */}
+          {aiRecommendations.length > 0 && (
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/10 dark:to-orange-900/10 border border-amber-200 dark:border-amber-700/50 rounded-xl p-4 mb-6 relative overflow-hidden">
+              <div className="flex items-center gap-2 mb-3 relative z-10">
+                <div className="h-6 w-6 rounded-md bg-gradient-to-tr from-amber-400 to-orange-500 flex items-center justify-center shadow-md">
+                  <Sparkles className="h-3.5 w-3.5 text-white" />
+                </div>
+                <h3 className="text-sm font-bold bg-clip-text text-transparent bg-gradient-to-r from-amber-600 to-orange-600 dark:from-amber-400 dark:to-orange-400">
+                  AI Smart Matchmaker
+                </h3>
+                <span className="ml-auto text-xs font-medium text-amber-700/70 dark:text-amber-400/70 flex items-center gap-1">
+                  <Zap className="h-3 w-3" /> Recommended for you
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 relative z-10">
+                {aiRecommendations.map(doc => {
+                  const openSlots = doc.availability.filter(s => !s.isBooked).length;
+                  return (
+                    <div 
+                      key={`ai-${doc.id}`} 
+                      className={cn(
+                        'bg-white dark:bg-slate-800/80 border rounded-xl p-4 text-left transition-all hover:shadow-md cursor-pointer',
+                        selectedDoctor?.id === doc.id
+                          ? 'border-emerald-500 ring-2 ring-emerald-500/20'
+                          : 'border-amber-100 dark:border-amber-700/30 hover:border-amber-300 dark:hover:border-amber-600/50'
+                      )}
+                      onClick={() => { setSelectedDoctor(doc); setSelectedSlot(null); }}
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400 font-bold shrink-0">
+                          {doc.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-gray-900 dark:text-white truncate">{doc.name}</h3>
+                          <p className="text-xs text-amber-600/80 dark:text-amber-400/80">{doc.specialty}</p>
+                          <div className="flex items-center gap-1.5 mt-2 text-xs text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-50 dark:bg-emerald-500/10 w-fit px-2 py-0.5 rounded-full">
+                            <Clock className="h-3 w-3" />
+                            {openSlots} {t('slotsOpen', { count: openSlots }) || 'slots open'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Background decoration */}
+              <Sparkles className="absolute -right-4 -top-4 w-32 h-32 text-amber-500/10 dark:text-amber-400/5 pointer-events-none" />
+            </div>
+          )}
+
+          {/* NORMAL DOCTOR LIST */}
           {filtered.length === 0 ? (
             <div className="bg-white dark:bg-slate-800/30 border dark:border-slate-700 rounded-xl p-12 text-center">
               <Search className="h-10 w-10 text-gray-200 dark:text-slate-700 mx-auto mb-3" />
