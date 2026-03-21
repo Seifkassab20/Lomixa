@@ -33,6 +33,7 @@ export function RepDashboard() {
         visitsThisMonth: 0,
         target: 25,
         userId,
+        credits: 0,
       };
       saveSalesRep(myRep);
     }

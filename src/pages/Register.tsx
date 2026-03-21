@@ -117,6 +117,8 @@ export function Register() {
     const newLang = i18n.language === 'en' ? 'ar' : 'en';
     i18n.changeLanguage(newLang);
     document.documentElement.dir = newLang === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.lang = newLang;
+    localStorage.setItem('lomixa_lang', newLang);
   };
 
   const getDynamicFieldLabel = () => {
@@ -319,7 +321,7 @@ export function Register() {
 
             <Button 
               type="submit" 
-              className="w-full h-12 rounded-xl bg-slate-400 hover:bg-slate-500 text-slate-900 font-medium flex items-center justify-center gap-2 transition-all"
+              className="w-full h-12 rounded-xl bg-[#0d7a5b] hover:bg-[#0a6148] text-white font-medium flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-900/20"
               disabled={loading}
             >
               {loading ? 'Registering...' : 'Register Globally'}
