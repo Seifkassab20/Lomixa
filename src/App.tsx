@@ -1,11 +1,13 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './lib/auth';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './lib/auth';
 import { ThemeProvider } from './components/ThemeProvider';
 import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
+import { Onboarding } from './pages/Onboarding';
+import { RoleSelection } from './pages/RoleSelection';
 
 // Shared pages
 import { NotificationsPage } from './pages/shared/NotificationsPage';
@@ -30,6 +32,32 @@ import { RepBookVisit } from './pages/rep/RepBookVisit';
 import { RepMyVisits } from './pages/rep/RepMyVisits';
 
 import { ToastProvider } from './components/ui/Toast';
+import { AboutUs } from './pages/AboutUs';
+import { TermsAndConditions } from './pages/TermsAndConditions';
+
+function OnboardingWrapper() {
+  const navigate = useNavigate();
+  const handleComplete = () => {
+    localStorage.setItem('lomixa_onboarding_seen', 'true');
+    navigate('/select-role');
+  };
+  return <Onboarding onComplete={handleComplete} />;
+}
+
+function InitialCheck() {
+  const { user } = useAuth();
+  const onboardingSeen = localStorage.getItem('lomixa_onboarding_seen') === 'true';
+
+  if (user) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (!onboardingSeen) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
+  return <Navigate to="/select-role" replace />;
+}
 
 export default function App() {
   return (
@@ -38,11 +66,18 @@ export default function App() {
         <BrowserRouter>
           <AuthProvider>
             <Routes>
+              <Route path="/onboarding" element={<OnboardingWrapper />} />
+              <Route path="/select-role" element={<RoleSelection />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/register/:role" element={<Register />} />
+              <Route path="/about" element={<AboutUs />} />
+              <Route path="/terms" element={<TermsAndConditions />} />
 
-              <Route path="/" element={<Layout />}>
-                <Route index element={<Dashboard />} />
+              <Route path="/" element={<InitialCheck />} />
+              
+              <Route element={<Layout />}>
+                <Route path="/dashboard" element={<Dashboard />} />
 
                 {/* Pharma */}
                 <Route path="subordinates" element={<PharmaSubordinates />} />
