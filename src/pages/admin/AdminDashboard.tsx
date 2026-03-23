@@ -61,7 +61,7 @@ export function AdminDashboard() {
       if (p) {
         savePharmaCompany({ ...p, isVerified: true });
         console.log(`[SIMULATED MAIL] To Pharma | ID: ${p.id} | Subject: Organization Verified`);
-        if (p.userId) pushNotification({ userId: p.userId, title: 'Company Verified', message: 'Your pharmaceutical organization has been verified by the Nexus Admin.', type: 'info' });
+        if (p.userId) pushNotification({ userId: p.userId, title: 'Company Verified', message: 'Your pharmaceutical organization has been verified by the LOMIXA Admin.', type: 'info' });
       }
     }
     refresh();
@@ -197,7 +197,7 @@ export function AdminDashboard() {
         <div className="flex items-center gap-8">
            <div>
               <h1 className="text-3xl font-black tracking-tighter text-gray-900 dark:text-white uppercase italic">
-                {t('appName')} <span className="text-brand">Nexus</span> Admin
+                {t('appName')} Admin
               </h1>
               <p className="text-sm text-gray-500 dark:text-slate-400 mt-1 uppercase tracking-widest font-bold opacity-60">{t('systemOverlord')}</p>
            </div>

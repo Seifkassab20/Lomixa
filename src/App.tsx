@@ -117,7 +117,7 @@ export default function App() {
                 <Route path="settings" element={<SettingsPage />} />
                 
                 {/* Admin */}
-                <Route path="nexus-admin" element={<AdminDashboard />} />
+                <Route path="admin-control" element={<AdminDashboard />} />
               </Route>
 
               <Route path="*" element={<Navigate to="/" replace />} />

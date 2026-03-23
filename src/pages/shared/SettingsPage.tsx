@@ -4,26 +4,14 @@ import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { User, Mail, Phone, Building2, Save, CheckCircle2, MapPin, Globe, Shield, Lock, Image as ImageIcon, Camera, Upload } from 'lucide-react';
+import { User, Mail, Phone, Building2, Save, CheckCircle2, MapPin, Globe, Shield, Lock, Image as ImageIcon, Camera, Upload, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '@/components/ui/Toast';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useTheme } from '@/components/ThemeProvider';
 import { cn } from '@/lib/utils';
 import { Palette, Sparkles, Layout } from 'lucide-react';
-
-const CITY_MAP: Record<string, string[]> = {
-  sa: ['riyadh', 'jeddah', 'dammam', 'makkah', 'medina', 'buraidah', 'tabuk', 'abha', 'khobar', 'hofuf'],
-  uae: ['dubai', 'abudhabi', 'sharjah', 'alain', 'ajman', 'rak'],
-  egypt: ['cairo', 'alex', 'giza', 'mansoura', 'sharm', 'hurghada'],
-  jordan: ['amman', 'zarqa', 'irbid'],
-  kuwait: ['kuwait_city', 'jahra', 'hawalli', 'salmiya'],
-  oman: ['muscat', 'salalah', 'sohar', 'nizwa'],
-  qatar: ['doha', 'wakrah', 'khor', 'rayyan'],
-  bahrain: ['manama', 'muharraq', 'riffa', 'hamad'],
-  iraq: ['baghdad', 'erbil', 'basra', 'mosul', 'suly', 'najaf'],
-  libya: ['tripoli', 'benghazi', 'misrata', 'bayda'],
-};
+import { ARABIC_COUNTRY_CODES, COUNTRIES, CITY_MAP } from '@/lib/constants';
 
 export function SettingsPage() {
   const { userId, user, role } = useAuth();
@@ -32,6 +20,7 @@ export function SettingsPage() {
   
   const [form, setForm] = useState({
     fullName: '',
+    phoneCode: '+966',
     phone: '',
     organization: '',
     country: 'sa',
@@ -53,9 +42,24 @@ export function SettingsPage() {
   useEffect(() => {
     if (userId) {
       const profile = getProfile(userId);
+      const rawPhone = profile.phone || user?.user_metadata?.mobile || '';
+      
+      // Try to extract country code from existing phone
+      let extractedCode = '+966';
+      let extractedNumber = rawPhone;
+      
+      for (const c of ARABIC_COUNTRY_CODES) {
+        if (rawPhone.startsWith(c.code)) {
+          extractedCode = c.code;
+          extractedNumber = rawPhone.slice(c.code.length);
+          break;
+        }
+      }
+
       setForm({
         fullName: profile.fullName || user?.user_metadata?.full_name || '',
-        phone: profile.phone || user?.user_metadata?.mobile || '',
+        phoneCode: extractedCode,
+        phone: extractedNumber,
         organization: profile.organization || user?.user_metadata?.organization || '',
         country: profile.country || user?.user_metadata?.country || 'sa',
         city: profile.city || user?.user_metadata?.city || '',
@@ -70,7 +74,13 @@ export function SettingsPage() {
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId) return;
-    saveProfile(userId, form);
+    
+    const finalData = {
+      ...form,
+      phone: `${form.phoneCode}${form.phone}`
+    };
+    
+    saveProfile(userId, finalData);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };
@@ -92,11 +102,12 @@ export function SettingsPage() {
   };
 
   const handleVerifyPhone = async () => {
+    const fullPhone = `${form.phoneCode}${form.phone}`;
     if (!form.phone) return;
     setVerifyingPhone(true);
     try {
       if (isSupabaseConfigured) {
-        const { error } = await supabase.auth.updateUser({ phone: form.phone });
+        const { error } = await supabase.auth.updateUser({ phone: fullPhone });
         if (error) throw error;
         setOtpSent(true);
       }
@@ -111,10 +122,11 @@ export function SettingsPage() {
   const handleConfirmOtp = async () => {
     if (!otpCode) return;
     setVerifyingOtp(true);
+    const fullPhone = `${form.phoneCode}${form.phone}`;
     try {
       if (isSupabaseConfigured) {
         const { error } = await supabase.auth.verifyOtp({
-          phone: form.phone,
+          phone: fullPhone,
           token: otpCode,
           type: 'phone_change'
         });
@@ -142,7 +154,6 @@ export function SettingsPage() {
     try {
       let avatarUrl = '';
       if (isSupabaseConfigured) {
-        // Upload to Supabase Storage
         const fileExt = file.name.split('.').pop();
         const filePath = `${userId}/${Math.random()}.${fileExt}`;
         const { data, error: uploadError } = await supabase.storage
@@ -150,8 +161,6 @@ export function SettingsPage() {
           .upload(filePath, file);
 
         if (uploadError) {
-          console.warn("Supabase bucket not found or error, falling back to local base64:", uploadError.message);
-          // FALLBACK to base64 if bucket missing
           const reader = new FileReader();
           reader.onloadend = () => {
             const result = reader.result as string;
@@ -178,7 +187,6 @@ export function SettingsPage() {
           toast('Profile picture updated and synced!', 'success');
         }
       } else {
-        // Fallback to Base64 for local dev
         const reader = new FileReader();
         reader.onloadend = () => {
           const result = reader.result as string;
@@ -192,7 +200,6 @@ export function SettingsPage() {
         reader.readAsDataURL(file);
       }
     } catch (err: any) {
-      console.error(err);
       toast('Upload failed: ' + err.message, 'error');
     }
   };
@@ -235,7 +242,6 @@ export function SettingsPage() {
       </div>
 
       <form onSubmit={handleSave} className="space-y-8">
-        {/* Core Identity */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white">{t('identity_sec') || 'Identity'}</h3>
@@ -272,18 +278,33 @@ export function SettingsPage() {
                     </button>
                   )}
                 </div>
-                <div className="relative group">
-                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
-                  <Input
-                    value={form.phone}
-                    onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                    className="pl-12 h-12 rounded-xl bg-app-card dark:border-slate-800"
-                  />
+                <div className="flex gap-2">
+                  <div className="relative w-28 shrink-0 group">
+                    <select
+                      value={form.phoneCode}
+                      onChange={e => setForm(f => ({ ...f, phoneCode: e.target.value }))}
+                      className="w-full h-12 pl-3 pr-8 rounded-xl bg-app-card border border-slate-200 dark:border-slate-800 text-xs font-bold focus:ring-2 focus:ring-emerald-500/20 outline-none appearance-none"
+                    >
+                      {ARABIC_COUNTRY_CODES.map(c => (
+                        <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                  </div>
+                  <div className="relative group flex-1">
+                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                    <Input
+                      value={form.phone}
+                      onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                      className="pl-12 h-12 rounded-xl bg-app-card dark:border-slate-800"
+                      placeholder="5XXXXXXX"
+                    />
+                  </div>
                 </div>
               </div>
 
               {otpSent && (
-                <div className="space-y-3 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl animate-in slide-in-from-top-2 duration-300">
+                <div className="space-y-3 col-span-2 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl animate-in slide-in-from-top-2 duration-300">
                   <div className="flex items-center justify-between">
                     <Label className="text-[10px] font-black uppercase text-emerald-600">Enter Verification Code</Label>
                     <button onClick={() => setOtpSent(false)} className="text-[10px] font-bold text-slate-400 hover:text-slate-600">Cancel</button>
@@ -328,7 +349,6 @@ export function SettingsPage() {
           </div>
         </div>
 
-        {/* Location - Universal */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-8 border-t dark:border-slate-800">
           <div className="lg:col-span-1">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white">{t('location_sec') || 'Location'}</h3>
@@ -344,14 +364,13 @@ export function SettingsPage() {
                     name="country"
                     value={form.country}
                     onChange={e => setForm(f => ({ ...f, country: e.target.value, city: '' }))}
-                    className="w-full h-12 pl-12 pr-4 rounded-xl bg-app-card border-app-border text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none appearance-none"
+                    className="w-full h-12 pl-12 pr-10 rounded-xl bg-app-card border border-app-border text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none appearance-none"
                   >
-                    <option value="sa">{t('country_sa') || 'Saudi Arabia'}</option>
-                    <option value="uae">{t('country_uae') || 'UAE'}</option>
-                    <option value="egypt">{t('country_egypt') || 'Egypt'}</option>
-                    <option value="jordan">{t('country_jordan') || 'Jordan'}</option>
-                    <option value="kuwait">{t('country_kuwait') || 'Kuwait'}</option>
+                    {COUNTRIES.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
                   </select>
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
                 </div>
               </div>
               <div className="space-y-1.5">
@@ -362,20 +381,20 @@ export function SettingsPage() {
                     name="city"
                     value={form.city}
                     onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
-                    className="w-full h-12 pl-12 pr-4 rounded-xl bg-app-card border-app-border text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none appearance-none"
+                    className="w-full h-12 pl-12 pr-10 rounded-xl bg-app-card border border-app-border text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none appearance-none"
                   >
                     <option value="">{t('selectCity') || 'Select city...'}</option>
                     {CITY_MAP[form.country]?.map(c => (
                       <option key={c} value={c}>{t(`city_${c}`) || c}</option>
                     ))}
                   </select>
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Security / Account */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-8 border-t dark:border-slate-800">
           <div className="lg:col-span-1">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white">{t('security_sec') || 'Account & Security'}</h3>
@@ -433,7 +452,7 @@ export function SettingsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {[
                 { id: 'emerald', name: 'Emerald Oasis', color: 'bg-[#10b981]', desc: t('classic_medical') || 'Classic Clinical' },
-                { id: 'sapphire', name: 'Sapphire Nexus', color: 'bg-[#4f46e5]', desc: t('modern_tech') || 'Modern Tech' },
+                { id: 'sapphire', name: 'Sapphire Grid', color: 'bg-[#4f46e5]', desc: t('modern_tech') || 'Modern Tech' },
                 { id: 'oasis', name: 'Desert Oasis', color: 'bg-[#0d9488]', desc: t('warm_premium') || 'Warm Premium' },
               ].map((p) => (
                 <button
@@ -456,7 +475,7 @@ export function SettingsPage() {
               ))}
             </div>
 
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border-app-border">
+            <div className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
               <div className="h-10 w-10 rounded-xl bg-white dark:bg-slate-900 flex items-center justify-center border dark:border-slate-700">
                  {theme === 'dark' ? <Lock className="w-5 h-5 text-slate-400" /> : <Sparkles className="w-5 h-5 text-brand" />}
               </div>

@@ -7,12 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Stethoscope, Plus, Trash2, Edit2, X, Phone, Mail, Clock, ShieldCheck, ShieldAlert, Award, Check } from 'lucide-react';
+import { Stethoscope, Plus, Trash2, Edit2, X, Phone, Mail, Clock, ShieldCheck, ShieldAlert, Award, Check, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { createClient } from '@supabase/supabase-js';
 import { motion, AnimatePresence } from 'motion/react';
+import { ARABIC_COUNTRY_CODES } from '@/lib/constants';
 
 // Helper client that doesn't persist session so signing up a user doesn't log out the admin
 const createTempClient = () => {
@@ -39,7 +40,7 @@ export function ManageDoctors() {
   const [form, setForm] = useState({
     title: 'dr',
     name: '', specialty: '', experienceYears: 0,
-    phone: '', email: '', password: '',
+    phoneCode: '+966', phone: '', email: '', password: '',
   });
 
   const hospitals = getHospitals();
@@ -54,6 +55,7 @@ export function ManageDoctors() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const fullPhone = `${form.phoneCode}${form.phone}`;
     
     // If we're adding a new doctor, create their Supabase account too
     if (!editingDoc && form.email && form.password) {
@@ -65,7 +67,7 @@ export function ManageDoctors() {
           data: {
             role: 'doctor',
             full_name: `${t(`title_${form.title}`)} ${form.name}`,
-            phone: form.phone
+            phone: fullPhone
           }
         }
       });
@@ -81,7 +83,7 @@ export function ManageDoctors() {
       name: editingDoc ? form.name : `${t(`title_${form.title}`)} ${form.name}`,
       specialty: form.specialty,
       experienceYears: form.experienceYears,
-      phone: form.phone,
+      phone: fullPhone,
       email: form.email,
       hospitalId: myHospital?.id || 'default',
       hospitalName: myHospital?.name || 'Hospital',
@@ -94,12 +96,33 @@ export function ManageDoctors() {
     refresh();
     setShowForm(false);
     setEditingDoc(null);
-    setForm({ title: 'dr', name: '', specialty: '', experienceYears: 0, phone: '', email: '', password: '' });
+    setForm({ title: 'dr', name: '', specialty: '', experienceYears: 0, phoneCode: '+966', phone: '', email: '', password: '' });
   };
 
   const handleEdit = (doc: Doctor) => {
     setEditingDoc(doc);
-    setForm({ title: 'dr', name: doc.name, specialty: doc.specialty, experienceYears: doc.experienceYears, phone: doc.phone, email: doc.email, password: '' });
+    
+    // Parse phone code
+    let extractedCode = '+966';
+    let extractedNumber = doc.phone;
+    for (const c of ARABIC_COUNTRY_CODES) {
+      if (doc.phone.startsWith(c.code)) {
+        extractedCode = c.code;
+        extractedNumber = doc.phone.slice(c.code.length);
+        break;
+      }
+    }
+
+    setForm({ 
+      title: 'dr', 
+      name: doc.name, 
+      specialty: doc.specialty, 
+      experienceYears: doc.experienceYears, 
+      phoneCode: extractedCode,
+      phone: extractedNumber, 
+      email: doc.email, 
+      password: '' 
+    });
     setShowForm(true);
   };
 
@@ -125,7 +148,7 @@ export function ManageDoctors() {
           <h1 className="text-2xl font-bold dark:text-white">{t('manageDoctors')}</h1>
           <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">{t('addDoctors')}</p>
         </div>
-        <Button onClick={() => { setShowForm(true); setEditingDoc(null); setForm({ name: '', specialty: '', experienceYears: 0, phone: '', email: '' }); }} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
+        <Button onClick={() => { setShowForm(true); setEditingDoc(null); setForm({ title: 'dr', name: '', specialty: '', experienceYears: 0, phoneCode: '+966', phone: '', email: '', password: '' }); }} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
           <Plus className="h-4 w-4" /> {t('addDoctor')}
         </Button>
       </div>
@@ -220,15 +243,29 @@ export function ManageDoctors() {
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-black uppercase text-slate-500 px-2 italic">{t('mobile')}</label>
-                      <div className="relative group">
-                        <Phone className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-emerald-500 transition-colors" />
-                        <input 
-                          required
-                          value={form.phone}
-                          onChange={e => setForm({...form, phone: e.target.value})}
-                          placeholder="+966 5X XXX XXXX"
-                          className="w-full h-14 rounded-2xl bg-black/40 border border-white/10 pl-14 pr-6 font-black text-white outline-none focus:border-emerald-500/50 transition-all" 
-                        />
+                      <div className="flex gap-2">
+                        <div className="relative w-28 group">
+                          <select
+                            value={form.phoneCode}
+                            onChange={e => setForm({...form, phoneCode: e.target.value})}
+                            className="w-full h-14 pl-3 pr-8 rounded-2xl bg-black/40 border border-white/10 font-black text-white outline-none focus:border-emerald-500/50 transition-all appearance-none text-[10px]"
+                          >
+                            {ARABIC_COUNTRY_CODES.map(c => (
+                              <option key={c.code} value={c.code} className="bg-[#0c121d]">{c.flag} {c.code}</option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-500 pointer-events-none" />
+                        </div>
+                        <div className="relative group flex-1">
+                          <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-600 group-focus-within:text-emerald-500 transition-colors" />
+                          <input 
+                            required
+                            value={form.phone}
+                            onChange={e => setForm({...form, phone: e.target.value})}
+                            placeholder="5X XXX XXXX"
+                            className="w-full h-14 rounded-2xl bg-black/40 border border-white/10 pl-10 pr-4 font-black text-white outline-none focus:border-emerald-500/50 transition-all" 
+                          />
+                        </div>
                       </div>
                     </div>
                     <div className="space-y-2">

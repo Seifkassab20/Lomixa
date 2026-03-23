@@ -1,11 +1,14 @@
 // Global store using localStorage for optimistic persistence + Supabase for real-time cloud sync
 import { supabase, isSupabaseConfigured } from './supabase';
 
-export type Role = 'pharma' | 'hospital' | 'doctor' | 'rep' | null;
+export type Role = 'pharma' | 'hospital' | 'doctor' | 'rep' | 'admin' | null;
 
 export interface Doctor {
   id: string;
-  name: string;
+  name: string; // Combined
+  firstName?: string;
+  lastName?: string;
+  title?: string;
   specialty: string;
   experienceYears: number;
   hospitalId: string;
@@ -17,6 +20,8 @@ export interface Doctor {
   userId?: string;
   role?: string;
   availability: AvailabilitySlot[];
+  avatar?: string;
+  location?: any;
 }
 
 export interface AvailabilitySlot {
@@ -31,6 +36,9 @@ export interface AvailabilitySlot {
 export interface SalesRep {
   id: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
+  roleTitle?: string;
   email: string;
   phone: string;
   pharmaId: string;
@@ -40,8 +48,11 @@ export interface SalesRep {
   isVerified: boolean;
   visitsThisMonth: number;
   target: number;
-  credits: number; // For booking appointments
+  credits: number;
   role?: string;
+  avatar?: string;
+  location?: any;
+  products?: any[];
 }
 
 export interface Hospital {
@@ -53,7 +64,14 @@ export interface Hospital {
   isVerified: boolean;
   type: 'hospital' | 'clinic';
   phone?: string;
+  email?: string;
   role?: string;
+  avatar?: string;
+  documents?: {
+    commercial: boolean;
+    address: boolean;
+    vat: boolean;
+  };
 }
 
 export interface PharmaCompany {
@@ -64,7 +82,14 @@ export interface PharmaCompany {
   isActive: boolean;
   isVerified: boolean;
   phone?: string;
+  email?: string;
   role?: string;
+  avatar?: string;
+  documents?: {
+    commercial: boolean;
+    address: boolean;
+    vat: boolean;
+  };
   customBundles?: Bundle[];
 }
 
@@ -237,23 +262,29 @@ function mapDoctorToDB(d: Doctor) {
     hospital_id: d.hospitalId === 'default' || !d.hospitalId ? null : d.hospitalId,
     hospital_name: d.hospitalName,
     name: d.name,
+    title: d.title,
     specialty: d.specialty,
     experience_years: d.experienceYears,
     phone: d.phone,
     email: d.email,
     is_active: d.isActive,
     is_verified: d.isVerified,
-    role: d.role
+    role: d.role,
+    avatar: d.avatar,
+    location: d.location ? JSON.stringify(d.location) : null
   };
 }
 
 function mapDoctorFromDB(db: any): Doctor {
+  let location = null;
+  try { if (db.location) location = JSON.parse(db.location); } catch(e) {}
   return {
     id: db.id,
     userId: db.user_id,
     hospitalId: db.hospital_id,
     hospitalName: db.hospital_name,
     name: db.name,
+    title: db.title,
     specialty: db.specialty,
     experienceYears: db.experience_years,
     phone: db.phone,
@@ -261,7 +292,9 @@ function mapDoctorFromDB(db: any): Doctor {
     isActive: db.is_active ?? true,
     isVerified: db.is_verified ?? false,
     role: db.role,
-    availability: load(`availability_${db.id}`, []), // Slots handle sync separately below
+    avatar: db.avatar,
+    location: location,
+    availability: load(`availability_${db.id}`, []),
   };
 }
 
@@ -275,11 +308,16 @@ function mapHospitalToDB(h: Hospital) {
     is_verified: h.isVerified,
     type: h.type,
     phone: h.phone,
-    role: h.role 
+    email: h.email,
+    role: h.role,
+    avatar: h.avatar,
+    documents: h.documents ? JSON.stringify(h.documents) : null
   };
 }
 
 function mapHospitalFromDB(db: any): Hospital {
+  let docs = null;
+  try { if (db.documents) docs = JSON.parse(db.documents); } catch(e) {}
   return { 
     id: db.id, 
     userId: db.user_id, 
@@ -288,30 +326,38 @@ function mapHospitalFromDB(db: any): Hospital {
     isActive: db.is_active ?? true, 
     isVerified: db.is_verified ?? false,
     phone: db.phone,
+    email: db.email,
     role: db.role,
-    type: db.type || 'hospital'
+    type: db.type || 'hospital',
+    avatar: db.avatar,
+    documents: docs
   };
 }
 
 function mapPharmaToDB(p: PharmaCompany) {
-  const data: any = { id: p.id, user_id: p.userId, name: p.name, credits: p.credits, is_active: p.isActive, is_verified: p.isVerified, phone: p.phone, role: p.role };
+  const data: any = { 
+    id: p.id, user_id: p.userId, name: p.name, credits: p.credits, 
+    is_active: p.isActive, is_verified: p.isVerified, phone: p.phone, email: p.email,
+    role: p.role, avatar: p.avatar,
+    documents: p.documents ? JSON.stringify(p.documents) : null
+  };
   if (p.customBundles) data.custom_bundles = JSON.stringify(p.customBundles);
   return data;
 }
 
 function mapPharmaFromDB(db: any): PharmaCompany {
   let bundles: Bundle[] = [];
-  try {
-    if (db.custom_bundles) bundles = JSON.parse(db.custom_bundles);
-  } catch (e) {
-    console.warn("Failed to parse custom bundles for " + db.name, e);
-  }
+  try { if (db.custom_bundles) bundles = JSON.parse(db.custom_bundles); } catch (e) {}
+  let docs = null;
+  try { if (db.documents) docs = JSON.parse(db.documents); } catch(e) {}
 
   return { 
     id: db.id, userId: db.user_id, name: db.name, credits: db.credits, 
     isActive: db.is_active ?? true, isVerified: db.is_verified ?? false,
-    phone: db.phone, role: db.role,
-    customBundles: bundles
+    phone: db.phone, email: db.email, role: db.role,
+    customBundles: bundles,
+    avatar: db.avatar,
+    documents: docs
   };
 }
 
@@ -320,20 +366,38 @@ function mapRepToDB(r: SalesRep) {
     id: r.id, user_id: r.userId, 
     pharma_id: r.pharmaId === 'default' || !r.pharmaId ? null : r.pharmaId, 
     pharma_name: r.pharmaName,
-    name: r.name, email: r.email, phone: r.phone, target: r.target, 
+    name: r.name, 
+    first_name: r.firstName,
+    last_name: r.lastName,
+    role_title: r.roleTitle,
+    email: r.email, phone: r.phone, target: r.target, 
     visits_this_month: r.visitsThisMonth, credits: r.credits || 0,
-    is_active: r.isActive, is_verified: r.isVerified, role: r.role
+    is_active: r.isActive, is_verified: r.isVerified, role: r.role,
+    avatar: r.avatar,
+    location: r.location ? JSON.stringify(r.location) : null,
+    products: r.products ? JSON.stringify(r.products) : null
   };
 }
 
 function mapRepFromDB(db: any): SalesRep {
+  let location = null;
+  try { if (db.location) location = JSON.parse(db.location); } catch(e) {}
+  let products = [];
+  try { if (db.products) products = JSON.parse(db.products); } catch(e) {}
   return {
     id: db.id, userId: db.user_id, pharmaId: db.pharma_id, pharmaName: db.pharma_name,
-    name: db.name, email: db.email, phone: db.phone, target: db.target, 
+    name: db.name, 
+    firstName: db.first_name,
+    lastName: db.last_name,
+    roleTitle: db.role_title,
+    email: db.email, phone: db.phone, target: db.target, 
     visitsThisMonth: db.visits_this_month, credits: db.credits || 0,
     isActive: db.is_active ?? true,
     isVerified: db.is_verified ?? true,
-    role: db.role
+    role: db.role,
+    avatar: db.avatar,
+    location: location,
+    products: products
   };
 }
 
@@ -347,12 +411,8 @@ function mapNotifFromDB(db: any): Notification {
 
 
 // BACKGROUND SYNC POLLER
-// We poll Supabase silently to pull remote changes down into local memory so the UI remains instantly responsive.
 export async function syncCloudData() {
   if (!isSupabaseConfigured) return;
-
-  // Guard: If we just made a local change, don't overwrite from cloud for 10s 
-  // to allow the cloud to catch up and avoid "disappearing" optimistic updates.
   if (Date.now() - getLastMutationTime() < 10000) return;
 
   try {
@@ -365,7 +425,6 @@ export async function syncCloudData() {
       supabase.from('notifications').select('*'),
     ]);
 
-    // Check again after fetch to avoid race condition during the async call
     if (Date.now() - getLastMutationTime() < 10000) return;
 
     if (hospitals.data) save('hospitals', hospitals.data.map(mapHospitalFromDB));
@@ -373,37 +432,29 @@ export async function syncCloudData() {
     if (reps.data) save('sales_reps', reps.data.map(mapRepFromDB));
     if (pharma.data) save('pharma_companies', pharma.data.map(mapPharmaFromDB));
     if (visits.data) save('visits', visits.data.map(mapVisitFromDB));
-    if (notifications.data) save('notifications', notifications.data.map(mapNotifFromDB).slice(0, 100)); // Keep only latest 100
+    if (notifications.data) save('notifications', notifications.data.map(mapNotifFromDB).slice(0, 100));
 
-    // Fetch availability slots separately
     const slots = await supabase.from('availability_slots').select('*');
     if (slots.data && Date.now() - getLastMutationTime() > 10000) {
       const slotsByDoc = slots.data.reduce((acc: any, row: any) => {
         if (!acc[row.doctor_id]) acc[row.doctor_id] = [];
         acc[row.doctor_id].push({
-          id: row.id, date: row.date, time: row.time, appointmentType: row.appointment_type, duration: row.duration, isBooked: row.is_booked
+          id: row.id, date: row.date, time: row.time, appointment_type: row.appointment_type, duration: row.duration, is_booked: row.is_booked
         });
         return acc;
       }, {});
       Object.keys(slotsByDoc).forEach(docId => save(`availability_${docId}`, slotsByDoc[docId]));
     }
   } catch (err) {
-    console.warn("Cloud sync failed, falling back to local memory:", err);
+    console.warn("Cloud sync failed:", err);
   }
 }
 
-// Ensure first-time load initiates a sync
 setTimeout(syncCloudData, 1000);
-
-// Set up periodic sync (every 10s)
 setInterval(syncCloudData, 10000);
 
 
 // ── DATA ACCESS & MUTATION FUNCTIONS ─────────────────────────────
-// All mutation functions perform an **Optimistic Update** (instant local save)
-// and a **Background Cloud Push** (async remote save). 
-
-// ---- HOSPITALS ----
 export function getHospitals(): Hospital[] { return load<Hospital[]>('hospitals', []); }
 export function saveHospital(hospital: Hospital) {
   const list = getHospitals();
@@ -412,17 +463,18 @@ export function saveHospital(hospital: Hospital) {
   save('hospitals', list);
   notifyMutation();
   if (isSupabaseConfigured) {
-    supabase.from('hospitals')
-      .upsert(mapHospitalToDB(hospital))
-      .then(({error}) => {
-        if (error) console.error("Hospital Cloud Push Failed:", error);
-      });
+    supabase.from('hospitals').upsert(mapHospitalToDB(hospital)).then(({error}) => error && console.error("Hospital Cloud Push Failed:", error));
+  }
+}
+export function deleteHospital(id: string) {
+  save('hospitals', getHospitals().filter(h => h.id !== id));
+  notifyMutation();
+  if (isSupabaseConfigured) {
+    supabase.from('hospitals').delete().eq('id', id).then(({error}) => error && console.error("Cloud delete hospital failed:", error));
   }
 }
 
-// ---- DOCTORS ----
 export function getDoctors(): Doctor[] { 
-  // Map current slots onto the return payload for smooth UI reading
   return load<Doctor[]>('doctors', []).map(d => ({ ...d, availability: getDoctorAvailability(d.id) }));
 }
 export function saveDoctor(doctor: Doctor) {
@@ -432,28 +484,20 @@ export function saveDoctor(doctor: Doctor) {
   save('doctors', list);
   notifyMutation();
   if (isSupabaseConfigured) {
-    supabase.from('doctors')
-      .upsert(mapDoctorToDB(doctor))
-      .then(({error}) => {
-        if (error) console.error("Doctor Cloud Push Failed:", error);
-      });
+    supabase.from('doctors').upsert(mapDoctorToDB(doctor)).then(({error}) => error && console.error("Doctor Cloud Push Failed:", error));
   }
 }
 export function deleteDoctor(id: string) {
-  // Purge dependencies first to satisfy database constraints
   save('visits', getVisits().filter(v => v.doctorId !== id));
   save(`availability_${id}`, []);
-  
   save('doctors', getDoctors().filter(d => d.id !== id));
   notifyMutation();
-  
   if (isSupabaseConfigured) {
     supabase.from('visits').delete().eq('doctor_id', id).then();
     supabase.from('doctors').delete().eq('id', id).then(({error}) => error && console.error("Cloud delete doctor failed:", error));
   }
 }
 
-// ---- SALES REPS ----
 export function getSalesReps(): SalesRep[] { return load<SalesRep[]>('sales_reps', []); }
 export function saveSalesRep(rep: SalesRep) {
   const list = getSalesReps();
@@ -464,12 +508,9 @@ export function saveSalesRep(rep: SalesRep) {
   if (isSupabaseConfigured) supabase.from('sales_reps').upsert(mapRepToDB(rep)).then(({error}) => error && console.error("Cloud push failed:", error));
 }
 export function deleteSalesRep(id: string) {
-  // Purge visits by this rep first
   save('visits', getVisits().filter(v => v.repId !== id));
-  
   save('sales_reps', getSalesReps().filter(r => r.id !== id));
   notifyMutation();
-  
   if (isSupabaseConfigured) {
     supabase.from('visits').delete().eq('rep_id', id).then();
     supabase.from('sales_reps').delete().eq('id', id).then(({error}) => error && console.error("Cloud delete rep failed:", error));
@@ -481,36 +522,21 @@ export function allocateCreditsToRep(repId: string, amount: number): boolean {
   const reps = getSalesReps();
   const repIdx = reps.findIndex(r => r.id === repId);
   if (repIdx < 0) return false;
-
   const pharmaId = reps[repIdx].pharmaId;
   const companies = getPharmaCompanies();
   const companyIdx = companies.findIndex(c => c.id === pharmaId);
   if (companyIdx < 0) return false;
-
-  // Check if enough company credits
   if (companies[companyIdx].credits < amount) return false;
-
-  // Perform transfer
   companies[companyIdx].credits -= amount;
   reps[repIdx].credits = (reps[repIdx].credits || 0) + amount;
-
-  // Update company
   save('pharma_companies', companies);
-  if (isSupabaseConfigured) {
-    supabase.from('pharma_companies').update({ credits: companies[companyIdx].credits }).eq('id', pharmaId).then();
-  }
-
-  // Update rep
+  if (isSupabaseConfigured) supabase.from('pharma_companies').update({ credits: companies[companyIdx].credits }).eq('id', pharmaId).then();
   save('sales_reps', reps);
-  if (isSupabaseConfigured) {
-    supabase.from('sales_reps').update({ credits: reps[repIdx].credits }).eq('id', repId).then();
-  }
-
+  if (isSupabaseConfigured) supabase.from('sales_reps').update({ credits: reps[repIdx].credits }).eq('id', repId).then();
   notifyMutation();
   return true;
 }
 
-// ---- PHARMA COMPANIES ----
 export function getPharmaCompanies(): PharmaCompany[] { return load<PharmaCompany[]>('pharma_companies', []); }
 export function savePharmaCompany(company: PharmaCompany) {
   const list = getPharmaCompanies();
@@ -519,18 +545,17 @@ export function savePharmaCompany(company: PharmaCompany) {
   save('pharma_companies', list);
   notifyMutation();
   if (isSupabaseConfigured) {
-    supabase.from('pharma_companies')
-      .upsert(mapPharmaToDB(company))
-      .then(({error}) => {
-        if (error) {
-           console.error("Pharma Cloud Push Failed:", error);
-           // We don't toast here as it might be frequent, but we log for debugging
-        }
-      });
+    supabase.from('pharma_companies').upsert(mapPharmaToDB(company)).then(({error}) => error && console.error("Pharma Cloud Push Failed:", error));
+  }
+}
+export function deletePharma(id: string) {
+  save('pharma_companies', getPharmaCompanies().filter(p => p.id !== id));
+  notifyMutation();
+  if (isSupabaseConfigured) {
+    supabase.from('pharma_companies').delete().eq('id', id).then(({error}) => error && console.error("Cloud delete pharma failed:", error));
   }
 }
 
-// ---- VISITS ----
 export function getVisits(): Visit[] { return load<Visit[]>('visits', []); }
 export function getVisitById(id: string): Visit | undefined { return getVisits().find(v => v.id === id); }
 export function saveVisit(visit: Visit) {
@@ -558,12 +583,7 @@ export function deleteVisit(id: string) {
   notifyMutation();
   if (isSupabaseConfigured) supabase.from('visits').delete().eq('id', id).then(({error}) => error && console.error("Cloud delete failed:", error));
 }
-export function getVisitsByRep(repId: string): Visit[] { return getVisits().filter(v => v.repId === repId); }
-export function getVisitsByDoctor(doctorId: string): Visit[] { return getVisits().filter(v => v.doctorId === doctorId); }
-export function getVisitsByHospital(hospitalId: string): Visit[] { return getVisits().filter(v => v.hospitalId === hospitalId); }
-export function getVisitsByPharma(pharmaId: string): Visit[] { return getVisits().filter(v => v.pharmaId === pharmaId); }
 
-// ---- NOTIFICATIONS ----
 export function getNotifications(): Notification[] { return load<Notification[]>('notifications', []); }
 export function saveNotification(n: Notification) {
   const list = getNotifications();
@@ -584,7 +604,6 @@ export function markAllNotificationsRead() {
   notifyMutation();
 }
 
-// ---- TRANSACTIONS ----
 export function getTransactions(): Transaction[] { return load<Transaction[]>('transactions', []); }
 export function saveTransaction(t: Transaction) {
   const list = getTransactions();
@@ -593,26 +612,21 @@ export function saveTransaction(t: Transaction) {
   notifyMutation();
 }
 
-// ---- BUNDLES ----
 export function getBundles(): Bundle[] { return BUNDLES; }
 
-// ---- PROFILE ----
 export function getProfile(userId: string) { return load<Record<string, any>>(`profile_${userId}`, {}); }
 export function saveProfile(userId: string, profile: Record<string, any>) { 
   save(`profile_${userId}`, profile); 
   notifyMutation();
 }
 
-// ---- AVAILABILITY ----
 export function getDoctorAvailability(doctorId: string): AvailabilitySlot[] {
   return load<AvailabilitySlot[]>(`availability_${doctorId}`, []);
 }
 export function saveDoctorAvailability(doctorId: string, slots: AvailabilitySlot[]) {
   save(`availability_${doctorId}`, slots);
   notifyMutation();
-  
   if (isSupabaseConfigured) {
-    // Basic sync: delete old slots for this doctor, insert new
     supabase.from('availability_slots').delete().eq('doctor_id', doctorId).then(() => {
       if (slots.length > 0) {
         supabase.from('availability_slots').insert(
@@ -626,32 +640,17 @@ export function saveDoctorAvailability(doctorId: string, slots: AvailabilitySlot
   }
 }
 
-// ---- UTILITIES ----
-/**
- * Checks if a user with the given email or phone exists in any of the role tables.
- * Used for forgot password and verification logic.
- */
 export async function checkUserExistence(type: 'email' | 'phone', value: string): Promise<boolean> {
   if (!isSupabaseConfigured) return true;
-  
   const tables = ['doctors', 'sales_reps', 'hospitals', 'pharma_companies'];
   try {
-    const results = await Promise.all(
-      tables.map(table => 
-        supabase.from(table).select('id').eq(type, value).limit(1)
-      )
-    );
+    const results = await Promise.all(tables.map(table => supabase.from(table).select('id').eq(type, value).limit(1)));
     return results.some(r => r.data && r.data.length > 0);
-  } catch (err) {
-    console.warn("Existence check failed:", err);
-    return false;
-  }
+  } catch (err) { return false; }
 }
 
 export function generateId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
     const r = Math.random() * 16 | 0;
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
@@ -673,59 +672,6 @@ export function pushNotification(params: {
   });
 }
 
-export function ensureUserEntityExists(user: any) {
-  if (!user || (!user.id && !user.user_metadata)) return;
-  const role = user.user_metadata?.role;
-  const name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
-  const email = user.email || '';
-  const phone = user.user_metadata?.mobile || '';
-  const org = user.user_metadata?.organization || '';
-  const uid = user.id;
-
-  // ONLY auto-create in Demo Mode (Local Storage only). 
-  // For Supabase, the account MUST be created during the Registration phase only.
-  if (isSupabaseConfigured) return;
-
-  if (role === 'doctor') {
-    const docs = getDoctors();
-    if (!docs.some(d => d.userId === uid)) {
-      saveDoctor({
-        id: generateId(), userId: uid, name, email, phone,
-        specialty: 'General Practice', experienceYears: 0,
-        hospitalId: null as any, hospitalName: org || 'Independent',
-        availability: [], isActive: true, isVerified: false
-      });
-    }
-  } else if (role === 'rep') {
-    const reps = getSalesReps();
-    if (!reps.some(r => r.userId === uid)) {
-      saveSalesRep({
-        id: generateId(), userId: uid, name, email, phone,
-        pharmaId: null as any, pharmaName: org || 'Independent Pharma',
-        target: 500, visitsThisMonth: 0, credits: 0, isActive: true, isVerified: false
-      });
-    }
-  } else if (role === 'hospital') {
-    const hosps = getHospitals();
-    if (!hosps.some(h => h.userId === uid)) {
-      saveHospital({ 
-        id: generateId(), 
-        userId: uid, 
-        name, 
-        location: org || 'Saudi Arabia', 
-        isActive: true, 
-        isVerified: false,
-        type: (user.user_metadata?.hospital_type || 'hospital') as any
-      });
-    }
-  } else if (role === 'pharma') {
-    const pharmas = getPharmaCompanies();
-    if (!pharmas.some(p => p.userId === uid)) {
-      savePharmaCompany({ id: generateId(), userId: uid, name, credits: 50, isActive: true, isVerified: false });
-    }
-  }
-}
-
 export function getBundleRequests(): BundleRequest[] {
   return load<BundleRequest[]>('bundle_requests', []);
 }
@@ -733,22 +679,15 @@ export function getBundleRequests(): BundleRequest[] {
 export function saveBundleRequest(req: BundleRequest) {
   const reqs = getBundleRequests();
   const idx = reqs.findIndex(r => r.id === (req as any).id);
-  const updated = idx >= 0
-    ? reqs.map((r, i) => i === idx ? req : r)
-    : [...reqs, req];
+  const updated = idx >= 0 ? reqs.map((r, i) => i === idx ? req : r) : [...reqs, req];
   save('bundle_requests', updated);
   notifyMutation();
 }
 
-/**
- * Checks if a user is both verified by admin and active.
- * Uses local store first, fallbacks to a direct cloud query for 100% reliability.
- */
 export async function isUserAuthorized(uid?: string, role?: string): Promise<boolean> {
   try {
     if (!uid || !role) return false;
     if (role === 'admin') return true;
-    
     const checkLocal = () => {
       let entity: any;
       if (role === 'doctor') entity = getDoctors().find(d => d.userId === uid);
@@ -757,124 +696,75 @@ export async function isUserAuthorized(uid?: string, role?: string): Promise<boo
       else if (role === 'rep') entity = getSalesReps().find(r => r.userId === uid);
       return entity;
     };
-
     const local = checkLocal();
     if (local && local.isVerified) return local.isActive !== false;
-
-    // Cloud Fallback
     if (!isSupabaseConfigured) return false;
-    
-    const table: Record<string, string> = { 
-      doctor: 'doctors', 
-      rep: 'sales_reps', 
-      pharma: 'pharma_companies', 
-      hospital: 'hospitals' 
-    };
-    
-    if (!table[role]) return false; // Unknown role -> block access
-
+    const table: Record<string, string> = { doctor: 'doctors', rep: 'sales_reps', pharma: 'pharma_companies', hospital: 'hospitals' };
+    if (!table[role]) return false;
     const { data, error } = await supabase.from(table[role]).select('is_verified, is_active').eq('user_id', uid).single();
     if (error || !data) return false;
-    
     const verified = data.is_verified === null ? true : !!data.is_verified;
     const active = data.is_active === null ? true : data.is_active !== false;
-    
     return verified && active;
-  } catch (err) {
-    console.warn("Identity Grid Check Failed (Safe Fallback to Blocked):", err);
-    return false; 
-  }
+  } catch (err) { return false; }
 }
 
-// ---- CUSTOM PHARMA BUNDLES ----
 export function getPharmaBundles(pharmaId: string): Bundle[] {
   const pc = getPharmaCompanies().find(p => p.id === pharmaId);
-  if (pc && pc.customBundles && pc.customBundles.length > 0) {
-    return pc.customBundles;
-  }
-  return BUNDLES; // Default template
+  if (pc && pc.customBundles && pc.customBundles.length > 0) return pc.customBundles;
+  return BUNDLES;
 }
 
 export function savePharmaBundle(pharmaId: string, bundle: Bundle) {
   const pharmas = getPharmaCompanies();
   const idx = pharmas.findIndex(p => p.id === pharmaId);
   if (idx >= 0) {
-    if (!pharmas[idx].customBundles) pharmas[idx].customBundles = [...BUNDLES];
-    const bIdx = pharmas[idx].customBundles!.findIndex(b => b.id === bundle.id);
-    if (bIdx >= 0) {
-      pharmas[idx].customBundles![bIdx] = bundle;
-    } else {
-      pharmas[idx].customBundles!.push(bundle);
-    }
-    savePharmaCompany(pharmas[idx]);
+    const pc = pharmas[idx];
+    const bundles = pc.customBundles || [];
+    const bIdx = bundles.findIndex(b => b.id === bundle.id);
+    if (bIdx >= 0) bundles[bIdx] = bundle; else bundles.push(bundle);
+    pc.customBundles = bundles;
+    savePharmaCompany(pc);
   }
 }
 
-export function deletePharmaBundle(pharmaId: string, bundleId: string) {
+export async function deletePharmaBundle(pharmaId: string, bundleId: string) {
   const pharmas = getPharmaCompanies();
   const idx = pharmas.findIndex(p => p.id === pharmaId);
-  if (idx >= 0 && pharmas[idx].customBundles) {
-    pharmas[idx].customBundles = pharmas[idx].customBundles!.filter(b => b.id !== bundleId);
-    savePharmaCompany(pharmas[idx]);
+  if (idx >= 0) {
+    const pc = pharmas[idx];
+    pc.customBundles = (pc.customBundles || []).filter(b => b.id !== bundleId);
+    savePharmaCompany(pc);
   }
 }
 
-export function deletePharma(id: string) {
-  // Cascading purge of all associated records
-  const reps = getSalesReps().filter(r => r.pharmaId === id);
-  reps.forEach(r => deleteSalesRep(r.id));
-  
-  save('transactions', load<any[]>('transactions', []).filter(t => t.pharmaId !== id));
-  save('bundle_requests', getBundleRequests().filter(r => r.pharmaId !== id));
-  save('visits', getVisits().filter(v => v.pharmaId !== id));
+export async function ensureUserEntityExists(user: any) {
+  if (!user || !isSupabaseConfigured) return;
+  const role = user.user_metadata?.role;
+  if (!role || role === 'admin') return;
 
-  save('pharma_companies', getPharmaCompanies().filter(p => p.id !== id));
-  notifyMutation();
+  const tableMap: Record<string, string> = {
+    pharma: 'pharma_companies',
+    hospital: 'hospitals',
+    doctor: 'doctors',
+    rep: 'sales_reps'
+  };
 
-  if (isSupabaseConfigured) {
-    supabase.from('transactions').delete().eq('pharma_id', id).then();
-    supabase.from('bundle_requests').delete().eq('pharma_id', id).then();
-    supabase.from('visits').delete().eq('pharma_id', id).then();
-    supabase.from('pharma_companies').delete().eq('id', id).then(({error}) => error && console.error("Cloud delete pharma failed:", error));
-  }
-}
+  const table = tableMap[role];
+  if (!table) return;
 
-export function deleteHospital(id: string) {
-  save('hospitals', getHospitals().filter(h => h.id !== id));
-  notifyMutation();
-  if (isSupabaseConfigured) supabase.from('hospitals').delete().eq('id', id).then(({error}) => error && console.error("Cloud delete failed:", error));
-}
-export async function wipeAllPublicData() {
-  if (confirm('GLOBAL PURGE: This will wipe ALL public data from Supabase sequentially and clear local cache. Proceed?')) {
-    // 1. Clear Local
-    Object.keys(localStorage).forEach(key => {
-      if (key.startsWith('lomixa_')) localStorage.removeItem(key);
-    });
+  try {
+    const { data, error } = await supabase.from(table).select('*').eq('user_id', user.id).single();
+    if (error || !data) return;
 
-    // 2. Clear Cloud (Sequential + Exception Resistant)
-    if (isSupabaseConfigured) {
-      console.log("Starting Sequential Global Purge...");
-      
-      const tables = [
-        'notifications', 'visits', 'availability_slots', 
-        'bundle_requests', 'transactions', 'doctors', 
-        'sales_reps', 'pharma_companies', 'hospitals'
-      ];
-
-      for (const table of tables) {
-        try {
-          console.log(`Purging ${table}...`);
-          // Use neq('id', '0') trick to target all rows
-          const { error } = await supabase.from(table).delete().neq('id', '0');
-          if (error) console.warn(`Cloud purge failed for table [${table}]:`, error.message);
-        } catch (e) {
-          console.warn(`Exception during cloud purge for table [${table}]:`, e);
-        }
-      }
-
-      console.log("Global Purge Process Complete.");
-    }
+    // Sync cloud data to local state
+    if (role === 'pharma') savePharmaCompany(mapPharmaFromDB(data));
+    else if (role === 'hospital') saveHospital(mapHospitalFromDB(data));
+    else if (role === 'doctor') saveDoctor(mapDoctorFromDB(data));
+    else if (role === 'rep') saveSalesRep(mapRepFromDB(data));
     
-    window.location.reload();
+    notifyMutation();
+  } catch (err) {
+    console.error("Failed to ensure user entity exists:", err);
   }
 }

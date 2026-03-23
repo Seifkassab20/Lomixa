@@ -5,12 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Users, Plus, Trash2, Edit2, X, Phone, Mail, Target, TrendingUp, Trophy, ShieldCheck, ShieldAlert, ArrowRight } from 'lucide-react';
+import { Users, Plus, Trash2, Edit2, X, Phone, Mail, Target, TrendingUp, Trophy, ShieldCheck, ShieldAlert, ArrowRight, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '@/components/ui/Toast';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { createClient } from '@supabase/supabase-js';
+import { ARABIC_COUNTRY_CODES } from '@/lib/constants';
 
 // Helper client that doesn't persist session so signing up a user doesn't log out the admin
 const createTempClient = () => {
@@ -27,7 +28,7 @@ export function PharmaSubordinates() {
   const [repVisitCounts, setRepVisitCounts] = useState<Record<string, number>>({});
   const [showForm, setShowForm] = useState(false);
   const [editingRep, setEditingRep] = useState<SalesRep | null>(null);
-  const [form, setForm] = useState({ name: '', email: '', phone: '', target: 25, password: '' });
+  const [form, setForm] = useState({ name: '', email: '', phoneCode: '+966', phone: '', target: 25, password: '' });
   const [allocationRep, setAllocationRep] = useState<SalesRep | null>(null);
   const [allocationAmount, setAllocationAmount] = useState(10);
 
@@ -59,6 +60,8 @@ export function PharmaSubordinates() {
     e.preventDefault();
     if (!myCompany) return;
 
+    const fullPhone = `${form.phoneCode}${form.phone}`;
+
     // If we're adding a new rep, create their Supabase account too
     if (!editingRep && form.email && form.password) {
       const tempSupabase = createTempClient();
@@ -69,7 +72,7 @@ export function PharmaSubordinates() {
           data: {
             role: 'rep',
             full_name: form.name,
-            phone: form.phone
+            phone: fullPhone
           }
         }
       });
@@ -84,7 +87,7 @@ export function PharmaSubordinates() {
       id: editingRep?.id || generateId(),
       name: form.name,
       email: form.email,
-      phone: form.phone,
+      phone: fullPhone,
       pharmaId: myCompany.id,
       pharmaName: myCompany.name,
       visitsThisMonth: editingRep?.visitsThisMonth || 0,
@@ -98,13 +101,25 @@ export function PharmaSubordinates() {
     loadData();
     setShowForm(false);
     setEditingRep(null);
-    setForm({ name: '', email: '', phone: '', target: 25, password: '' });
+    setForm({ name: '', email: '', phoneCode: '+966', phone: '', target: 25, password: '' });
     toast(editingRep ? t('repUpdated') || 'Representative updated successfully' : t('repAddedWithAccount') || 'Representative and account created successfully', 'success');
   };
 
   const handleEdit = (rep: SalesRep) => {
     setEditingRep(rep);
-    setForm({ name: rep.name, email: rep.email, phone: rep.phone, target: rep.target, password: '' });
+    
+    // Parse phone code
+    let extractedCode = '+966';
+    let extractedNumber = rep.phone;
+    for (const c of ARABIC_COUNTRY_CODES) {
+      if (rep.phone.startsWith(c.code)) {
+        extractedCode = c.code;
+        extractedNumber = rep.phone.slice(c.code.length);
+        break;
+      }
+    }
+
+    setForm({ name: rep.name, email: rep.email, phoneCode: extractedCode, phone: extractedNumber, target: rep.target, password: '' });
     setShowForm(true);
   };
 
@@ -146,7 +161,7 @@ export function PharmaSubordinates() {
           <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">{t('manageFieldTeam') || 'Manage your field team and visit targets'}</p>
         </div>
         <Button
-          onClick={() => { setShowForm(true); setEditingRep(null); setForm({ name: '', email: '', phone: '', target: 25 }); }}
+          onClick={() => { setShowForm(true); setEditingRep(null); setForm({ name: '', email: '', phoneCode: '+966', phone: '', target: 25, password: '' }); }}
           className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
         >
           <Plus className="h-4 w-4" /> {t('addRep') || 'Add Rep'}
@@ -205,7 +220,21 @@ export function PharmaSubordinates() {
               </div>
               <div>
                 <Label className="dark:text-slate-300">{t('phone') || 'Phone'}</Label>
-                <Input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+966 5X XXX XXXX" className="mt-1 dark:bg-slate-800 dark:border-slate-600 dark:text-white" />
+                <div className="flex gap-2 mt-1">
+                  <div className="relative w-24 shrink-0">
+                    <select
+                      value={form.phoneCode}
+                      onChange={e => setForm(f => ({ ...f, phoneCode: e.target.value }))}
+                      className="w-full h-10 pl-2 pr-6 rounded-lg bg-white dark:bg-slate-800 border dark:border-slate-600 text-xs font-bold outline-none appearance-none"
+                    >
+                      {ARABIC_COUNTRY_CODES.map(c => (
+                        <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400 pointer-events-none" />
+                  </div>
+                  <Input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="5X XXX XXXX" className="flex-1 dark:bg-slate-800 dark:border-slate-600 dark:text-white" />
+                </div>
               </div>
               <div>
                 <Label className="dark:text-slate-300">{t('monthlyVisitTarget') || 'Monthly Visit Target'}</Label>
@@ -290,22 +319,22 @@ export function PharmaSubordinates() {
                       </div>
                     </div>
                   </div>
-                    <div className="flex items-center gap-2 pr-2 border-r dark:border-slate-700">
-                      <span className="text-[10px] font-black uppercase tracking-tighter text-slate-500">
-                        {rep.isActive ? t('active') : t('inactive') || 'Inactive'}
-                      </span>
-                      <Switch 
-                        checked={rep.isActive} 
-                        onCheckedChange={() => toggleActivation(rep)}
-                        className="scale-75"
-                      />
-                    </div>
-                    <button onClick={() => handleEdit(rep)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
-                      <Edit2 className="h-4 w-4 text-gray-400 dark:text-slate-500" />
-                    </button>
-                    <button onClick={() => handleDelete(rep.id, rep.name)} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors">
-                      <Trash2 className="h-4 w-4 text-red-500/60 hover:text-red-500" />
-                    </button>
+                  <div className="flex items-center gap-2 pr-2 border-r dark:border-slate-700">
+                    <span className="text-[10px] font-black uppercase tracking-tighter text-slate-500">
+                      {rep.isActive ? t('active') : t('inactive') || 'Inactive'}
+                    </span>
+                    <Switch 
+                      checked={rep.isActive} 
+                      onCheckedChange={() => toggleActivation(rep)}
+                      className="scale-75"
+                    />
+                  </div>
+                  <button onClick={() => handleEdit(rep)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
+                    <Edit2 className="h-4 w-4 text-gray-400 dark:text-slate-500" />
+                  </button>
+                  <button onClick={() => handleDelete(rep.id, rep.name)} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors">
+                    <Trash2 className="h-4 w-4 text-red-500/60 hover:text-red-500" />
+                  </button>
                 </div>
                 <div className="space-y-2 text-sm text-gray-500 dark:text-slate-400 mb-4">
                   {rep.email && <div className="flex items-center gap-2"><Mail className="h-3.5 w-3.5" />{rep.email}</div>}

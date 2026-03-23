@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
-import { Building2, Hospital as HospitalIcon, Stethoscope, Users, ArrowRight, Shield } from 'lucide-react';
+import { Building2, Hospital as HospitalIcon, Stethoscope, Users, ArrowRight, Shield, Sparkles, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function RoleSelection() {
@@ -20,20 +20,13 @@ export function RoleSelection() {
 
   const roles = [
     {
-      id: 'pharma',
-      title: t('roleSelection.pharma.title'),
-      desc: t('roleSelection.pharma.desc'),
-      icon: Building2,
-      path: '/register/pharma',
-      gradient: 'from-emerald-500 to-teal-600'
-    },
-    {
       id: 'hospital',
       title: t('roleSelection.hospital.title'),
       desc: t('roleSelection.hospital.desc'),
       icon: HospitalIcon,
       path: '/register/hospital',
-      gradient: 'from-blue-500/80 to-indigo-600/80'
+      gradient: 'from-emerald-500 to-teal-600',
+      badge: 'Facility'
     },
     {
       id: 'doctor',
@@ -41,7 +34,17 @@ export function RoleSelection() {
       desc: t('roleSelection.doctor.desc'),
       icon: Stethoscope,
       path: '/register/doctor',
-      gradient: 'from-[#0d7a5b] to-emerald-600'
+      gradient: 'from-sky-500 to-blue-600',
+      badge: 'Provider'
+    },
+    {
+      id: 'pharma',
+      title: t('roleSelection.pharma.title'),
+      desc: t('roleSelection.pharma.desc'),
+      icon: Building2,
+      path: '/register/pharma',
+      gradient: 'from-indigo-600 to-blue-700',
+      badge: 'Enterprise'
     },
     {
       id: 'rep',
@@ -49,94 +52,108 @@ export function RoleSelection() {
       desc: t('roleSelection.rep.desc'),
       icon: Users,
       path: '/register/rep',
-      gradient: 'from-orange-500 to-amber-600'
+      gradient: 'from-orange-500 to-amber-600',
+      badge: 'Field Team'
     }
   ];
 
   if (showAdmin) {
-    roles.unshift({
+    roles.push({
       id: 'admin',
-      title: 'LOMIXA Nexus Admin',
+      title: 'LOMIXA Admin',
       desc: 'System Overlord Registration - Root Access',
       icon: Shield,
       path: '/register/admin',
-      gradient: 'from-purple-600 to-pink-700'
+      gradient: 'from-purple-600 to-pink-700',
+      badge: 'System'
     });
   }
 
   return (
-    <div className="min-h-screen bg-[#050b14] text-white flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-[120px] -z-10 -translate-y-1/2 translate-x-1/2"></div>
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/5 rounded-full blur-[120px] -z-10 translate-y-1/2 -translate-x-1/2"></div>
+    <div className="min-h-screen bg-[#050b14] text-white flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
+      {/* Background Decor */}
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] -z-10 -translate-y-1/2 translate-x-1/2"></div>
+      <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[120px] -z-10 translate-y-1/2 -translate-x-1/2"></div>
+      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none -z-10"></div>
 
-      <div className="w-full max-w-xl flex flex-col items-center space-y-12">
-        {/* Header */}
+      <div className="w-full max-w-2xl flex flex-col items-center space-y-16">
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col items-center text-center space-y-6"
+          className="flex flex-col items-center text-center space-y-8"
         >
           <div 
             onClick={() => setLogoClicks(p => p + 1)}
-            className="w-16 h-16 bg-white rounded-2xl p-2.5 shadow-2xl shadow-emerald-500/20 transform hover:rotate-3 transition-transform duration-500 cursor-pointer active:scale-95"
+            className="w-20 h-20 bg-white rounded-[2rem] p-3 shadow-2xl transition-transform duration-500 cursor-pointer active:scale-95 group overflow-hidden"
           >
-            <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
+            <img src="/logo.png" alt="Logo" className="w-full h-full object-contain transition-transform group-hover:scale-110" />
           </div>
-          <div className="space-y-2">
-            <h1 className="text-3xl lg:text-4xl font-black text-white">{t('roleSelection.title')}</h1>
-            <p className="text-slate-400 font-medium">{t('roleSelection.subtitle')}</p>
+          
+          <div className="space-y-4">
+            <h1 className="text-4xl lg:text-6xl font-black text-white italic tracking-tighter uppercase leading-none">
+              Join <span className="text-emerald-500">LOMIXA</span>
+            </h1>
+            <p className="text-slate-400 font-bold max-w-md mx-auto text-sm uppercase tracking-widest opacity-60">
+              {t('roleSelection.subtitle')}
+            </p>
           </div>
         </motion.div>
 
-        {/* Role Cards */}
-        <div className="w-full space-y-4">
+        <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-6">
           {roles.map((role, i) => (
             <motion.button
               key={role.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-              whileHover={{ scale: 1.02 }}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: i * 0.05 }}
+              whileHover={{ y: -5, scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => navigate(role.path)}
-              className="w-full group p-5 rounded-2xl bg-slate-900/50 border border-slate-800 hover:border-emerald-500/30 hover:bg-slate-900/80 transition-all flex items-center gap-6 text-left relative overflow-hidden"
+              className="group p-6 rounded-[2.5rem] bg-slate-900/40 border border-white/5 hover:border-emerald-500/30 hover:bg-slate-900/80 transition-all text-left relative overflow-hidden backdrop-blur-xl shadow-2xl shadow-black/50"
               style={{ textAlign: isRTL ? 'right' : 'left' }}
             >
-              <div className={cn(
-                "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-gradient-to-br shadow-lg",
-                role.gradient
-              )}>
-                <role.icon className="w-6 h-6 text-white" />
-              </div>
+              <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none"></div>
+              
+              <div className="flex flex-col h-full justify-between gap-8 relative z-10">
+                <div className="flex justify-between items-start">
+                  <div className={cn(
+                    "w-14 h-14 rounded-2xl flex items-center justify-center bg-gradient-to-br shadow-xl transform group-hover:rotate-6 transition-transform",
+                    role.gradient
+                  )}>
+                    <role.icon className="w-7 h-7 text-white" />
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 bg-black/40 px-3 py-1 rounded-full border border-white/5">
+                    {role.badge}
+                  </span>
+                </div>
 
-              <div className="flex-1 space-y-1 pr-6">
-                <h3 className="text-lg font-bold text-white group-hover:text-emerald-400 transition-colors">
-                  {role.title}
-                </h3>
-                <p className="text-xs text-slate-500 leading-relaxed font-normal group-hover:text-slate-400">
-                  {role.desc}
-                </p>
-              </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-black text-white uppercase italic tracking-tighter group-hover:text-emerald-400 transition-colors">
+                    {role.title}
+                  </h3>
+                  <p className="text-xs text-slate-500 leading-relaxed font-bold opacity-60 group-hover:opacity-100 transition-opacity">
+                    {role.desc}
+                  </p>
+                </div>
 
-              <ArrowRight className={cn(
-                "w-5 h-5 text-slate-700 group-hover:text-emerald-500 transition-all",
-                isRTL ? "rotate-180 ml-4" : "mr-4"
-              )} />
+                <div className="flex items-center gap-2 text-emerald-500 font-black text-[10px] uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0">
+                  <span>Initialize</span>
+                  <ChevronRight className="w-4 h-4" />
+                </div>
+              </div>
             </motion.button>
           ))}
         </div>
 
-        {/* Footer */}
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.6 }}
-          className="pt-6 text-center border-t border-slate-800/50 w-full"
+          className="pt-12 text-center border-t border-white/5 w-full max-w-sm"
         >
-          <p className="text-sm text-slate-500">
-            {t('alreadyHaveAccount')}{' '}
-            <Link to="/login" className="text-emerald-500 font-bold hover:text-emerald-400 transition-colors hover:underline underline-offset-4 decoration-emerald-500/30">
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 flex items-center justify-center gap-4">
+            <span>{t('alreadyHaveAccount')}</span>
+            <Link to="/login" className="text-emerald-500 hover:text-white transition-all underline underline-offset-8 decoration-emerald-500/30">
               {t('signIn')}
             </Link>
           </p>

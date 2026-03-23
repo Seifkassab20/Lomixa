@@ -94,7 +94,7 @@ export function PharmaBundles() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black text-gray-900 dark:text-white uppercase italic tracking-tighter">
-            Nexus <span className="text-emerald-500">Market</span>
+            LOMIXA <span className="text-emerald-500">Market</span>
           </h1>
           <p className="text-sm text-gray-500 dark:text-slate-400 mt-1 uppercase tracking-widest font-bold opacity-60">Expand your regional healthcare influence</p>
         </div>
@@ -211,7 +211,7 @@ export function PharmaBundles() {
               <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-800/50">
                  <div className="flex justify-between items-center mb-4 text-[10px] font-black uppercase tracking-widest text-slate-500">
                     <span>Order Summary</span>
-                    <span>Nexus Marketplace</span>
+                    <span>LOMIXA Marketplace</span>
                  </div>
                  <div className="flex justify-between items-end">
                     <div className="text-white font-black italic">{bundles.find(b => b.id === showPayment)?.name} Plan</div>

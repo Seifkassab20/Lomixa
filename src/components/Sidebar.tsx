@@ -34,7 +34,7 @@ export function Sidebar() {
 
     switch (role) {
       case 'admin': return [
-        { key: 'admin', name: 'Nexus Admin', href: '/nexus-admin', icon: ShieldCheck },
+        { key: 'admin', name: 'LOMIXA Admin', href: '/admin-control', icon: ShieldCheck },
         { key: 'notifications', name: t('notifications'), href: '/notifications', icon: Bell, badge: notifCount },
         { key: 'settings', name: t('settings'), href: '/settings', icon: Settings },
       ];
