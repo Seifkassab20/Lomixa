@@ -12,6 +12,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '@/components/ui/Toast';
+import { saveDoctor, saveHospital, savePharmaCompany, saveSalesRep, getDoctors, generateId } from '@/lib/store';
 
 const CITY_MAP: Record<string, string[]> = {
   sa: ['riyadh', 'jeddah', 'dammam', 'makkah', 'medina', 'buraidah', 'tabuk', 'abha', 'khobar', 'hofuf'],
@@ -68,6 +69,7 @@ export function Register() {
     title: '', specialty: '', yearsExperience: '',
     roleTitle: '', pharmaCompany: '',
     licenseNumber: '', clinicName: '', profBio: '',
+    hospitalType: 'hospital',
     products: [{ category: '', name: '', form: '', description: '', indications: '', doses: '' }],
   });
 
@@ -118,7 +120,64 @@ export function Register() {
         options: { data: { ...formData, role: selectedRole, full_name: displayName } }
       });
       if (error) throw error;
-      navigate('/');
+      
+      let finalIsVerified = false;
+      const userId = data.user?.id;
+      if (userId) {
+        // Initial Grid Presence Creation (Linking with pre-invited records)
+        if (selectedRole === 'doctor') {
+          const existing = getDoctors().find(d => d.email?.toLowerCase() === formData.email.toLowerCase());
+          finalIsVerified = existing?.isVerified || false;
+          
+          saveDoctor({
+            id: existing?.id || generateId(),
+            userId,
+            name: displayName,
+            email: formData.email,
+            phone: formData.mobile,
+            specialty: existing?.specialty || 'General Practice',
+            experienceYears: existing?.experienceYears || 0,
+            hospitalId: existing?.hospitalId || null as any,
+            hospitalName: existing?.hospitalName || formData.clinicName || 'Independent',
+            availability: existing?.availability || [],
+            isActive: true,
+            isVerified: finalIsVerified
+          });
+        } else if (selectedRole === 'pharma') {
+          savePharmaCompany({ 
+            id: generateId(), userId, name: displayName, 
+            credits: 50, isActive: true, isVerified: false 
+          });
+        } else if (selectedRole === 'hospital') {
+          saveHospital({ 
+            id: generateId(), 
+            userId, 
+            name: displayName, 
+            location: formData.address || 'Saudi Arabia', 
+            isActive: true, 
+            isVerified: false,
+            type: formData.hospitalType as any
+          });
+        } else if (selectedRole === 'rep') {
+          saveSalesRep({
+            id: generateId(), userId, name: displayName, email: formData.email, phone: formData.mobile,
+            pharmaId: null as any, pharmaName: formData.pharmaCompany || 'Independent',
+            target: 500, visitsThisMonth: 0, credits: 0, isActive: true, isVerified: false
+          });
+        }
+      }
+
+      // If they were pre-verified (invited by hospital), they can proceed to login
+      if (finalIsVerified) {
+        toast('Identity Linked! Your account is active per facility invitation. Please login.', 'success');
+        window.location.href = '/login';
+        return;
+      }
+
+      // Mandatory: Sign out immediately as the account is pending admin approval
+      await supabase.auth.signOut();
+      toast('Registration Successful! Your account is now pending administrative approval.', 'success');
+      navigate('/login');
     } catch (err: any) {
       toast(err.message, 'error');
     } finally {
@@ -147,7 +206,7 @@ export function Register() {
         </div>
         <div className="p-8 rounded-[2rem] bg-white/5 border border-white/10 backdrop-blur-xl">
            <p className="text-[10px] font-black tracking-[0.4em] text-emerald-500 mb-2 uppercase italic">Verification Phase</p>
-           <h4 className="font-bold text-white tracking-wide">Syncing regional credentials...</h4>
+           <h4 className="font-bold text-white tracking-wide">{t('syncingCredentials')}</h4>
         </div>
       </div>
 
@@ -269,7 +328,7 @@ export function Register() {
                     <div className="space-y-8 animate-in fade-in duration-500 pt-8 border-t border-slate-800/30">
                        <div className="flex items-center gap-3 text-emerald-500 opacity-80">
                           <LayoutGrid className="w-4 h-4" />
-                          <span className="text-[10px] font-black uppercase tracking-[0.2em]">{isRTL ? 'تغطية الأحياء' : 'District Coverage'}</span>
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em]">{t('districtCoverage')}</span>
                        </div>
                        
                        <div className="space-y-8">
@@ -311,20 +370,86 @@ export function Register() {
                   <div className="p-4 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 shadow-emerald-500/10 shadow-xl">
                      <Shield className="w-6 h-6 text-emerald-400" />
                   </div>
-                  <h3 className="text-2xl font-black italic tracking-tighter uppercase">{t('domain_sec')}</h3>
+                  <h3 className="text-2xl font-black italic tracking-tighter uppercase">{selectedRole === 'admin' ? 'Nexus Credentials' : t('domain_sec')}</h3>
                </div>
 
+               {selectedRole === 'admin' && (
+                  <div className="space-y-6">
+                     <div className="p-8 rounded-[2rem] bg-emerald-500/5 border border-emerald-500/20">
+                        <p className="text-xs text-emerald-500/70 font-bold italic leading-relaxed">
+                           You are registering as a LOMIXA System Overlord. This account will have absolute control over credits, account status, and system-wide configurations. 
+                        </p>
+                     </div>
+                     <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase text-slate-500 px-2 italic">Access Token (Optional)</Label>
+                        <Input placeholder="X-NEXUS-ROOT-KEY" className="h-14 rounded-2xl bg-black/40 border-slate-800" />
+                     </div>
+                  </div>
+               )}
+
                {(selectedRole === 'pharma' || selectedRole === 'hospital') && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                     {['commCert', 'natAddress', 'vatCert'].map(doc => (
-                       <label key={doc} className="flex flex-col items-center justify-center p-12 rounded-[3.5rem] bg-black/40 border-2 border-dashed border-slate-800 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all cursor-pointer group space-y-5 text-center">
-                          <div className="w-14 h-14 rounded-2xl bg-slate-900 flex items-center justify-center group-hover:bg-emerald-500/20 transition-all">
-                             <Upload className="w-6 h-6 text-slate-600 group-hover:text-emerald-500" />
-                          </div>
-                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 group-hover:text-emerald-400 leading-relaxed italic">{t(doc)}</span>
-                          <input type="file" className="hidden" />
-                       </label>
-                     ))}
+                  <div className="space-y-12">
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {selectedRole === 'pharma' && (
+                           <div className="space-y-3">
+                              <Label className="text-[10px] font-black uppercase text-slate-500 px-2 italic">{t('pharma_cat_label')}</Label>
+                              <select name="specialty" value={formData.specialty} onChange={handleChange} className="w-full h-15 rounded-2xl bg-black/60 border border-slate-800 px-6 font-black text-sm outline-none focus:border-emerald-500/50 transition-all cursor-pointer">
+                                 {PHARMA_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                              </select>
+                           </div>
+                        )}
+                         {selectedRole === 'hospital' && (
+                            <div className="space-y-6">
+                               <div className="space-y-3">
+                                 <Label className="text-[10px] font-black uppercase text-slate-500 px-2 italic">{t('hospitalType')}</Label>
+                                 <div className="flex gap-4">
+                                   {['hospital', 'clinic'].map(type => (
+                                     <button
+                                       key={type}
+                                       type="button"
+                                       onClick={() => setFormData(p => ({ ...p, hospitalType: type }))}
+                                       className={cn(
+                                         "flex-1 h-14 rounded-2xl border font-black uppercase text-xs transition-all",
+                                         formData.hospitalType === type 
+                                           ? "bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/25"
+                                           : "bg-black/40 border-slate-800 text-slate-500 hover:border-slate-700"
+                                       )}
+                                     >
+                                       {t(type === 'hospital' ? 'hospitalKey' : 'clinic')}
+                                     </button>
+                                   ))}
+                                 </div>
+                               </div>
+                               <div className="space-y-3">
+                                 <Label className="text-[10px] font-black uppercase text-slate-500 px-2 italic">{t('hospital_level_label')}</Label>
+                                 <select name="specialty" value={formData.specialty} onChange={handleChange} className="w-full h-15 rounded-2xl bg-black/60 border border-slate-800 px-6 font-black text-sm outline-none focus:border-emerald-500/50 transition-all cursor-pointer">
+                                    <option value="primary">{t('primaryCare')}</option>
+                                    <option value="secondary">{t('secondaryCare')}</option>
+                                    <option value="tertiary">{t('tertiaryCare')}</option>
+                                 </select>
+                               </div>
+                            </div>
+                         )}
+                        <div className="space-y-3">
+                           <Label className="text-[10px] font-black uppercase text-slate-500 px-2 italic">{t('org_size_label')}</Label>
+                           <Input type="number" name="yearsExperience" value={formData.yearsExperience} onChange={handleChange} placeholder={t('totalWorkforce')} className="h-15 rounded-2xl bg-black/60 border-slate-800 font-black px-6" />
+                        </div>
+                     </div>
+
+                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-4">
+                        {['commCert', 'natAddress', 'vatCert'].map(doc => (
+                          <label key={doc} className="flex flex-col items-center justify-center p-10 rounded-[3rem] bg-black/40 border-2 border-dashed border-slate-800 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all cursor-pointer group space-y-4 text-center">
+                             <div className="w-14 h-14 rounded-2xl bg-slate-900 flex items-center justify-center group-hover:bg-emerald-500/20 transition-all shadow-inner">
+                                <Upload className="w-6 h-6 text-slate-600 group-hover:text-emerald-500" />
+                             </div>
+                              <div className="space-y-1">
+                                 <span className="block text-[10px] font-black uppercase tracking-widest text-slate-500 group-hover:text-emerald-400 leading-tight italic">{t(doc)}</span>
+                                 <span className="block text-[8px] font-black text-slate-600 uppercase tracking-tighter opacity-0 group-hover:opacity-100 transition-opacity">{t('uploadRestriction')}</span>
+                              </div>
+                             <input type="file" className="hidden" />
+                          </label>
+                        ))}
+                     </div>
                   </div>
                )}
 
@@ -371,11 +496,11 @@ export function Register() {
                   <div className="space-y-12">
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div className="space-y-3">
-                           <Label className="text-[10px] font-black text-slate-500 px-2 uppercase">Pharma Company</Label>
+                           <Label className="text-[10px] font-black text-slate-500 px-2 uppercase">{t('pharmaCompany')}</Label>
                            <Input name="pharmaCompany" value={formData.pharmaCompany} onChange={handleChange} className="h-15 rounded-2xl bg-black/60 border-slate-800 px-6 font-black" />
                         </div>
                         <div className="space-y-3">
-                           <Label className="text-[10px] font-black text-slate-500 px-2 uppercase">Official Role</Label>
+                           <Label className="text-[10px] font-black text-slate-500 px-2 uppercase">{t('officialRole')}</Label>
                            <select name="roleTitle" value={formData.roleTitle} onChange={handleChange} className="w-full h-15 rounded-2xl bg-black/60 border-slate-800 px-6 font-black outline-none">
                               {REP_ROLES.map(k => <option key={k} value={k}>{t(`rep_${k}`)}</option>)}
                            </select>
@@ -392,32 +517,32 @@ export function Register() {
                            {formData.products.map((p, i) => (
                              <div key={i} className="p-10 rounded-[3rem] bg-black/60 border border-slate-800 relative group/item">
                                 {i > 0 && <button type="button" onClick={() => setFormData(old => ({ ...old, products: old.products.filter((_, idx) => idx !== i) }))} className="absolute top-6 right-8 text-slate-700 hover:text-red-500 transition-colors"><X className="w-6 h-6" /></button>}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                   <div className="space-y-2">
-                                      <Label className="text-[10px] font-bold text-slate-600 px-2 uppercase">Brand Name</Label>
-                                      <Input value={p.name} onChange={e => {
-                                         const prods = [...formData.products];
-                                         prods[i].name = e.target.value;
-                                         setFormData(f => ({ ...f, products: prods }));
-                                      }} className="h-12 rounded-2xl bg-slate-900/40 border-slate-800" />
-                                   </div>
-                                   <div className="space-y-2">
-                                      <Label className="text-[10px] font-bold text-slate-600 px-2 uppercase">Category</Label>
-                                      <Input value={p.category} onChange={e => {
-                                         const prods = [...formData.products];
-                                         prods[i].category = e.target.value;
-                                         setFormData(f => ({ ...f, products: prods }));
-                                      }} className="h-12 rounded-2xl bg-slate-900/40 border-slate-800" />
-                                   </div>
-                                   <div className="md:col-span-2 space-y-2">
-                                      <Label className="text-[10px] font-bold text-slate-600 px-2 uppercase">Indications</Label>
-                                      <Input value={p.indications} onChange={e => {
-                                         const prods = [...formData.products];
-                                         prods[i].indications = e.target.value;
-                                         setFormData(f => ({ ...f, products: prods }));
-                                      }} className="h-12 rounded-2xl bg-slate-900/40 border-slate-800" />
-                                   </div>
-                                </div>
+                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                       <Label className="text-[10px] font-bold text-slate-600 px-2 uppercase">{t('brand_name')}</Label>
+                                       <Input value={p.name} onChange={e => {
+                                          const prods = [...formData.products];
+                                          prods[i].name = e.target.value;
+                                          setFormData(f => ({ ...f, products: prods }));
+                                       }} className="h-12 rounded-2xl bg-slate-900/40 border-slate-800" />
+                                    </div>
+                                    <div className="space-y-2">
+                                       <Label className="text-[10px] font-bold text-slate-600 px-2 uppercase">{t('product_cat')}</Label>
+                                       <Input value={p.category} onChange={e => {
+                                          const prods = [...formData.products];
+                                          prods[i].category = e.target.value;
+                                          setFormData(f => ({ ...f, products: prods }));
+                                       }} className="h-12 rounded-2xl bg-slate-900/40 border-slate-800" />
+                                    </div>
+                                    <div className="md:col-span-2 space-y-2">
+                                       <Label className="text-[10px] font-bold text-slate-600 px-2 uppercase">{t('indications')}</Label>
+                                       <Input value={p.indications} onChange={e => {
+                                          const prods = [...formData.products];
+                                          prods[i].indications = e.target.value;
+                                          setFormData(f => ({ ...f, products: prods }));
+                                       }} className="h-12 rounded-2xl bg-slate-900/40 border-slate-800" />
+                                    </div>
+                                 </div>
                              </div>
                            ))}
                         </div>

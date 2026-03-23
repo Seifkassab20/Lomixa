@@ -46,9 +46,6 @@ export function Topbar() {
   return (
     <header className="h-16 bg-white dark:bg-[#0f172a] border-b border-gray-200 dark:border-slate-800 flex items-center justify-between px-6 transition-colors shrink-0">
       <div className="flex items-center gap-4">
-        <h2 className="text-sm font-semibold text-gray-700 dark:text-slate-300">
-          {role ? t(rolePortalKey[role] || 'dashboard') : t('dashboard')}
-        </h2>
       </div>
       <div className="flex items-center gap-2">
         {/* Theme toggle */}

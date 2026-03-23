@@ -25,20 +25,32 @@ export function Layout() {
       : 'LOMIXA';
   }, [role, i18n.language, t]);
 
-  if (loading) {
+  const [authorized, setAuthorized] = React.useState<boolean | null>(null);
+
+  useEffect(() => {
+    const check = async () => {
+      if (!user) { setAuthorized(false); return; }
+      const { isUserAuthorized } = await import('@/lib/store');
+      const v = await isUserAuthorized(user.id, user.user_metadata?.role);
+      setAuthorized(v);
+    };
+    check();
+  }, [user, role]);
+
+  if (loading || authorized === null) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-[#050b14]">
         <div className="flex flex-col items-center gap-4">
           <div className="h-10 w-10 rounded-xl bg-emerald-500 flex items-center justify-center animate-pulse">
             <div className="h-5 w-5 rounded bg-white/50" />
           </div>
-          <div className="text-sm text-gray-500 dark:text-slate-400">Loading LOMIXA...</div>
+          <div className="text-sm text-gray-500 dark:text-slate-400">Verifying LOMIXA Security Protocol...</div>
         </div>
       </div>
     );
   }
 
-  if (!user) {
+  if (!user || authorized === false) {
     return <Navigate to="/login" replace />;
   }
 

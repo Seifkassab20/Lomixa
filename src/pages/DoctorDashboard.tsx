@@ -31,6 +31,8 @@ export function DoctorDashboard() {
         hospitalName: user?.user_metadata?.organization || 'Hospital',
         availability: [],
         userId,
+        isActive: true,
+        isVerified: false,
       };
       saveDoctor(myDoc);
     }

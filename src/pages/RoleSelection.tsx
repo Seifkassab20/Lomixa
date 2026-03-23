@@ -1,14 +1,22 @@
 import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
-import { Building2, Hospital as HospitalIcon, Stethoscope, Users, ArrowRight } from 'lucide-react';
+import { Building2, Hospital as HospitalIcon, Stethoscope, Users, ArrowRight, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function RoleSelection() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const isRTL = i18n.language === 'ar';
+  const [logoClicks, setLogoClicks] = React.useState(0);
+  const [showAdmin, setShowAdmin] = React.useState(false);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => setLogoClicks(0), 3000);
+    if (logoClicks >= 5) setShowAdmin(true);
+    return () => clearTimeout(timer);
+  }, [logoClicks]);
 
   const roles = [
     {
@@ -37,13 +45,24 @@ export function RoleSelection() {
     },
     {
       id: 'rep',
-      title: t('roleSelection.rep.title'),
-      desc: t('roleSelection.rep.desc'),
+      title: t('salesRep'),
+      desc: t('salesRepDesc'),
       icon: Users,
-      path: '/register/subordinate',
-      gradient: 'from-teal-500/80 to-emerald-600/80'
+      path: '/register/rep',
+      gradient: 'from-orange-500 to-amber-600'
     }
   ];
+
+  if (showAdmin) {
+    roles.unshift({
+      id: 'admin',
+      title: 'LOMIXA Nexus Admin',
+      desc: 'System Overlord Registration - Root Access',
+      icon: Shield,
+      path: '/register/admin',
+      gradient: 'from-purple-600 to-pink-700'
+    });
+  }
 
   return (
     <div className="min-h-screen bg-[#050b14] text-white flex flex-col items-center justify-center p-6 relative overflow-hidden">
@@ -58,7 +77,10 @@ export function RoleSelection() {
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col items-center text-center space-y-6"
         >
-          <div className="w-16 h-16 bg-white rounded-2xl p-2.5 shadow-2xl shadow-emerald-500/20 transform hover:rotate-3 transition-transform duration-500">
+          <div 
+            onClick={() => setLogoClicks(p => p + 1)}
+            className="w-16 h-16 bg-white rounded-2xl p-2.5 shadow-2xl shadow-emerald-500/20 transform hover:rotate-3 transition-transform duration-500 cursor-pointer active:scale-95"
+          >
             <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
           </div>
           <div className="space-y-2">

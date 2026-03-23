@@ -34,6 +34,7 @@ import { RepMyVisits } from './pages/rep/RepMyVisits';
 import { ToastProvider } from './components/ui/Toast';
 import { AboutUs } from './pages/AboutUs';
 import { TermsAndConditions } from './pages/TermsAndConditions';
+import { AdminDashboard } from './pages/admin/AdminDashboard';
 
 function OnboardingWrapper() {
   const navigate = useNavigate();
@@ -44,11 +45,25 @@ function OnboardingWrapper() {
   return <Onboarding onComplete={handleComplete} />;
 }
 
+import { isUserAuthorized } from './lib/store';
+
 function InitialCheck() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const [authorized, setAuthorized] = React.useState<boolean | null>(null);
   const onboardingSeen = localStorage.getItem('lomixa_onboarding_seen') === 'true';
 
+  React.useEffect(() => {
+    if (user) {
+      isUserAuthorized(user.id, user.user_metadata?.role).then(setAuthorized);
+    } else {
+      setAuthorized(false);
+    }
+  }, [user]);
+
+  if (authLoading || (user && authorized === null)) return null;
+
   if (user) {
+    if (authorized === false) return <Navigate to="/login" replace />;
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -100,6 +115,9 @@ export default function App() {
                 <Route path="bookings" element={<BookingsPage />} />
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="settings" element={<SettingsPage />} />
+                
+                {/* Admin */}
+                <Route path="nexus-admin" element={<AdminDashboard />} />
               </Route>
 
               <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/lib/auth';
 import { getVisits, getSalesReps, getPharmaCompanies, getDoctors, getNotifications, savePharmaCompany, generateId } from '@/lib/store';
-import { Users, Activity, CreditCard, Calendar as CalendarIcon, Video, Phone, MapPin, MessageSquare, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Users, Activity, CreditCard, Calendar as CalendarIcon, Video, Phone, MapPin, MessageSquare, TrendingUp, AlertTriangle, ArrowRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -34,6 +34,8 @@ export function PharmaDashboard() {
         name: user?.user_metadata?.organization || user?.email?.split('@')[1]?.split('.')[0] || 'My Pharma Company',
         credits: 100,
         userId,
+        isActive: true,
+        isVerified: false,
       };
       savePharmaCompany(mine);
     }
@@ -164,18 +166,19 @@ export function PharmaDashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {[
-          { label: t('subordinates'), href: '/subordinates', icon: Users },
-          { label: t('analytics'), href: '/analytics', icon: Activity },
-          { label: t('buyBundle'), href: '/bundles', icon: CreditCard },
+          { label: t('manageRepresentatives') || 'Manage Representatives', href: '/subordinates', icon: Users },
           { label: t('allBookings'), href: '/bookings', icon: CalendarIcon },
         ].map(({ label, href, icon: Icon }) => (
-          <button key={label} onClick={() => navigate(href)} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-4 flex flex-col items-center gap-3 hover:border-emerald-500/50 hover:shadow-md transition-all group">
-            <div className="h-10 w-10 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
-              <Icon className="h-5 w-5" />
+          <button key={label} onClick={() => navigate(href)} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-6 flex items-center justify-between hover:border-emerald-500/50 hover:shadow-md transition-all group">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
+                <Icon className="h-6 w-6" />
+              </div>
+              <span className="text-sm font-bold text-gray-700 dark:text-slate-300 uppercase tracking-widest">{label}</span>
             </div>
-            <span className="text-xs font-medium text-gray-700 dark:text-slate-300">{label}</span>
+            <ArrowRight className="w-5 h-5 text-slate-400 group-hover:translate-x-1 group-hover:text-emerald-500 transition-all" />
           </button>
         ))}
       </div>

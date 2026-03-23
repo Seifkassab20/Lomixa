@@ -39,9 +39,16 @@ export function Login() {
   const { toast } = useToast();
 
   React.useEffect(() => {
-    if (user && !loading) {
-      navigate('/', { replace: true });
-    }
+    const checkRedirect = async () => {
+      // Only redirect if authenticated AND fully verified/authorized
+      if (user && !loading) {
+        const { isUserAuthorized } = await import('@/lib/store');
+        if (isUserAuthorized(user.id, user.user_metadata?.role)) {
+           navigate('/dashboard', { replace: true });
+        }
+      }
+    };
+    checkRedirect();
   }, [user, loading, navigate]);
 
   const handleLogoClick = () => {
@@ -102,10 +109,22 @@ export function Login() {
       // Force-fetch the latest user data to ensure metadata is sync'd
       const { data: { user: freshUser } } = await supabase.auth.getUser();
       
+      const userId = freshUser?.id;
       const actualRole = freshUser?.user_metadata?.role;
       if (actualRole && actualRole !== selectedRole) {
         await supabase.auth.signOut();
         throw new Error(`Invalid role. This account is registered as a ${actualRole}. Please select the ${actualRole} role to sign in.`);
+      }
+
+      // Robust Verification Gate: Check local grid, then fallback to direct cloud query
+      if (userId) {
+        const { isUserAuthorized } = await import('@/lib/store');
+        const authorized = await isUserAuthorized(userId, selectedRole);
+
+        if (!authorized) {
+          await supabase.auth.signOut();
+          throw new Error('Verification Pending: Your practitioner identity is currently being reviewed by the LOMIXA Nexus Admin. You will be notified once access is granted.');
+        }
       }
 
       navigate('/', { replace: true });
@@ -214,8 +233,11 @@ export function Login() {
               )}
 
               <div className="space-y-3">
-                <Label className="text-[10px] font-bold tracking-widest uppercase text-slate-500 ml-1">{t('identifyRole')}</Label>
-                <div className="grid grid-cols-2 gap-3">
+                <Label className="text-[10px] font-black tracking-widest uppercase text-slate-500 ml-1 italic">{t('identifyRole')}</Label>
+                <div className={cn(
+                  "grid gap-3 transition-all duration-500",
+                  showAdmin ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-5" : "grid-cols-2"
+                )}>
                   {roles.map((r) => {
                     const Icon = r.icon;
                     const isSelected = selectedRole === r.id;
@@ -308,13 +330,16 @@ export function Login() {
               </Button>
             </form>
 
-            <div className="mt-10 text-center relative z-10 pt-6 border-t border-slate-800/50">
-              <p className="text-sm text-slate-400">
-                {t('newToPlatform')}{' '}
-                <Link to="/register" className="font-bold text-emerald-400 hover:text-emerald-300 transition-colors underline underline-offset-4 decoration-emerald-500/30 hover:decoration-emerald-500">
-                  {t('initiateRegistration')}
-                </Link>
+            <div className="mt-8 text-center border-t border-slate-800/30 pt-8 flex items-center justify-between px-4">
+              <p className="text-sm text-slate-500 font-bold uppercase tracking-widest leading-relaxed">
+                {t('noAccount')} <Link to="/select-role" className="text-emerald-500 hover:text-emerald-400 underline decoration-emerald-500/20 underline-offset-4">{t('signUp')}</Link>
               </p>
+              <button 
+                onClick={() => setShowAdmin(true)} 
+                className="text-[10px] text-slate-700 hover:text-emerald-500/50 uppercase font-black tracking-widest transition-colors flex items-center gap-1"
+              >
+                <Shield className="w-3 h-3" /> Admin Access
+              </button>
             </div>
           </div>
         </div>

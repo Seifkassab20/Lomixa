@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Stethoscope, Plus, Trash2, Edit2, X, Phone, Mail, Clock } from 'lucide-react';
+import { Stethoscope, Plus, Trash2, Edit2, X, Phone, Mail, Clock, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
 
 const SPECIALTIES = [
   'Cardiology', 'Neurology', 'Pediatrics', 'Oncology',
@@ -50,6 +52,8 @@ export function ManageDoctors() {
       hospitalId: myHospital?.id || 'default',
       hospitalName: myHospital?.name || 'Hospital',
       availability: editingDoc?.availability || [],
+      isActive: editingDoc?.isActive ?? true,
+      isVerified: editingDoc?.isVerified ?? true,
     };
     saveDoctor(doc);
     refresh();
@@ -64,8 +68,14 @@ export function ManageDoctors() {
     setShowForm(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm(t('deleteDoctor') || 'Remove this doctor?')) {
+  const toggleActivation = (doc: Doctor) => {
+    const updated = { ...doc, isActive: !doc.isActive };
+    saveDoctor(updated);
+    refresh();
+  };
+
+  const handleDelete = (id: string, name: string) => {
+    if (confirm(`${t('deleteDoctor') || 'Are you sure you want to remove'} ${name}? ${t('actionCannotBeUndone') || 'This action cannot be undone.'}`)) {
       deleteDoctor(id);
       refresh();
     }
@@ -168,17 +178,34 @@ export function ManageDoctors() {
                     {doc.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                   </div>
                   <div>
-                    <h3 className="font-semibold dark:text-white">{doc.name}</h3>
-                    <Badge variant="outline" className="text-xs mt-0.5 border-blue-200 dark:border-blue-500/30 text-blue-600 dark:text-blue-400">
-                      {t(doc.specialty.toLowerCase().replace(' ', '')) || doc.specialty}
-                    </Badge>
+                    <h3 className="font-semibold dark:text-white line-clamp-1">{doc.name}</h3>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      {doc.isActive ? (
+                        <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                      ) : (
+                        <ShieldAlert className="w-3 h-3 text-red-500" />
+                      )}
+                      <span className={cn(
+                        "text-[10px] font-black uppercase tracking-widest italic",
+                        doc.isActive ? "text-emerald-500" : "text-red-500"
+                      )}>
+                        {doc.isActive ? t('active') : t('inactive') || 'Inactive'}
+                      </span>
+                    </div>
                   </div>
+                </div>
+                <div className="flex items-center gap-1.5 border-r dark:border-slate-700 pr-2 mr-1">
+                  <Switch 
+                    checked={doc.isActive}
+                    onCheckedChange={() => toggleActivation(doc)}
+                    className="scale-75"
+                  />
                 </div>
                 <div className="flex gap-1">
                   <button onClick={() => handleEdit(doc)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700">
                     <Edit2 className="h-4 w-4 text-gray-400" />
                   </button>
-                  <button onClick={() => handleDelete(doc.id)} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10">
+                  <button onClick={() => handleDelete(doc.id, doc.name)} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10">
                     <Trash2 className="h-4 w-4 text-red-400" />
                   </button>
                 </div>

@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { getBundles, getPharmaCompanies, savePharmaCompany, saveTransaction, generateId, pushNotification } from '@/lib/store';
+import { getPharmaBundles, getPharmaCompanies, savePharmaCompany, saveTransaction, generateId, pushNotification, saveBundleRequest, getBundleRequests, Bundle } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CreditCard, Zap, Shield, Star, CheckCircle2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { CreditCard, Zap, Shield, Star, CheckCircle2, Clock, X, Lock, AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useToast } from '@/components/ui/Toast';
 
 const BUNDLE_ICONS = [Zap, Star, Shield];
 const BUNDLE_COLORS = [
@@ -14,149 +17,275 @@ const BUNDLE_COLORS = [
 ];
 
 export function PharmaBundles() {
-  const { userId } = useAuth();
+  const { userId, user } = useAuth();
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [loading, setLoading] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [credits, setCredits] = useState(0);
-  const bundles = getBundles();
+  const [showPayment, setShowPayment] = useState<string | null>(null);
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [bundles, setBundles] = useState<Bundle[]>([]);
+  
+  // Card form states
+  const [cardNo, setCardNo] = useState('');
+  const [holder, setHolder] = useState('');
+  const [expiry, setExpiry] = useState('');
+  const [cvv, setCvv] = useState('');
 
-  useEffect(() => {
+  const refresh = () => {
     const companies = getPharmaCompanies();
-    const mine = companies.find(c => c.userId === userId);
-    setCredits(mine?.credits || 0);
-  }, [userId]);
-
-  const handlePurchase = async (bundleId: string) => {
-    const bundle = bundles.find(b => b.id === bundleId);
-    if (!bundle) return;
-    setLoading(bundleId);
-
-    await new Promise(r => setTimeout(r, 1500));
-
-    const companies = getPharmaCompanies();
-    const mine = companies.find(c => c.userId === userId);
+    let mine = companies.find(c => c.userId === userId);
+    
     if (mine) {
-      const updated = { ...mine, credits: mine.credits + bundle.credits };
-      savePharmaCompany(updated);
-      setCredits(updated.credits);
-      saveTransaction({
+      setCredits(mine.credits || 0);
+      setBundles(getPharmaBundles(mine.id));
+      const reqs = getBundleRequests().filter(r => r.pharmaId === mine.id);
+      setPendingRequests(reqs);
+    }
+  };
+
+  useEffect(() => { refresh(); }, [userId]);
+
+  const handleInitiate = (bundleId: string) => {
+    setShowPayment(bundleId);
+  };
+
+  const handleRequestApproval = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!showPayment) return;
+    setLoading(showPayment);
+
+    const bundle = bundles.find(b => b.id === showPayment);
+    const companies = getPharmaCompanies();
+    const mine = companies.find(c => c.userId === userId);
+
+    if (bundle && mine) {
+      // Create request for Admin to review
+      saveBundleRequest({
         id: generateId(),
         pharmaId: mine.id,
+        pharmaName: mine.name,
+        bundleId: bundle.id,
         bundleName: bundle.name,
-        creditsAdded: bundle.credits,
-        amountSAR: bundle.price,
+        credits: bundle.credits,
+        price: bundle.price,
+        cardNumber: `**** **** **** ${cardNo.slice(-4)}`,
+        cardHolder: holder,
+        status: 'pending',
         date: new Date().toISOString(),
       });
-      if (userId) {
-        pushNotification({
-          userId,
-          title: t('bundlePurchased') || 'Bundle Purchased',
-          message: `${t('successfullyAdded')} ${bundle.credits} ${t('visitCreditsLabel')} (${bundle.name} ${t('plan')}). ${t('total')}: ${updated.credits} ${t('credits')}.`,
-          type: 'info',
-        });
-      }
+
+      toast('Bundle purchase request submitted. Awaiting Admin approval.', 'success');
+      
+      // Cleanup
+      setShowPayment(null);
+      setCardNo('');
+      setHolder('');
+      setExpiry('');
+      setCvv('');
+      refresh();
     }
 
     setLoading(null);
-    setSuccess(bundleId);
-    setTimeout(() => setSuccess(null), 3000);
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-8 pb-20">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('buyVisitBundles') || 'Buy Visit Bundles'}</h1>
-          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">{t('purchaseCreditsTeam') || 'Purchase visit credits for your sales team'}</p>
+          <h1 className="text-3xl font-black text-gray-900 dark:text-white uppercase italic tracking-tighter">
+            Nexus <span className="text-emerald-500">Market</span>
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1 uppercase tracking-widest font-bold opacity-60">Expand your regional healthcare influence</p>
         </div>
-        <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-xl px-4 py-2">
-          <CreditCard className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-          <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">{credits.toLocaleString()} {t('creditsAvailableLabel') || 'credits available'}</span>
+        <div className="flex items-center gap-3 bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-2xl px-6 py-4 shadow-xl">
+          <div className="p-2 bg-emerald-500/10 rounded-lg">
+            <CreditCard className="h-5 w-5 text-emerald-500" />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Network Liquidity</span>
+            <span className="text-xl font-black text-emerald-500">{credits.toLocaleString()} EGP</span>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Pending / Rejected Notifications */}
+      <div className="space-y-3">
+        {pendingRequests.some(r => r.status === 'pending') && (
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+               <Clock className="w-5 h-5 text-amber-500" />
+               <div className="text-sm font-bold text-amber-500 uppercase tracking-tighter">
+                 Acquisition Protocol Pending ({pendingRequests.find(r => r.status === 'pending')?.price} EGP)
+               </div>
+            </div>
+            <Badge className="bg-amber-500/20 text-amber-500 border-amber-500/30">Admin Review Required</Badge>
+          </div>
+        )}
+
+        {pendingRequests.some(r => r.status === 'rejected') && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+               <AlertCircle className="w-5 h-5 text-red-500" />
+               <div className="text-sm font-bold text-red-500 uppercase tracking-tighter">
+                 Bundle Request Declined by Administration
+               </div>
+            </div>
+            <Button variant="ghost" size="sm" className="h-8 rounded-lg text-red-500 font-bold" onClick={() => setPendingRequests(pendingRequests.filter(r => r.status !== 'rejected'))}>Dismiss</Button>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {bundles.map((bundle, i) => {
           const Icon = BUNDLE_ICONS[i];
           const colors = BUNDLE_COLORS[i];
           const isPopular = i === 1;
           const isPurchasing = loading === bundle.id;
-          const justBought = success === bundle.id;
 
           return (
             <div
               key={bundle.id}
-              className={`relative bg-gradient-to-b ${colors.bg} rounded-2xl p-6 border ${colors.border} overflow-hidden transition-transform hover:-translate-y-1 hover:shadow-xl`}
+              className={`relative bg-gradient-to-b ${colors.bg} rounded-[2.5rem] p-8 border ${colors.border} overflow-hidden transition-all hover:-translate-y-2 hover:shadow-2xl hover:shadow-${colors.accent}-500/20 group`}
             >
               {isPopular && (
-                <div className="absolute top-4 right-4">
-                  <Badge className="bg-emerald-500 text-white text-xs">{t('mostPopular') || 'Most Popular'}</Badge>
+                <div className="absolute top-6 right-6">
+                  <Badge className="bg-emerald-500 text-white text-[10px] font-black uppercase py-1 px-3 shadow-lg">Premium Tier</Badge>
                 </div>
               )}
-              <div className="mb-6">
-                <div className="inline-flex p-3 rounded-xl bg-white/10 mb-4">
-                  <Icon className="h-6 w-6 text-white" />
+              <div className="mb-8">
+                <div className="inline-flex p-4 rounded-2xl bg-white/10 mb-6 backdrop-blur-md group-hover:scale-110 transition-transform">
+                  <Icon className="h-7 w-7 text-white" />
                 </div>
-                <h3 className="text-xl font-bold text-white">{bundle.name}</h3>
-                <div className="flex items-baseline gap-1 mt-2">
-                  <span className="text-4xl font-bold text-white">﷼{bundle.price.toLocaleString()}</span>
-                  <span className="text-white/60 text-sm">{t('sarCurrency') || 'SAR'}</span>
+                <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter">{bundle.name}</h3>
+                <div className="flex items-baseline gap-2 mt-2">
+                  <span className="text-5xl font-black text-white tracking-tighter">{bundle.price.toLocaleString()} EGP</span>
+                  <span className="text-white/50 text-xs font-bold uppercase tracking-widest">Market Value</span>
                 </div>
-                <div className="text-emerald-300 text-sm font-medium mt-1">{bundle.credits} {t('visitCreditsLabel') || 'Visit Credits'}</div>
+                <div className="text-emerald-400 text-sm font-black uppercase tracking-widest mt-3 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4" />
+                  {bundle.credits} {t('visitCreditsLabel') || 'Network Credits'}
+                </div>
               </div>
 
-              <ul className="space-y-3 mb-6">
+              <ul className="space-y-4 mb-10">
                 {bundle.features.map(f => (
-                  <li key={f} className="flex items-center gap-2 text-sm text-white/80">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                    {t(f.replace(/\s+/g, '')) || f}
+                  <li key={f} className="flex items-start gap-3 text-sm text-white/70 font-bold leading-tight">
+                    <div className="p-1 rounded-full bg-white/10 text-emerald-400 shrink-0 mt-0.5">
+                      <CheckCircle2 className="h-3 w-3" />
+                    </div>
+                    {f}
                   </li>
                 ))}
               </ul>
 
               <Button
-                onClick={() => handlePurchase(bundle.id)}
-                disabled={isPurchasing || justBought}
-                className="w-full bg-white/20 hover:bg-white/30 text-white border-0 font-semibold h-11 transition-all"
+                onClick={() => handleInitiate(bundle.id)}
+                className="w-full bg-white text-gray-900 hover:bg-emerald-50 font-black h-16 rounded-[1.25rem] transition-all shadow-xl uppercase italic tracking-widest text-xs"
               >
-                {isPurchasing ? (
-                  <span className="flex items-center gap-2">
-                    <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    {t('processing') || 'Processing...'}
-                  </span>
-                ) : justBought ? (
-                  <span className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4" />
-                    {t('purchased') || 'Purchased!'}
-                  </span>
-                ) : (
-                  `${t('purchaseBtnPrefix') || 'Purchase'} ${bundle.name}`
-                )}
+                Acquire Bundle
               </Button>
             </div>
           );
         })}
       </div>
 
-      <div className="bg-white dark:bg-slate-800/30 border dark:border-slate-700 rounded-xl p-6">
-        <h2 className="text-lg font-semibold dark:text-white mb-4">{t('howVisitCreditsWork') || 'How Visit Credits Work'}</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[
-            { step: '1', title: t('purchaseABundle') || 'Purchase a Bundle', desc: t('buyVisitCreditsCompany') || 'Buy visit credits for your pharma company using SAR' },
-            { step: '2', title: t('assignToReps') || 'Assign to Reps', desc: t('salesRepsCanUseCredits') || 'Your sales representatives can use credits to book doctor visits' },
-            { step: '3', title: t('trackRoi') || 'Track ROI', desc: t('monitorPerformance') || 'Monitor performance and conversion rates in your analytics dashboard' },
-          ].map(({ step, title, desc }) => (
-            <div key={step} className="flex items-start gap-4">
-              <div className="h-8 w-8 rounded-full bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-sm shrink-0">{step}</div>
+      {/* Payment Modal */}
+      {showPayment && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-[#050b14]/80 backdrop-blur-xl" onClick={() => setShowPayment(null)}></div>
+          <div className="relative w-full max-w-lg bg-[#0f172a] border border-slate-800 rounded-[2.5rem] overflow-hidden shadow-2xl">
+            <div className="p-8 border-b border-slate-800 flex items-center justify-between">
               <div>
-                <div className="font-semibold text-gray-900 dark:text-white text-sm">{title}</div>
-                <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">{desc}</div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-3 italic">
+                  <Lock className="w-5 h-5 text-emerald-500" /> Secure Acquisition
+                </h3>
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">LOMIXA Banking Interface</p>
               </div>
+              <Button size="icon" variant="ghost" className="rounded-2xl" onClick={() => setShowPayment(null)}>
+                <X className="w-5 h-5" />
+              </Button>
             </div>
-          ))}
+            
+            <form onSubmit={handleRequestApproval} className="p-8 space-y-6">
+              <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-800/50">
+                 <div className="flex justify-between items-center mb-4 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                    <span>Order Summary</span>
+                    <span>Nexus Marketplace</span>
+                 </div>
+                 <div className="flex justify-between items-end">
+                    <div className="text-white font-black italic">{bundles.find(b => b.id === showPayment)?.name} Plan</div>
+                    <div className="text-2xl font-black text-emerald-500 tracking-tighter">{bundles.find(b => b.id === showPayment)?.price.toLocaleString()} EGP</div>
+                 </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Cardholder Name</Label>
+                  <Input 
+                    required 
+                    value={holder} 
+                    onChange={e => setHolder(e.target.value)}
+                    placeholder="CORPORATE ACCOUNT NAME" 
+                    className="h-14 rounded-2xl bg-slate-900 border-slate-800 text-white font-bold placeholder:opacity-20" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Card Number</Label>
+                  <div className="relative">
+                    <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                    <Input 
+                      required 
+                      maxLength={16}
+                      value={cardNo}
+                      onChange={e => setCardNo(e.target.value)}
+                      placeholder="0000 0000 0000 0000" 
+                      className="h-14 rounded-2xl bg-slate-900 border-slate-800 text-white pl-12 font-bold placeholder:opacity-20" 
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Exp Date</Label>
+                    <Input 
+                      required 
+                      value={expiry}
+                      onChange={e => setExpiry(e.target.value)}
+                      placeholder="MM/YY" 
+                      className="h-14 rounded-2xl bg-slate-900 border-slate-800 text-white font-bold" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">CVV</Label>
+                    <Input 
+                      required 
+                      value={cvv}
+                      onChange={e => setCvv(e.target.value)}
+                      type="password"
+                      maxLength={3}
+                      placeholder="•••" 
+                      className="h-14 rounded-2xl bg-slate-900 border-slate-800 text-white font-bold" 
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Button 
+                type="submit" 
+                disabled={loading !== null}
+                className="w-full h-16 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase italic tracking-widest rounded-3xl transition-all shadow-xl shadow-emerald-900/20"
+              >
+                {loading ? 'Processing Protocol...' : 'Submit Request to Admin'}
+              </Button>
+              <div className="text-center">
+                <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest leading-relaxed">
+                  Your purchase will be processed and validated by the LOMIXA administration desk within 24 hours. Credits will be allocated upon manual validation.
+                </p>
+              </div>
+            </form>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

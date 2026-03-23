@@ -14,6 +14,8 @@ export interface Doctor {
   email: string;
   availability: AvailabilitySlot[];
   userId?: string;
+  isActive: boolean;
+  isVerified: boolean;
 }
 
 export interface AvailabilitySlot {
@@ -33,6 +35,8 @@ export interface SalesRep {
   pharmaId: string;
   pharmaName: string;
   userId?: string;
+  isActive: boolean;
+  isVerified: boolean;
   visitsThisMonth: number;
   target: number;
   credits: number; // For booking appointments
@@ -43,6 +47,9 @@ export interface Hospital {
   name: string;
   location: string;
   userId?: string;
+  isActive: boolean;
+  isVerified: boolean;
+  type: 'hospital' | 'clinic';
 }
 
 export interface PharmaCompany {
@@ -50,6 +57,9 @@ export interface PharmaCompany {
   name: string;
   credits: number;
   userId?: string;
+  isActive: boolean;
+  isVerified: boolean;
+  customBundles?: Bundle[];
 }
 
 export type VisitStatus = 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled';
@@ -85,6 +95,20 @@ export interface Bundle {
   features: string[];
 }
 
+export interface BundleRequest {
+  id: string;
+  pharmaId: string;
+  pharmaName: string;
+  bundleId: string;
+  bundleName: string;
+  credits: number;
+  price: number;
+  cardNumber: string; // Partial for demo
+  cardHolder: string;
+  status: 'pending' | 'approved' | 'rejected';
+  date: string;
+}
+
 export interface Notification {
   id: string;
   userId: string;
@@ -100,7 +124,7 @@ export interface Transaction {
   pharmaId: string;
   bundleName: string;
   creditsAdded: number;
-  amountSAR: number;
+  amountEGP: number;
   date: string;
 }
 
@@ -109,21 +133,21 @@ const BUNDLES: Bundle[] = [
     id: 'starter',
     name: 'Starter',
     credits: 50,
-    price: 500,
+    price: 1500,
     features: ['50 Visit Credits', 'Basic Analytics', 'Email Support', '1 Sales Rep'],
   },
   {
     id: 'professional',
     name: 'Professional',
     credits: 200,
-    price: 1500,
+    price: 4500,
     features: ['200 Visit Credits', 'Advanced Analytics', 'Priority Support', '5 Sales Reps', 'Video Call Integration'],
   },
   {
     id: 'enterprise',
     name: 'Enterprise',
     credits: 1000,
-    price: 5000,
+    price: 15000,
     features: ['1000 Visit Credits', 'Full Analytics Suite', 'Dedicated Account Manager', 'Unlimited Reps', 'Custom Integrations', 'Arabic/English Support'],
   },
 ];
@@ -142,6 +166,14 @@ function load<T>(key: string, fallback: T): T {
 
 function save<T>(key: string, value: T) {
   localStorage.setItem(getKey(key), JSON.stringify(value));
+}
+
+function notifyMutation() {
+  localStorage.setItem(getKey('last_mutation'), Date.now().toString());
+}
+
+function getLastMutationTime() {
+  return parseInt(localStorage.getItem(getKey('last_mutation')) || '0');
 }
 
 // ── SUPABASE SYNC MAPPINGS ───────────────────────────────────────
@@ -203,6 +235,8 @@ function mapDoctorToDB(d: Doctor) {
     experience_years: d.experienceYears,
     phone: d.phone,
     email: d.email,
+    is_active: d.isActive,
+    is_verified: d.isVerified
   };
 }
 
@@ -217,24 +251,55 @@ function mapDoctorFromDB(db: any): Doctor {
     experienceYears: db.experience_years,
     phone: db.phone,
     email: db.email,
+    isActive: db.is_active ?? true,
+    isVerified: db.is_verified ?? false,
     availability: load(`availability_${db.id}`, []), // Slots handle sync separately below
   };
 }
 
 function mapHospitalToDB(h: Hospital) {
-  return { id: h.id, user_id: h.userId, name: h.name, location: h.location };
+  return { 
+    id: h.id, 
+    user_id: h.userId, 
+    name: h.name, 
+    location: h.location, 
+    is_active: h.isActive, 
+    is_verified: h.isVerified,
+    type: h.type 
+  };
 }
 
 function mapHospitalFromDB(db: any): Hospital {
-  return { id: db.id, userId: db.user_id, name: db.name, location: db.location };
+  return { 
+    id: db.id, 
+    userId: db.user_id, 
+    name: db.name, 
+    location: db.location, 
+    isActive: db.is_active ?? true, 
+    isVerified: db.is_verified ?? false,
+    type: db.type || 'hospital'
+  };
 }
 
 function mapPharmaToDB(p: PharmaCompany) {
-  return { id: p.id, user_id: p.userId, name: p.name, credits: p.credits };
+  const data: any = { id: p.id, user_id: p.userId, name: p.name, credits: p.credits, is_active: p.isActive, is_verified: p.isVerified };
+  if (p.customBundles) data.custom_bundles = JSON.stringify(p.customBundles);
+  return data;
 }
 
 function mapPharmaFromDB(db: any): PharmaCompany {
-  return { id: db.id, userId: db.user_id, name: db.name, credits: db.credits };
+  let bundles: Bundle[] = [];
+  try {
+    if (db.custom_bundles) bundles = JSON.parse(db.custom_bundles);
+  } catch (e) {
+    console.warn("Failed to parse custom bundles for " + db.name, e);
+  }
+
+  return { 
+    id: db.id, userId: db.user_id, name: db.name, credits: db.credits, 
+    isActive: db.is_active ?? true, isVerified: db.is_verified ?? false,
+    customBundles: bundles
+  };
 }
 
 function mapRepToDB(r: SalesRep) {
@@ -243,7 +308,8 @@ function mapRepToDB(r: SalesRep) {
     pharma_id: r.pharmaId === 'default' || !r.pharmaId ? null : r.pharmaId, 
     pharma_name: r.pharmaName,
     name: r.name, email: r.email, phone: r.phone, target: r.target, 
-    visits_this_month: r.visitsThisMonth, credits: r.credits || 0
+    visits_this_month: r.visitsThisMonth, credits: r.credits || 0,
+    is_active: r.isActive, is_verified: r.isVerified
   };
 }
 
@@ -251,7 +317,9 @@ function mapRepFromDB(db: any): SalesRep {
   return {
     id: db.id, userId: db.user_id, pharmaId: db.pharma_id, pharmaName: db.pharma_name,
     name: db.name, email: db.email, phone: db.phone, target: db.target, 
-    visitsThisMonth: db.visits_this_month, credits: db.credits || 0
+    visitsThisMonth: db.visits_this_month, credits: db.credits || 0,
+    isActive: db.is_active ?? true,
+    isVerified: db.is_verified ?? true // Reps are usually pre-verified by pharma if created by pharma
   };
 }
 
@@ -264,20 +332,14 @@ function mapNotifFromDB(db: any): Notification {
 }
 
 
-let lastMutationTime = 0;
-
-function notifyMutation() {
-  lastMutationTime = Date.now();
-}
-
 // BACKGROUND SYNC POLLER
 // We poll Supabase silently to pull remote changes down into local memory so the UI remains instantly responsive.
 export async function syncCloudData() {
   if (!isSupabaseConfigured) return;
 
-  // Guard: If we just made a local change, don't overwrite from cloud for 5s 
+  // Guard: If we just made a local change, don't overwrite from cloud for 10s 
   // to allow the cloud to catch up and avoid "disappearing" optimistic updates.
-  if (Date.now() - lastMutationTime < 5000) return;
+  if (Date.now() - getLastMutationTime() < 10000) return;
 
   try {
     const [hospitals, doctors, reps, pharma, visits, notifications] = await Promise.all([
@@ -290,7 +352,7 @@ export async function syncCloudData() {
     ]);
 
     // Check again after fetch to avoid race condition during the async call
-    if (Date.now() - lastMutationTime < 5000) return;
+    if (Date.now() - getLastMutationTime() < 10000) return;
 
     if (hospitals.data) save('hospitals', hospitals.data.map(mapHospitalFromDB));
     if (doctors.data) save('doctors', doctors.data.map(mapDoctorFromDB));
@@ -301,7 +363,7 @@ export async function syncCloudData() {
 
     // Fetch availability slots separately
     const slots = await supabase.from('availability_slots').select('*');
-    if (slots.data && Date.now() - lastMutationTime > 5000) {
+    if (slots.data && Date.now() - getLastMutationTime() > 10000) {
       const slotsByDoc = slots.data.reduce((acc: any, row: any) => {
         if (!acc[row.doctor_id]) acc[row.doctor_id] = [];
         acc[row.doctor_id].push({
@@ -335,7 +397,13 @@ export function saveHospital(hospital: Hospital) {
   if (idx >= 0) list[idx] = hospital; else list.push(hospital);
   save('hospitals', list);
   notifyMutation();
-  if (isSupabaseConfigured) supabase.from('hospitals').upsert(mapHospitalToDB(hospital)).then(({error}) => error && console.error("Cloud push failed:", error));
+  if (isSupabaseConfigured) {
+    supabase.from('hospitals')
+      .upsert(mapHospitalToDB(hospital))
+      .then(({error}) => {
+        if (error) console.error("Hospital Cloud Push Failed:", error);
+      });
+  }
 }
 
 // ---- DOCTORS ----
@@ -349,12 +417,26 @@ export function saveDoctor(doctor: Doctor) {
   if (idx >= 0) list[idx] = doctor; else list.push(doctor);
   save('doctors', list);
   notifyMutation();
-  if (isSupabaseConfigured) supabase.from('doctors').upsert(mapDoctorToDB(doctor)).then(({error}) => error && console.error("Cloud push failed:", error));
+  if (isSupabaseConfigured) {
+    supabase.from('doctors')
+      .upsert(mapDoctorToDB(doctor))
+      .then(({error}) => {
+        if (error) console.error("Doctor Cloud Push Failed:", error);
+      });
+  }
 }
 export function deleteDoctor(id: string) {
+  // Purge dependencies first to satisfy database constraints
+  save('visits', getVisits().filter(v => v.doctorId !== id));
+  save(`availability_${id}`, []);
+  
   save('doctors', getDoctors().filter(d => d.id !== id));
   notifyMutation();
-  if (isSupabaseConfigured) supabase.from('doctors').delete().eq('id', id).then(({error}) => error && console.error("Cloud delete failed:", error));
+  
+  if (isSupabaseConfigured) {
+    supabase.from('visits').delete().eq('doctor_id', id).then();
+    supabase.from('doctors').delete().eq('id', id).then(({error}) => error && console.error("Cloud delete doctor failed:", error));
+  }
 }
 
 // ---- SALES REPS ----
@@ -368,9 +450,16 @@ export function saveSalesRep(rep: SalesRep) {
   if (isSupabaseConfigured) supabase.from('sales_reps').upsert(mapRepToDB(rep)).then(({error}) => error && console.error("Cloud push failed:", error));
 }
 export function deleteSalesRep(id: string) {
+  // Purge visits by this rep first
+  save('visits', getVisits().filter(v => v.repId !== id));
+  
   save('sales_reps', getSalesReps().filter(r => r.id !== id));
   notifyMutation();
-  if (isSupabaseConfigured) supabase.from('sales_reps').delete().eq('id', id).then(({error}) => error && console.error("Cloud delete failed:", error));
+  
+  if (isSupabaseConfigured) {
+    supabase.from('visits').delete().eq('rep_id', id).then();
+    supabase.from('sales_reps').delete().eq('id', id).then(({error}) => error && console.error("Cloud delete rep failed:", error));
+  }
 }
 
 export function allocateCreditsToRep(repId: string, amount: number): boolean {
@@ -415,7 +504,16 @@ export function savePharmaCompany(company: PharmaCompany) {
   if (idx >= 0) list[idx] = company; else list.push(company);
   save('pharma_companies', list);
   notifyMutation();
-  if (isSupabaseConfigured) supabase.from('pharma_companies').upsert(mapPharmaToDB(company)).then(({error}) => error && console.error("Cloud push failed:", error));
+  if (isSupabaseConfigured) {
+    supabase.from('pharma_companies')
+      .upsert(mapPharmaToDB(company))
+      .then(({error}) => {
+        if (error) {
+           console.error("Pharma Cloud Push Failed:", error);
+           // We don't toast here as it might be frequent, but we log for debugging
+        }
+      });
+  }
 }
 
 // ---- VISITS ----
@@ -549,6 +647,10 @@ export function ensureUserEntityExists(user: any) {
   const org = user.user_metadata?.organization || '';
   const uid = user.id;
 
+  // ONLY auto-create in Demo Mode (Local Storage only). 
+  // For Supabase, the account MUST be created during the Registration phase only.
+  if (isSupabaseConfigured) return;
+
   if (role === 'doctor') {
     const docs = getDoctors();
     if (!docs.some(d => d.userId === uid)) {
@@ -556,7 +658,7 @@ export function ensureUserEntityExists(user: any) {
         id: generateId(), userId: uid, name, email, phone,
         specialty: 'General Practice', experienceYears: 0,
         hospitalId: null as any, hospitalName: org || 'Independent',
-        availability: []
+        availability: [], isActive: true, isVerified: false
       });
     }
   } else if (role === 'rep') {
@@ -565,18 +667,179 @@ export function ensureUserEntityExists(user: any) {
       saveSalesRep({
         id: generateId(), userId: uid, name, email, phone,
         pharmaId: null as any, pharmaName: org || 'Independent Pharma',
-        target: 500, visitsThisMonth: 0, credits: 0
+        target: 500, visitsThisMonth: 0, credits: 0, isActive: true, isVerified: false
       });
     }
   } else if (role === 'hospital') {
     const hosps = getHospitals();
     if (!hosps.some(h => h.userId === uid)) {
-      saveHospital({ id: generateId(), userId: uid, name, location: org || 'Saudi Arabia' });
+      saveHospital({ 
+        id: generateId(), 
+        userId: uid, 
+        name, 
+        location: org || 'Saudi Arabia', 
+        isActive: true, 
+        isVerified: false,
+        type: (user.user_metadata?.hospital_type || 'hospital') as any
+      });
     }
   } else if (role === 'pharma') {
     const pharmas = getPharmaCompanies();
     if (!pharmas.some(p => p.userId === uid)) {
-      savePharmaCompany({ id: generateId(), userId: uid, name, credits: 50 });
+      savePharmaCompany({ id: generateId(), userId: uid, name, credits: 50, isActive: true, isVerified: false });
     }
+  }
+}
+
+export function getBundleRequests(): BundleRequest[] {
+  return load<BundleRequest[]>('bundle_requests', []);
+}
+
+export function saveBundleRequest(req: BundleRequest) {
+  const reqs = getBundleRequests();
+  const idx = reqs.findIndex(r => r.id === (req as any).id);
+  const updated = idx >= 0
+    ? reqs.map((r, i) => i === idx ? req : r)
+    : [...reqs, req];
+  save('bundle_requests', updated);
+  notifyMutation();
+}
+
+/**
+ * Checks if a user is both verified by admin and active.
+ * Uses local store first, fallbacks to a direct cloud query for 100% reliability.
+ */
+export async function isUserAuthorized(uid?: string, role?: string): Promise<boolean> {
+  try {
+    if (!uid || !role) return false;
+    if (role === 'admin') return true;
+    
+    const checkLocal = () => {
+      let entity: any;
+      if (role === 'doctor') entity = getDoctors().find(d => d.userId === uid);
+      else if (role === 'pharma') entity = getPharmaCompanies().find(p => p.userId === uid);
+      else if (role === 'hospital') entity = getHospitals().find(h => h.userId === uid);
+      else if (role === 'rep') entity = getSalesReps().find(r => r.userId === uid);
+      return entity;
+    };
+
+    const local = checkLocal();
+    if (local && local.isVerified) return local.isActive !== false;
+
+    // Cloud Fallback
+    if (!isSupabaseConfigured) return false;
+    
+    const table: Record<string, string> = { 
+      doctor: 'doctors', 
+      rep: 'sales_reps', 
+      pharma: 'pharma_companies', 
+      hospital: 'hospitals' 
+    };
+    
+    if (!table[role]) return false; // Unknown role -> block access
+
+    const { data, error } = await supabase.from(table[role]).select('is_verified, is_active').eq('user_id', uid).single();
+    if (error || !data) return false;
+    
+    const verified = data.is_verified === null ? true : !!data.is_verified;
+    const active = data.is_active === null ? true : data.is_active !== false;
+    
+    return verified && active;
+  } catch (err) {
+    console.warn("Identity Grid Check Failed (Safe Fallback to Blocked):", err);
+    return false; 
+  }
+}
+
+// ---- CUSTOM PHARMA BUNDLES ----
+export function getPharmaBundles(pharmaId: string): Bundle[] {
+  const pc = getPharmaCompanies().find(p => p.id === pharmaId);
+  if (pc && pc.customBundles && pc.customBundles.length > 0) {
+    return pc.customBundles;
+  }
+  return BUNDLES; // Default template
+}
+
+export function savePharmaBundle(pharmaId: string, bundle: Bundle) {
+  const pharmas = getPharmaCompanies();
+  const idx = pharmas.findIndex(p => p.id === pharmaId);
+  if (idx >= 0) {
+    if (!pharmas[idx].customBundles) pharmas[idx].customBundles = [...BUNDLES];
+    const bIdx = pharmas[idx].customBundles!.findIndex(b => b.id === bundle.id);
+    if (bIdx >= 0) {
+      pharmas[idx].customBundles![bIdx] = bundle;
+    } else {
+      pharmas[idx].customBundles!.push(bundle);
+    }
+    savePharmaCompany(pharmas[idx]);
+  }
+}
+
+export function deletePharmaBundle(pharmaId: string, bundleId: string) {
+  const pharmas = getPharmaCompanies();
+  const idx = pharmas.findIndex(p => p.id === pharmaId);
+  if (idx >= 0 && pharmas[idx].customBundles) {
+    pharmas[idx].customBundles = pharmas[idx].customBundles!.filter(b => b.id !== bundleId);
+    savePharmaCompany(pharmas[idx]);
+  }
+}
+
+export function deletePharma(id: string) {
+  // Cascading purge of all associated records
+  const reps = getSalesReps().filter(r => r.pharmaId === id);
+  reps.forEach(r => deleteSalesRep(r.id));
+  
+  save('transactions', load<any[]>('transactions', []).filter(t => t.pharmaId !== id));
+  save('bundle_requests', getBundleRequests().filter(r => r.pharmaId !== id));
+  save('visits', getVisits().filter(v => v.pharmaId !== id));
+
+  save('pharma_companies', getPharmaCompanies().filter(p => p.id !== id));
+  notifyMutation();
+
+  if (isSupabaseConfigured) {
+    supabase.from('transactions').delete().eq('pharma_id', id).then();
+    supabase.from('bundle_requests').delete().eq('pharma_id', id).then();
+    supabase.from('visits').delete().eq('pharma_id', id).then();
+    supabase.from('pharma_companies').delete().eq('id', id).then(({error}) => error && console.error("Cloud delete pharma failed:", error));
+  }
+}
+
+export function deleteHospital(id: string) {
+  save('hospitals', getHospitals().filter(h => h.id !== id));
+  notifyMutation();
+  if (isSupabaseConfigured) supabase.from('hospitals').delete().eq('id', id).then(({error}) => error && console.error("Cloud delete failed:", error));
+}
+export async function wipeAllPublicData() {
+  if (confirm('GLOBAL PURGE: This will wipe ALL public data from Supabase sequentially and clear local cache. Proceed?')) {
+    // 1. Clear Local
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('lomixa_')) localStorage.removeItem(key);
+    });
+
+    // 2. Clear Cloud (Sequential + Exception Resistant)
+    if (isSupabaseConfigured) {
+      console.log("Starting Sequential Global Purge...");
+      
+      const tables = [
+        'notifications', 'visits', 'availability_slots', 
+        'bundle_requests', 'transactions', 'doctors', 
+        'sales_reps', 'pharma_companies', 'hospitals'
+      ];
+
+      for (const table of tables) {
+        try {
+          console.log(`Purging ${table}...`);
+          // Use neq('id', '0') trick to target all rows
+          const { error } = await supabase.from(table).delete().neq('id', '0');
+          if (error) console.warn(`Cloud purge failed for table [${table}]:`, error.message);
+        } catch (e) {
+          console.warn(`Exception during cloud purge for table [${table}]:`, e);
+        }
+      }
+
+      console.log("Global Purge Process Complete.");
+    }
+    
+    window.location.reload();
   }
 }

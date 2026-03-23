@@ -34,6 +34,8 @@ export function RepDashboard() {
         target: 25,
         userId,
         credits: 0,
+        isActive: true,
+        isVerified: false,
       };
       saveSalesRep(myRep);
     }

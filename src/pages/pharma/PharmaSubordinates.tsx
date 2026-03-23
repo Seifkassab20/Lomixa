@@ -5,9 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Users, Plus, Trash2, Edit2, X, Phone, Mail, Target, TrendingUp, Trophy } from 'lucide-react';
+import { Users, Plus, Trash2, Edit2, X, Phone, Mail, Target, TrendingUp, Trophy, ShieldCheck, ShieldAlert, ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '@/components/ui/Toast';
+import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
 
 export function PharmaSubordinates() {
   const { userId } = useAuth();
@@ -58,6 +60,8 @@ export function PharmaSubordinates() {
       visitsThisMonth: editingRep?.visitsThisMonth || 0,
       target: form.target,
       credits: editingRep?.credits || 0,
+      isActive: editingRep?.isActive ?? true,
+      isVerified: editingRep?.isVerified ?? true,
     };
     saveSalesRep(rep);
     loadData();
@@ -73,11 +77,18 @@ export function PharmaSubordinates() {
     setShowForm(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm(t('removeRepConfirm') || 'Remove this sales representative?')) {
+  const toggleActivation = (rep: SalesRep) => {
+    const updated = { ...rep, isActive: !rep.isActive };
+    saveSalesRep(updated);
+    loadData();
+    toast(updated.isActive ? t('repActivated') || 'Representative activated' : t('repDeactivated') || 'Representative deactivated', 'info');
+  };
+
+  const handleDelete = (id: string, name: string) => {
+    if (confirm(`${t('removeRepConfirm') || 'Are you sure you want to delete'} ${name}? ${t('actionCannotBeUndone') || 'This action cannot be undone.'}`)) {
       deleteSalesRep(id);
       setReps(prev => prev.filter(r => r.id !== id));
-      toast(t('repDeleted') || 'Representative removed', 'success');
+      toast(t('repDeleted') || 'Representative removed permanently', 'success');
     }
   };
 
@@ -223,18 +234,38 @@ export function PharmaSubordinates() {
                       )}
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900 dark:text-white">{rep.name}</h3>
-                      <Badge variant="outline" className="text-xs mt-0.5 border-emerald-500/30 text-emerald-600 dark:text-emerald-400">{t('active') || 'Active'}</Badge>
+                      <h3 className="font-semibold text-gray-900 dark:text-white line-clamp-1">{rep.name}</h3>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        {rep.isActive ? (
+                          <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                        ) : (
+                          <ShieldAlert className="w-3 h-3 text-red-500" />
+                        )}
+                        <span className={cn(
+                          "text-[10px] font-black uppercase tracking-widest italic",
+                          rep.isActive ? "text-emerald-500" : "text-red-500"
+                        )}>
+                          {rep.isActive ? t('active') : t('inactive') || 'Inactive'}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex gap-1">
+                    <div className="flex items-center gap-2 pr-2 border-r dark:border-slate-700">
+                      <span className="text-[10px] font-black uppercase tracking-tighter text-slate-500">
+                        {rep.isActive ? t('active') : t('inactive') || 'Inactive'}
+                      </span>
+                      <Switch 
+                        checked={rep.isActive} 
+                        onCheckedChange={() => toggleActivation(rep)}
+                        className="scale-75"
+                      />
+                    </div>
                     <button onClick={() => handleEdit(rep)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
-                      <Edit2 className="h-4 w-4 text-gray-500 dark:text-slate-400" />
+                      <Edit2 className="h-4 w-4 text-gray-400 dark:text-slate-500" />
                     </button>
-                    <button onClick={() => handleDelete(rep.id)} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors">
-                      <Trash2 className="h-4 w-4 text-red-500" />
+                    <button onClick={() => handleDelete(rep.id, rep.name)} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors">
+                      <Trash2 className="h-4 w-4 text-red-500/60 hover:text-red-500" />
                     </button>
-                  </div>
                 </div>
                 <div className="space-y-2 text-sm text-gray-500 dark:text-slate-400 mb-4">
                   {rep.email && <div className="flex items-center gap-2"><Mail className="h-3.5 w-3.5" />{rep.email}</div>}

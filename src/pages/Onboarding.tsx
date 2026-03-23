@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { Calendar, Stethoscope, Video, ArrowRight, ChevronRight, ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';

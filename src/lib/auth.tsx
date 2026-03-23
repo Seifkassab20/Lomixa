@@ -3,7 +3,7 @@ import { supabase, isSupabaseConfigured } from './supabase';
 import { ensureUserEntityExists } from './store';
 import { User } from '@supabase/supabase-js';
 
-type Role = 'pharma' | 'hospital' | 'doctor' | 'rep' | null;
+type Role = 'pharma' | 'hospital' | 'doctor' | 'rep' | 'admin' | null;
 
 interface AuthContextType {
   user: User | null;

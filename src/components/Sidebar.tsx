@@ -4,7 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { 
   LayoutDashboard, Users, Calendar, CreditCard, Settings, Activity,
-  Stethoscope, Clock, BookOpen, Bell, Plus, History, ChevronLeft, ChevronRight
+  Stethoscope, Clock, BookOpen, Bell, Plus, History, ChevronLeft, ChevronRight, ShieldCheck
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getNotifications } from '@/lib/store';
@@ -33,11 +33,14 @@ export function Sidebar() {
     ];
 
     switch (role) {
+      case 'admin': return [
+        { key: 'admin', name: 'Nexus Admin', href: '/nexus-admin', icon: ShieldCheck },
+        { key: 'notifications', name: t('notifications'), href: '/notifications', icon: Bell, badge: notifCount },
+        { key: 'settings', name: t('settings'), href: '/settings', icon: Settings },
+      ];
       case 'pharma': return [
         ...base,
-        { key: 'subordinates', name: t('subordinates'), href: '/subordinates', icon: Users },
-        { key: 'manageDoctors', name: t('manageDoctors'), href: '/doctors', icon: Stethoscope },
-        { key: 'analytics', name: t('analytics'), href: '/analytics', icon: Activity },
+        { key: 'subordinates', name: t('manageRepresentatives') || 'Manage Representatives', href: '/subordinates', icon: Users },
         { key: 'buyBundle', name: t('buyBundle'), href: '/bundles', icon: CreditCard },
         { key: 'allBookings', name: t('allBookings'), href: '/bookings', icon: Calendar },
         { key: 'notifications', name: t('notifications'), href: '/notifications', icon: Bell, badge: notifCount },
@@ -46,7 +49,6 @@ export function Sidebar() {
       case 'hospital': return [
         ...base,
         { key: 'manageDoctors', name: t('manageDoctors'), href: '/doctors', icon: Stethoscope },
-        { key: 'analytics', name: t('analytics'), href: '/hospital-analytics', icon: Activity },
         { key: 'allBookings', name: t('allBookings'), href: '/bookings', icon: Calendar },
         { key: 'notifications', name: t('notifications'), href: '/notifications', icon: Bell, badge: notifCount },
         { key: 'settings', name: t('settings'), href: '/settings', icon: Settings },

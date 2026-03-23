@@ -39,21 +39,20 @@ export function HospitalAnalytics() {
   })).filter(d => d.value > 0);
 
   const getAiInsight = () => {
-    if (visits.length === 0) return "Not enough data to generate predictive insights yet. Begin scheduling visits to feed the AI engine.";
+    if (visits.length === 0) return t('aiNoData');
     
-    // Sort specialties to find highest growth/demand
     const sorted = [...specialtyData].sort((a, b) => b.value - a.value);
     const top = sorted[0]?.name || 'General';
     
     const completed = visits.filter(v => v.status === 'Completed').length;
     const rate = Math.round((completed / visits.length) * 100);
     
-    let insight = `Based on recent trends, ${top} is experiencing the highest demand. We predict a 15% increase in pharmaceutical interest for this specialty next month. `;
+    let insight = t('aiDemandTrend', { specialty: top });
     
     if (rate > 70) {
-      insight += `Your completion rate (${rate}%) is excellent, indicating high doctor engagement.`;
+      insight += ' ' + t('aiHighRate', { rate });
     } else {
-      insight += `Consider adjusting schedules, as completion rates (${rate}%) are dropping below the optimal threshold.`;
+      insight += ' ' + t('aiLowRate', { rate });
     }
     
     return insight;
@@ -62,8 +61,8 @@ export function HospitalAnalytics() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold dark:text-white">{t('hospitalAnalytics') || 'Hospital Analytics'}</h1>
-        <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">{t('doctorActivityStats') || 'Doctor activity & visit statistics'}</p>
+        <h1 className="text-2xl font-bold dark:text-white">{t('hospitalAnalyticsTitle')}</h1>
+        <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">{t('doctorActivityStats')}</p>
       </div>
 
       {/* AI Predictive Insight Panel */}
@@ -77,7 +76,7 @@ export function HospitalAnalytics() {
               <Sparkles className="h-3.5 w-3.5 text-white" />
             </div>
             <h2 className="text-sm font-bold bg-clip-text text-transparent bg-gradient-to-r from-amber-600 to-orange-600 dark:from-amber-400 dark:to-orange-400">
-              Lomixa AI Prediction
+              {t('analyticsPulse')}
             </h2>
           </div>
           <p className="text-sm text-amber-900/80 dark:text-amber-100/80 leading-relaxed max-w-3xl">
@@ -89,10 +88,10 @@ export function HospitalAnalytics() {
       {/* KPI */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: t('totalDoctors') || 'Total Doctors', value: doctors.length },
-          { label: t('totalVisits') || 'Total Visits', value: visits.length },
-          { label: t('activePharma') || 'Active Pharma', value: [...new Set(visits.map(v => v.pharmaId))].length },
-          { label: t('completionRate') || 'Completion Rate', value: visits.length > 0 ? `${Math.round((visits.filter(v => v.status === 'Completed').length / visits.length) * 100)}%` : '0%' },
+          { label: t('totalDoctors'), value: doctors.length },
+          { label: t('totalVisits'), value: visits.length },
+          { label: t('activePharma'), value: [...new Set(visits.map(v => v.pharmaId))].length },
+          { label: t('completionRate'), value: visits.length > 0 ? `${Math.round((visits.filter(v => v.status === 'Completed').length / visits.length) * 100)}%` : '0%' },
         ].map(({ label, value }) => (
           <div key={label} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-4">
             <div className="text-2xl font-bold dark:text-white">{value}</div>
@@ -104,22 +103,21 @@ export function HospitalAnalytics() {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
-          <h2 className="text-base font-semibold dark:text-white mb-4">{t('monthlyVisitFrequency') || 'Monthly Visit Frequency'}</h2>
+          <h2 className="text-base font-semibold dark:text-white mb-4">{t('monthlyVisitFrequency')}</h2>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={monthlyData}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
               <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
               <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
               <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, color: '#fff' }} />
-              <Bar dataKey="visits" fill="#059669" radius={[4, 4, 0, 0]} name={t('visits') || 'Visits'} />
+              <Bar dataKey="visits" fill="#059669" radius={[4, 4, 0, 0]} name={t('visits')} />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
         <div className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
-          <h2 className="text-base font-semibold dark:text-white mb-4">{t('doctorsBySpecialty') || 'Doctors by Specialty'}</h2>
           {specialtyData.length === 0 ? (
-            <div className="h-40 flex items-center justify-center text-sm text-gray-400 dark:text-slate-500">{t('noDoctorsYet') || 'No doctors added yet'}</div>
+            <div className="h-40 flex items-center justify-center text-sm text-gray-400 dark:text-slate-500">{t('noDoctorsAdded')}</div>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
@@ -134,9 +132,9 @@ export function HospitalAnalytics() {
         </div>
 
         <div className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
-          <h2 className="text-base font-semibold dark:text-white mb-4">{t('visitStatusBreakdown') || 'Visit Status Breakdown'}</h2>
+          <h2 className="text-base font-semibold dark:text-white mb-4">{t('visitStatusBreakdown')}</h2>
           {statusData.length === 0 ? (
-            <div className="h-40 flex items-center justify-center text-sm text-gray-400 dark:text-slate-500">{t('noVisitsYet') || 'No visits yet'}</div>
+            <div className="h-40 flex items-center justify-center text-sm text-gray-400 dark:text-slate-500">{t('noVisitsYet')}</div>
           ) : (
             <div className="space-y-3">
               {['Pending', 'Confirmed', 'Completed', 'Cancelled'].map((s, i) => {
@@ -159,9 +157,9 @@ export function HospitalAnalytics() {
         </div>
 
         <div className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
-          <h2 className="text-base font-semibold dark:text-white mb-4">{t('topActiveDoctors') || 'Top Active Doctors'}</h2>
+          <h2 className="text-base font-semibold dark:text-white mb-4">{t('topActiveDoctors')}</h2>
           {doctors.length === 0 ? (
-            <div className="h-40 flex items-center justify-center text-sm text-gray-400 dark:text-slate-500">{t('noDoctorsYet') || 'No doctors yet'}</div>
+            <div className="h-40 flex items-center justify-center text-sm text-gray-400 dark:text-slate-500">{t('noDoctorsAdded')}</div>
           ) : (
             <div className="space-y-3">
               {doctors.map(doc => {
@@ -177,7 +175,7 @@ export function HospitalAnalytics() {
                         <div className="text-xs text-gray-500 dark:text-slate-400">{t(doc.specialty.toLowerCase().replace(' ', '')) || doc.specialty}</div>
                       </div>
                     </div>
-                    <div className="text-sm font-medium text-emerald-600 dark:text-emerald-400">{docVisits} {t('visits') || 'visits'}</div>
+                    <div className="text-sm font-medium text-emerald-600 dark:text-emerald-400">{docVisits} {t('visits')}</div>
                   </div>
                 );
               })}
