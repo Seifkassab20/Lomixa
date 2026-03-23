@@ -32,7 +32,7 @@ export function DoctorDashboard() {
         availability: [],
         userId,
         isActive: true,
-        isVerified: false,
+        isVerified: true,
       };
       saveDoctor(myDoc);
     }

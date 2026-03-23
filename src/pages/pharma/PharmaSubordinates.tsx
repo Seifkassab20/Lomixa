@@ -10,6 +10,14 @@ import { useTranslation } from 'react-i18next';
 import { useToast } from '@/components/ui/Toast';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
+import { createClient } from '@supabase/supabase-js';
+
+// Helper client that doesn't persist session so signing up a user doesn't log out the admin
+const createTempClient = () => {
+  const url = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-anon-key-for-demo-mode';
+  return createClient(url, key, { auth: { persistSession: false } });
+};
 
 export function PharmaSubordinates() {
   const { userId } = useAuth();
@@ -19,7 +27,7 @@ export function PharmaSubordinates() {
   const [repVisitCounts, setRepVisitCounts] = useState<Record<string, number>>({});
   const [showForm, setShowForm] = useState(false);
   const [editingRep, setEditingRep] = useState<SalesRep | null>(null);
-  const [form, setForm] = useState({ name: '', email: '', phone: '', target: 25 });
+  const [form, setForm] = useState({ name: '', email: '', phone: '', target: 25, password: '' });
   const [allocationRep, setAllocationRep] = useState<SalesRep | null>(null);
   const [allocationAmount, setAllocationAmount] = useState(10);
 
@@ -47,9 +55,31 @@ export function PharmaSubordinates() {
     return () => clearInterval(interval);
   }, [loadData]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!myCompany) return;
+
+    // If we're adding a new rep, create their Supabase account too
+    if (!editingRep && form.email && form.password) {
+      const tempSupabase = createTempClient();
+      const { error } = await tempSupabase.auth.signUp({
+        email: form.email,
+        password: form.password,
+        options: {
+          data: {
+            role: 'rep',
+            full_name: form.name,
+            phone: form.phone
+          }
+        }
+      });
+      
+      if (error) {
+        toast(`${t('errorCreatingAccount') || 'Error creating account'}: ${error.message}`, 'error');
+        return;
+      }
+    }
+
     const rep: SalesRep = {
       id: editingRep?.id || generateId(),
       name: form.name,
@@ -61,19 +91,20 @@ export function PharmaSubordinates() {
       target: form.target,
       credits: editingRep?.credits || 0,
       isActive: editingRep?.isActive ?? true,
-      isVerified: editingRep?.isVerified ?? true,
+      isVerified: true, // Pre-verified by pharma company
+      role: 'rep'
     };
     saveSalesRep(rep);
     loadData();
     setShowForm(false);
     setEditingRep(null);
-    setForm({ name: '', email: '', phone: '', target: 25 });
-    toast(editingRep ? t('repUpdated') || 'Representative updated successfully' : t('repAdded') || 'Representative added successfully', 'success');
+    setForm({ name: '', email: '', phone: '', target: 25, password: '' });
+    toast(editingRep ? t('repUpdated') || 'Representative updated successfully' : t('repAddedWithAccount') || 'Representative and account created successfully', 'success');
   };
 
   const handleEdit = (rep: SalesRep) => {
     setEditingRep(rep);
-    setForm({ name: rep.name, email: rep.email, phone: rep.phone, target: rep.target });
+    setForm({ name: rep.name, email: rep.email, phone: rep.phone, target: rep.target, password: '' });
     setShowForm(true);
   };
 
@@ -180,6 +211,15 @@ export function PharmaSubordinates() {
                 <Label className="dark:text-slate-300">{t('monthlyVisitTarget') || 'Monthly Visit Target'}</Label>
                 <Input type="number" value={form.target} onChange={e => setForm(f => ({ ...f, target: parseInt(e.target.value) || 25 }))} required min={1} className="mt-1 dark:bg-slate-800 dark:border-slate-600 dark:text-white" />
               </div>
+              {!editingRep && (
+                <div>
+                  <div className="bg-emerald-50 dark:bg-emerald-500/10 p-2 rounded text-[10px] text-emerald-600 dark:text-emerald-400 mb-2 border border-emerald-100 dark:border-emerald-500/20">
+                    {t('adminCreatorNote') || "Defining a password will automatically register a pre-verified account for this representative."}
+                  </div>
+                  <Label className="dark:text-slate-300">{t('password')}</Label>
+                  <Input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} required placeholder="••••••••" className="mt-1 dark:bg-slate-800 dark:border-slate-600 dark:text-white" />
+                </div>
+              )}
               <div className="flex gap-3 pt-2">
                 <Button type="button" variant="outline" onClick={() => setShowForm(false)} className="flex-1 dark:border-slate-600 dark:text-slate-300">{t('cancel') || 'Cancel'}</Button>
                 <Button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white">{editingRep ? (t('update') || 'Update') : (t('add') || 'Add')} {t('rep') || 'Rep'}</Button>

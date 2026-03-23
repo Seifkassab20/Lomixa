@@ -3,8 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   getPharmaCompanies, savePharmaCompany, PharmaCompany, getHospitals, Hospital, 
   getDoctors, getSalesReps, getBundleRequests, saveBundleRequest, pushNotification,
-  BundleRequest, generateId, saveTransaction, Doctor, saveDoctor, saveHospital,
-  deleteDoctor, deleteHospital, deletePharma, deleteSalesRep, getPharmaBundles, savePharmaBundle, deletePharmaBundle, Bundle
+  BundleRequest, generateId, saveTransaction, saveHospital,
+  deleteHospital, deletePharma, deleteSalesRep, getPharmaBundles, savePharmaBundle, deletePharmaBundle, Bundle
 } from '@/lib/store';
 import { useTranslation } from 'react-i18next';
 import { 
@@ -25,7 +25,6 @@ export function AdminDashboard() {
   const { toast } = useToast();
   const [pharma, setPharma] = useState<PharmaCompany[]>([]);
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
-  const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [search, setSearch] = useState('');
   const [requests, setRequests] = useState<BundleRequest[]>([]);
   const [activeTab, setActiveTab] = useState<'verification' | 'bundles' | 'pharma'>('verification');
@@ -35,13 +34,12 @@ export function AdminDashboard() {
   const [customBundles, setCustomBundles] = useState<Bundle[]>([]);
 
   // Rejection State
-  const [rejectingUser, setRejectingUser] = useState<{ type: 'doctor' | 'hospital' | 'pharma', id: string, name: string } | null>(null);
+  const [rejectingUser, setRejectingUser] = useState<{ type: 'hospital' | 'pharma', id: string, name: string } | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
 
   const refresh = () => {
     setPharma(getPharmaCompanies());
     setHospitals(getHospitals());
-    setDoctors(getDoctors());
     setRequests(getBundleRequests());
     if (editingPharma) {
       setCustomBundles(getPharmaBundles(editingPharma.id));
@@ -50,15 +48,8 @@ export function AdminDashboard() {
 
   useEffect(() => { refresh(); }, []);
 
-  const handleVerifyUser = (type: 'doctor' | 'hospital' | 'pharma', id: string) => {
-    if (type === 'doctor') {
-      const d = doctors.find(doc => doc.id === id);
-      if (d) {
-        saveDoctor({ ...d, isVerified: true });
-        console.log(`[SIMULATED MAIL] To: ${d.email} | Subject: Account Verified | Message: Your LOMIXA identity is active.`);
-        if (d.userId) pushNotification({ userId: d.userId, title: 'Identity Verified', message: 'Your LOMIXA practitioner identity has been verified by the Nexus Admin.', type: 'info' });
-      }
-    } else if (type === 'hospital') {
+  const handleVerifyUser = (type: 'hospital' | 'pharma', id: string) => {
+    if (type === 'hospital') {
       const h = hospitals.find(hosp => hosp.id === id);
       if (h) {
         saveHospital({ ...h, isVerified: true });
@@ -77,10 +68,9 @@ export function AdminDashboard() {
     toast('Access permission granted and identity verified.', 'success');
   };
 
-  const initiateReject = (type: 'doctor' | 'hospital' | 'pharma', id: string) => {
+  const initiateReject = (type: 'hospital' | 'pharma', id: string) => {
     let name = 'Unknown';
-    if (type === 'doctor') name = doctors.find(d => d.id === id)?.name || name;
-    else if (type === 'hospital') name = hospitals.find(h => h.id === id)?.name || name;
+    if (type === 'hospital') name = hospitals.find(h => h.id === id)?.name || name;
     else if (type === 'pharma') name = pharma.find(p => p.id === id)?.name || name;
     
     setRejectingUser({ type, id, name });
@@ -92,9 +82,7 @@ export function AdminDashboard() {
     
     console.log(`[SIMULATED MAIL] To: ${name} | Subject: Registration Declined | Reason: ${rejectionReason}`);
     
-    if (type === 'doctor') {
-      deleteDoctor(id);
-    } else if (type === 'hospital') {
+    if (type === 'hospital') {
       deleteHospital(id);
     } else if (type === 'pharma') {
       getSalesReps().filter(r => r.pharmaId === id).forEach(r => deleteSalesRep(r.id));
@@ -201,10 +189,9 @@ export function AdminDashboard() {
   const filteredPharma = pharma.filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()));
   const pendingRequests = requests.filter(r => r.status === 'pending');
   
-  const pendingDocs = doctors.filter(d => d.isVerified === false);
   const pendingHosps = hospitals.filter(h => h.isVerified === false);
   const pendingPharmas = pharma.filter(p => p.isVerified === false);
-  const totalPendingVerification = pendingDocs.length + pendingHosps.length + pendingPharmas.length;
+  const totalPendingVerification = pendingHosps.length + pendingPharmas.length;
 
   return (
     <div className="space-y-8 pb-12">
@@ -230,7 +217,7 @@ export function AdminDashboard() {
       {/* Command Tabs */}
       <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900/50 p-1.5 rounded-[1.5rem] border dark:border-slate-800 w-fit">
         {[
-          { id: 'verification', label: 'Practitioner Verification', icon: ShieldCheck, color: 'emerald', count: totalPendingVerification },
+          { id: 'verification', label: 'Facility Verification', icon: ShieldCheck, color: 'emerald', count: totalPendingVerification },
           { id: 'bundles', label: 'Bundle Requests', icon: CreditCard, color: 'blue', count: pendingRequests.length },
           { id: 'pharma', label: 'Network Management', icon: Building2, color: 'purple' },
         ].map((tab) => (
@@ -261,7 +248,7 @@ export function AdminDashboard() {
         <section className="space-y-6">
           <div className="flex items-center gap-3 text-emerald-500 mb-2">
             <ShieldCheck className="w-6 h-6 shadow-[0_0_10px_rgba(16,185,129,0.3)]" />
-            <h2 className="text-xl font-black uppercase italic tracking-tighter">Practitioner Verification Desk</h2>
+            <h2 className="text-xl font-black uppercase italic tracking-tighter">Facility Verification Desk</h2>
           </div>
 
           {totalPendingVerification === 0 ? (
@@ -272,45 +259,6 @@ export function AdminDashboard() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Doctors */}
-              {pendingDocs.map(doc => (
-                 <div key={doc.id} className="bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-[2.5rem] p-8 hover:shadow-2xl transition-all border-t-8 border-t-amber-500 shadow-xl relative overflow-hidden group">
-                    <div className="absolute -top-4 -right-4 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl group-hover:bg-amber-500/10 transition-colors"></div>
-                    <div className="flex items-start justify-between mb-6">
-                       <div className="p-4 bg-amber-500/10 rounded-2xl text-amber-500">
-                          <Stethoscope className="w-6 h-6" />
-                       </div>
-                       <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 font-black uppercase tracking-widest text-[8px]">Doctor Verification</Badge>
-                    </div>
-                    <h4 className="text-xl font-black text-gray-900 dark:text-white uppercase italic tracking-tighter mb-1">{doc.name}</h4>
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">{doc.specialty} • {doc.hospitalName}</p>
-                    
-                    <div className="space-y-3 mb-8">
-                       <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
-                          <AlertCircle className="w-3 h-3 text-amber-500" /> License Documents Pending Review
-                       </div>
-                       <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                          <div className="h-full w-[40%] bg-amber-500 rounded-full" />
-                       </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 mt-auto">
-                      <Button 
-                        className="rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase italic tracking-widest text-[10px] h-12 shadow-lg shadow-emerald-500/20"
-                        onClick={() => handleVerifyUser('doctor', doc.id)}
-                      >
-                        Verify
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        className="rounded-2xl border border-slate-800 text-slate-500 hover:bg-red-500/10 hover:text-red-500 font-black uppercase italic tracking-widest text-[10px] h-12"
-                        onClick={() => initiateReject('doctor', doc.id)}
-                      >
-                        Reject
-                      </Button>
-                    </div>
-                 </div>
-              ))}
 
               {/* Hospitals */}
               {pendingHosps.map(hosp => (

@@ -123,7 +123,7 @@ export function Login() {
 
         if (!authorized) {
           await supabase.auth.signOut();
-          throw new Error('Verification Pending: Your practitioner identity is currently being reviewed by the LOMIXA Nexus Admin. You will be notified once access is granted.');
+          throw new Error('Access Pending: Your registration is currently being reviewed by the System Administrator. You will be notified once your organization is verified.');
         }
       }
 

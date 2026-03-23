@@ -26,7 +26,7 @@ export function DoctorSchedule() {
     date: '',
     time: '',
     appointmentType: 'In Person' as AvailabilitySlot['appointmentType'],
-    duration: 30,
+    duration: 15,
   });
 
   useEffect(() => {
@@ -52,7 +52,7 @@ export function DoctorSchedule() {
     saveDoctorAvailability(doctorId, updated);
     setSlots(updated);
     setShowForm(false);
-    setForm({ date: '', time: '', appointmentType: 'In Person', duration: 30 });
+    setForm({ date: '', time: '', appointmentType: 'In Person', duration: 15 });
   };
 
   const handleDelete = (id: string) => {
@@ -139,7 +139,7 @@ export function DoctorSchedule() {
                   onChange={e => setForm(f => ({ ...f, duration: parseInt(e.target.value) }))}
                   className="mt-1 w-full rounded-md border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                 >
-                  {[15, 30, 45, 60, 90].map(m => <option key={m} value={m}>{m} {t('minutesLabel') || 'minutes'}</option>)}
+                  {[5, 10, 15].map(m => <option key={m} value={m}>{m} {t('minutesLabel') || 'minutes'}</option>)}
                 </select>
               </div>
               <div className="flex gap-3 pt-2">

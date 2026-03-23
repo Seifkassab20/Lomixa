@@ -141,7 +141,7 @@ export function Register() {
             hospitalName: existing?.hospitalName || formData.clinicName || 'Independent',
             availability: existing?.availability || [],
             isActive: true,
-            isVerified: finalIsVerified,
+            isVerified: true,
             role: 'doctor'
           });
         } else if (selectedRole === 'pharma') {
@@ -167,7 +167,7 @@ export function Register() {
           saveSalesRep({
             id: generateId(), userId, name: displayName, email: formData.email, phone: formData.phone,
             pharmaId: null as any, pharmaName: formData.pharmaCompany || 'Independent',
-            target: 500, visitsThisMonth: 0, credits: 0, isActive: true, isVerified: false,
+            target: 500, visitsThisMonth: 0, credits: 0, isActive: true, isVerified: true,
             role: 'rep'
           });
         }
