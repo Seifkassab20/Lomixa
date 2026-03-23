@@ -141,12 +141,15 @@ export function Register() {
             hospitalName: existing?.hospitalName || formData.clinicName || 'Independent',
             availability: existing?.availability || [],
             isActive: true,
-            isVerified: finalIsVerified
+            isVerified: finalIsVerified,
+            role: 'doctor'
           });
         } else if (selectedRole === 'pharma') {
           savePharmaCompany({ 
             id: generateId(), userId, name: displayName, 
-            credits: 50, isActive: true, isVerified: false 
+            credits: 50, isActive: true, isVerified: false,
+            phone: formData.phone,
+            role: 'pharma'
           });
         } else if (selectedRole === 'hospital') {
           saveHospital({ 
@@ -156,13 +159,16 @@ export function Register() {
             location: `${formData.cities.join(', ')} - ${formData.areas.join(', ')} - ${formData.address}`,
             isActive: true, 
             isVerified: false,
-            type: formData.hospitalType as any
+            type: formData.hospitalType as any,
+            phone: formData.phone,
+            role: 'hospital'
           });
         } else if (selectedRole === 'rep') {
           saveSalesRep({
             id: generateId(), userId, name: displayName, email: formData.email, phone: formData.phone,
             pharmaId: null as any, pharmaName: formData.pharmaCompany || 'Independent',
-            target: 500, visitsThisMonth: 0, credits: 0, isActive: true, isVerified: false
+            target: 500, visitsThisMonth: 0, credits: 0, isActive: true, isVerified: false,
+            role: 'rep'
           });
         }
       }

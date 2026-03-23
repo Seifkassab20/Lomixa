@@ -12,10 +12,11 @@ export interface Doctor {
   hospitalName: string;
   phone: string;
   email: string;
-  availability: AvailabilitySlot[];
-  userId?: string;
-  isActive: boolean;
   isVerified: boolean;
+  isActive: boolean;
+  userId?: string;
+  role?: string;
+  availability: AvailabilitySlot[];
 }
 
 export interface AvailabilitySlot {
@@ -40,6 +41,7 @@ export interface SalesRep {
   visitsThisMonth: number;
   target: number;
   credits: number; // For booking appointments
+  role?: string;
 }
 
 export interface Hospital {
@@ -50,6 +52,8 @@ export interface Hospital {
   isActive: boolean;
   isVerified: boolean;
   type: 'hospital' | 'clinic';
+  phone?: string;
+  role?: string;
 }
 
 export interface PharmaCompany {
@@ -59,6 +63,8 @@ export interface PharmaCompany {
   userId?: string;
   isActive: boolean;
   isVerified: boolean;
+  phone?: string;
+  role?: string;
   customBundles?: Bundle[];
 }
 
@@ -236,7 +242,8 @@ function mapDoctorToDB(d: Doctor) {
     phone: d.phone,
     email: d.email,
     is_active: d.isActive,
-    is_verified: d.isVerified
+    is_verified: d.isVerified,
+    role: d.role
   };
 }
 
@@ -253,6 +260,7 @@ function mapDoctorFromDB(db: any): Doctor {
     email: db.email,
     isActive: db.is_active ?? true,
     isVerified: db.is_verified ?? false,
+    role: db.role,
     availability: load(`availability_${db.id}`, []), // Slots handle sync separately below
   };
 }
@@ -265,7 +273,9 @@ function mapHospitalToDB(h: Hospital) {
     location: h.location, 
     is_active: h.isActive, 
     is_verified: h.isVerified,
-    type: h.type 
+    type: h.type,
+    phone: h.phone,
+    role: h.role 
   };
 }
 
@@ -277,12 +287,14 @@ function mapHospitalFromDB(db: any): Hospital {
     location: db.location, 
     isActive: db.is_active ?? true, 
     isVerified: db.is_verified ?? false,
+    phone: db.phone,
+    role: db.role,
     type: db.type || 'hospital'
   };
 }
 
 function mapPharmaToDB(p: PharmaCompany) {
-  const data: any = { id: p.id, user_id: p.userId, name: p.name, credits: p.credits, is_active: p.isActive, is_verified: p.isVerified };
+  const data: any = { id: p.id, user_id: p.userId, name: p.name, credits: p.credits, is_active: p.isActive, is_verified: p.isVerified, phone: p.phone, role: p.role };
   if (p.customBundles) data.custom_bundles = JSON.stringify(p.customBundles);
   return data;
 }
@@ -298,6 +310,7 @@ function mapPharmaFromDB(db: any): PharmaCompany {
   return { 
     id: db.id, userId: db.user_id, name: db.name, credits: db.credits, 
     isActive: db.is_active ?? true, isVerified: db.is_verified ?? false,
+    phone: db.phone, role: db.role,
     customBundles: bundles
   };
 }
@@ -309,7 +322,7 @@ function mapRepToDB(r: SalesRep) {
     pharma_name: r.pharmaName,
     name: r.name, email: r.email, phone: r.phone, target: r.target, 
     visits_this_month: r.visitsThisMonth, credits: r.credits || 0,
-    is_active: r.isActive, is_verified: r.isVerified
+    is_active: r.isActive, is_verified: r.isVerified, role: r.role
   };
 }
 
@@ -319,7 +332,8 @@ function mapRepFromDB(db: any): SalesRep {
     name: db.name, email: db.email, phone: db.phone, target: db.target, 
     visitsThisMonth: db.visits_this_month, credits: db.credits || 0,
     isActive: db.is_active ?? true,
-    isVerified: db.is_verified ?? true // Reps are usually pre-verified by pharma if created by pharma
+    isVerified: db.is_verified ?? true,
+    role: db.role
   };
 }
 
