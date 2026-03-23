@@ -134,9 +134,9 @@ export function Register() {
             userId,
             name: displayName,
             email: formData.email,
-            phone: formData.mobile,
-            specialty: existing?.specialty || 'General Practice',
-            experienceYears: existing?.experienceYears || 0,
+            phone: formData.phone,
+            specialty: formData.specialty || existing?.specialty || 'General Practice',
+            experienceYears: parseInt(formData.yearsExperience) || existing?.experienceYears || 0,
             hospitalId: existing?.hospitalId || null as any,
             hospitalName: existing?.hospitalName || formData.clinicName || 'Independent',
             availability: existing?.availability || [],
@@ -153,14 +153,14 @@ export function Register() {
             id: generateId(), 
             userId, 
             name: displayName, 
-            location: formData.address || 'Saudi Arabia', 
+            location: `${formData.cities.join(', ')} - ${formData.areas.join(', ')} - ${formData.address}`,
             isActive: true, 
             isVerified: false,
             type: formData.hospitalType as any
           });
         } else if (selectedRole === 'rep') {
           saveSalesRep({
-            id: generateId(), userId, name: displayName, email: formData.email, phone: formData.mobile,
+            id: generateId(), userId, name: displayName, email: formData.email, phone: formData.phone,
             pharmaId: null as any, pharmaName: formData.pharmaCompany || 'Independent',
             target: 500, visitsThisMonth: 0, credits: 0, isActive: true, isVerified: false
           });
