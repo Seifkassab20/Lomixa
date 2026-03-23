@@ -56,7 +56,7 @@ export function Layout() {
 
   return (
     <div
-      className="flex h-screen bg-gray-50 dark:bg-[#050b14] overflow-hidden transition-colors"
+      className="flex h-screen bg-app-bg overflow-hidden transition-colors"
       dir={isRTL ? 'rtl' : 'ltr'}
     >
       <Sidebar />

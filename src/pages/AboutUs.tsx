@@ -151,7 +151,7 @@ export function AboutUs() {
                 <span className="text-xl font-bold tracking-tight">{t('appName')}</span>
               </Link>
               <p className="text-slate-400 text-sm leading-relaxed">
-                Transforming healthcare professional and pharmaceutical company interactions through secure digital platform.
+                {t('about_desc')}
               </p>
             </div>
             <div>

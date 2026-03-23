@@ -627,6 +627,27 @@ export function saveDoctorAvailability(doctorId: string, slots: AvailabilitySlot
 }
 
 // ---- UTILITIES ----
+/**
+ * Checks if a user with the given email or phone exists in any of the role tables.
+ * Used for forgot password and verification logic.
+ */
+export async function checkUserExistence(type: 'email' | 'phone', value: string): Promise<boolean> {
+  if (!isSupabaseConfigured) return true;
+  
+  const tables = ['doctors', 'sales_reps', 'hospitals', 'pharma_companies'];
+  try {
+    const results = await Promise.all(
+      tables.map(table => 
+        supabase.from(table).select('id').eq(type, value).limit(1)
+      )
+    );
+    return results.some(r => r.data && r.data.length > 0);
+  } catch (err) {
+    console.warn("Existence check failed:", err);
+    return false;
+  }
+}
+
 export function generateId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();

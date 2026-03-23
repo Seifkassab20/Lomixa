@@ -5,7 +5,8 @@ import { Button } from './ui/button';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from './ThemeProvider';
 import { useNavigate } from 'react-router-dom';
-import { getNotifications } from '@/lib/store';
+import { getNotifications, getProfile } from '@/lib/store';
+import { useLayoutEffect } from 'react';
 
 export function Topbar() {
   const { user, signOut, role, userId } = useAuth();
@@ -13,11 +14,16 @@ export function Topbar() {
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const [notifCount, setNotifCount] = useState(0);
+  const [avatar, setAvatar] = useState<string | null>(null);
 
   useEffect(() => {
     const refresh = () => {
       const n = getNotifications().filter(n => !n.read && (!n.userId || n.userId === userId)).length;
       setNotifCount(n);
+      if (userId) {
+        const p = getProfile(userId);
+        setAvatar(p.avatar || null);
+      }
     };
     refresh();
     const interval = setInterval(refresh, 3000);
@@ -75,8 +81,12 @@ export function Topbar() {
 
         {/* User */}
         <div className="flex items-center gap-2 border-l border-slate-200 dark:border-slate-800 pl-3 ml-1">
-          <button onClick={() => navigate('/settings')} className="h-8 w-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400 hover:ring-2 hover:ring-emerald-500/40 transition-all">
-            <User className="h-4 w-4" />
+          <button onClick={() => navigate('/settings')} className="h-8 w-8 rounded-full bg-brand-muted flex items-center justify-center text-brand hover:ring-2 hover:ring-brand/40 transition-all overflow-hidden border dark:border-slate-800">
+            {avatar ? (
+              <img src={avatar} alt="Profile" className="h-full w-full object-cover" />
+            ) : (
+              <User className="h-4 w-4" />
+            )}
           </button>
           <span className="text-sm text-gray-600 dark:text-slate-300 hidden sm:block max-w-[120px] truncate">
             {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}

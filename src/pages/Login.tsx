@@ -32,6 +32,10 @@ export function Login() {
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [showAdmin, setShowAdmin] = useState(false);
   const [clickCount, setClickCount] = useState(0);
+  const [isResetMode, setIsResetMode] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  const [resetMethod, setResetMethod] = useState<'email' | 'phone'>('email');
+  const [resetPhone, setResetPhone] = useState('');
 
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -42,8 +46,9 @@ export function Login() {
     const checkRedirect = async () => {
       // Only redirect if authenticated AND fully verified/authorized
       if (user && !loading) {
-        const { isUserAuthorized } = await import('@/lib/store');
-        if (isUserAuthorized(user.id, user.user_metadata?.role)) {
+        const { isUserAuthorized, checkUserExistence } = await import('@/lib/store');
+        const authorized = await isUserAuthorized(user.id, user.user_metadata?.role);
+        if (authorized) {
            navigate('/dashboard', { replace: true });
         }
       }
@@ -87,6 +92,16 @@ export function Login() {
       // Signal the intended role for the AuthProvider to enforce
       localStorage.setItem('lomixa_target_role', selectedRole);
 
+      // Pre-check existence for better AX (as requested)
+      // EXCEPTION: Admins are not stored in the public role tables, they are in auth.users directly.
+      if (selectedRole !== 'admin') {
+        const { checkUserExistence } = await import('@/lib/store');
+        const emailExists = await checkUserExistence('email', email);
+        if (!emailExists) {
+          throw new Error(`The workspace identity '${email}' does not exist in our grid. Please check your spelling or register a new identity.`);
+        }
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
       if (error) {
@@ -118,7 +133,7 @@ export function Login() {
 
       // Robust Verification Gate: Check local grid, then fallback to direct cloud query
       if (userId) {
-        const { isUserAuthorized } = await import('@/lib/store');
+        const { isUserAuthorized, checkUserExistence } = await import('@/lib/store');
         const authorized = await isUserAuthorized(userId, selectedRole);
 
         if (!authorized) {
@@ -132,6 +147,41 @@ export function Login() {
       const msg = err.message || 'Failed to login';
       setError(msg);
       toast(msg, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      // checkUserExistence is only needed for phone reset, not email
+      // as email reset should allow admin accounts not in role tables.
+      if (resetMethod === 'email') {
+        if (!email) throw new Error('Please enter your workspace email.');
+        if (isSupabaseConfigured) {
+          const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}/login?type=recovery`,
+          });
+          if (error) throw error;
+        }
+        toast('Verification link sent to your workspace email.', 'success');
+      } else { // resetMethod === 'phone'
+        if (!resetPhone) throw new Error('Please enter your registered mobile number.');
+        if (isSupabaseConfigured) {
+          const { checkUserExistence } = await import('@/lib/store');
+          const exists = await checkUserExistence('phone', resetPhone);
+          if (!exists) throw new Error('This mobile identity does not exist in our grid.');
+
+          const { error } = await supabase.auth.updateUser({ phone: resetPhone });
+          if (error) throw error;
+        }
+        toast('Verification code sent to your mobile.', 'success');
+      }
+      setResetSent(true);
+    } catch (err: any) {
+      toast(err.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -157,53 +207,20 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col font-sans bg-[#050b14]">
-      <div className="flex-1 w-full flex flex-col lg:flex-row">
-        {/* Left Panel - Branding */}
-        <div className="w-full lg:w-1/2 bg-[#0d7a5b] text-white p-8 lg:p-16 flex flex-col justify-between relative overflow-hidden min-h-[400px]">
-          {/* Decorative elements */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-black/10 rounded-full blur-3xl translate-y-1/3 -translate-x-1/3"></div>
-
-          <div className="relative z-10">
-            <div className="mb-16">
-              <button onClick={handleLogoClick} className="bg-white rounded-full p-2 w-24 h-24 lg:w-32 lg:h-32 flex items-center justify-center shadow-xl border-4 border-white/20 transition-transform active:scale-95 group overflow-hidden">
-                <img src="/logo.png" alt="Lomixa Logo" className="w-full h-full object-contain rounded-full transition-transform group-hover:scale-110" />
-              </button>
-            </div>
-
-            <div className="max-w-md">
-              <h2 className="text-4xl lg:text-6xl font-extrabold leading-tight mb-6 tracking-tight">
-                {t('bridgingPharma')} <br />
-                <span className="relative inline-block">
-                  {t('healthcare')}
-                  <div className="absolute bottom-2 left-0 w-full h-2 bg-emerald-400/50 -z-10"></div>
-                </span>
-              </h2>
-              <p className="text-lg text-emerald-50/90 leading-relaxed mb-8">
-                {t('platformDesc')}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 relative z-10 max-w-sm">
-            {[
-              { label: t('activeDoctors'), value: '500+' },
-              { label: t('pharmaCompanies'), value: '48' },
-              { label: t('visitsScheduled'), value: '12K+' },
-              { label: t('satisfactionRate'), value: '98%' },
-            ].map((stat, i) => (
-              <div key={i} className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-4">
-                <div className="text-2xl font-bold mb-1">{stat.value}</div>
-                <div className="text-[10px] font-bold tracking-wider uppercase text-emerald-100">{stat.label}</div>
-              </div>
-            ))}
-          </div>
+    <div className="min-h-screen w-full flex flex-col font-sans bg-[#050b14] items-center py-20 px-6">
+      {/* Centered Logo Section */}
+      <div className="w-full max-w-xl flex flex-col items-center mb-16">
+        <button onClick={handleLogoClick} className="bg-white rounded-[2.5rem] p-3 w-24 h-24 lg:w-32 lg:h-32 flex items-center justify-center shadow-2xl border-4 border-white/5 shadow-emerald-500/10 transition-transform active:scale-95 group overflow-hidden hover:rotate-2">
+          <img src="/logo.png" alt="Lomixa Logo" className="w-full h-full object-contain rounded-full transition-transform group-hover:scale-110" />
+        </button>
+        <div className="mt-8 text-center space-y-4">
+          <h1 className="text-4xl lg:text-5xl font-black text-white italic tracking-tighter uppercase">{t('appName')}</h1>
+          <p className="text-slate-400 text-lg max-w-sm mx-auto leading-relaxed">{t('platformDesc')}</p>
         </div>
+      </div>
 
-        {/* Right Panel - Login Form */}
-        <div className="w-full lg:w-1/2 bg-[#050b14] flex flex-col items-center justify-center p-8 lg:p-16 relative">
-          <div className="absolute top-8 right-8 flex items-center gap-4 bg-slate-900/50 backdrop-blur-sm p-1 rounded-full border border-slate-800">
+      <div className="w-full max-w-2xl px-6 pb-24 relative">
+        <div className="absolute top-0 right-0 flex items-center gap-4 bg-slate-900/50 backdrop-blur-sm p-1 rounded-full border border-slate-800 -translate-y-12">
             <Link to="/about" className="text-slate-400 hover:text-white text-xs font-bold uppercase tracking-widest px-4 py-2 hover:bg-slate-800 rounded-full transition-all">About</Link>
             <button 
               onClick={toggleLanguage}
@@ -211,9 +228,9 @@ export function Login() {
             >
               {i18n.language === 'en' ? 'عربي' : 'English'}
             </button>
-          </div>
+        </div>
 
-          <div className="w-full max-w-md bg-[#0f172a] rounded-[2.5rem] p-8 lg:p-10 border border-slate-800 shadow-2xl relative overflow-hidden group">
+        <div className="w-full max-w-md mx-auto bg-[#0f172a] rounded-[2.5rem] p-8 lg:p-10 border border-slate-800 shadow-2xl relative overflow-hidden group">
             <div className="absolute -top-24 -right-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-[80px] group-hover:bg-emerald-500/20 transition-all duration-700"></div>
             
             <div className="mb-8 relative z-10">
@@ -293,7 +310,16 @@ export function Login() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-xs font-bold text-slate-400 ml-1 tracking-wide uppercase">{t('securityKey')}</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password" className="text-xs font-bold text-slate-400 ml-1 tracking-wide uppercase">{t('securityKey')}</Label>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsResetMode(true)}
+                      className="text-[10px] font-black uppercase tracking-widest text-[#0d7a5b] hover:text-emerald-400 italic transition-colors"
+                    >
+                      {t('forgotKey') || 'Restore Key?'}
+                    </button>
+                  </div>
                   <div className="relative group/input">
                     <Input
                       id="password"
@@ -330,20 +356,108 @@ export function Login() {
               </Button>
             </form>
 
-            <div className="mt-8 text-center border-t border-slate-800/30 pt-8 flex items-center justify-between px-4">
+            {isResetMode && (
+              <div className="absolute inset-0 z-50 bg-[#0f172a] p-8 lg:p-10 flex flex-col justify-center animate-in fade-in zoom-in duration-300">
+                <div className="mb-6">
+                  <h3 className="text-2xl font-bold text-white mb-2">{t('restoreAccess') || 'Restore Access'}</h3>
+                  <p className="text-slate-400 text-sm">
+                    {resetSent 
+                      ? (t('verificationSent') || 'Check your communications for the reset link/code.')
+                      : (t('enterDetailsRescue') || 'Select your restoration method and enter details.')}
+                  </p>
+                </div>
+
+                {!resetSent ? (
+                  <form onSubmit={handleForgotPassword} className="space-y-6">
+                    <div className="flex gap-2 p-1 bg-slate-900/80 rounded-xl border border-slate-800">
+                      <button 
+                        type="button" 
+                        onClick={() => setResetMethod('email')}
+                        className={cn(
+                          "flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                          resetMethod === 'email' ? "bg-emerald-500 text-white" : "text-slate-500 hover:text-slate-300"
+                        )}
+                      >
+                        Email
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => setResetMethod('phone')}
+                        className={cn(
+                          "flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                          resetMethod === 'phone' ? "bg-emerald-500 text-white" : "text-slate-500 hover:text-slate-300"
+                        )}
+                      >
+                        Phone
+                      </button>
+                    </div>
+
+                    {resetMethod === 'email' ? (
+                      <div className="space-y-2">
+                        <Label htmlFor="resetEmail" className="text-xs font-bold text-slate-400 ml-1 tracking-wide uppercase">{t('emailWorkspace')}</Label>
+                        <div className="relative group/input">
+                          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 group-focus-within/input:text-emerald-500 transition-colors" />
+                          <Input
+                            id="resetEmail"
+                            type="email"
+                            required
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="you@work.com"
+                            className="bg-slate-900/50 border-slate-800 text-white placeholder:text-slate-600 h-12 rounded-2xl pl-12 focus-visible:ring-emerald-500/50 focus-visible:border-emerald-500/50 transition-all shadow-inner"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Label htmlFor="resetPhone" className="text-xs font-bold text-slate-400 ml-1 tracking-wide uppercase">{t('mobile')}</Label>
+                        <div className="relative group/input">
+                          <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 group-focus-within/input:text-emerald-500 transition-colors" />
+                          <Input
+                            id="resetPhone"
+                            type="tel"
+                            required
+                            value={resetPhone}
+                            onChange={(e) => setResetPhone(e.target.value)}
+                            placeholder="+20 XXX XXX XXXX"
+                            className="bg-slate-900/50 border-slate-800 text-white placeholder:text-slate-600 h-12 rounded-2xl pl-12 focus-visible:ring-emerald-500/50 focus-visible:border-emerald-500/50 transition-all shadow-inner"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <Button 
+                      disabled={loading}
+                      className="w-full h-12 rounded-xl bg-[#0d7a5b] hover:bg-[#0a6148] text-white font-bold"
+                    >
+                      {loading ? t('sending') || 'Sending...' : t('sendLink') || 'Send Restoration Link'}
+                    </Button>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsResetMode(false)}
+                      className="w-full text-xs font-bold text-slate-400 hover:text-white transition-colors py-2"
+                    >
+                      {t('backToLogin') || 'Return to Login'}
+                    </button>
+                  </form>
+                ) : (
+                  <Button 
+                    onClick={() => { setIsResetMode(false); setResetSent(false); }}
+                    className="w-full h-12 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold"
+                  >
+                    {t('gotIt') || 'Got it'}
+                  </Button>
+                )}
+              </div>
+            )}
+
+            <div className="mt-8 text-center border-t border-slate-800/30 pt-8">
               <p className="text-sm text-slate-500 font-bold uppercase tracking-widest leading-relaxed">
                 {t('noAccount')} <Link to="/select-role" className="text-emerald-500 hover:text-emerald-400 underline decoration-emerald-500/20 underline-offset-4">{t('signUp')}</Link>
               </p>
-              <button 
-                onClick={() => setShowAdmin(true)} 
-                className="text-[10px] text-slate-700 hover:text-emerald-500/50 uppercase font-black tracking-widest transition-colors flex items-center gap-1"
-              >
-                <Shield className="w-3 h-3" /> Admin Access
-              </button>
             </div>
           </div>
         </div>
-      </div>
 
       {/* Footer Section */}
       <footer className="w-full bg-[#050b14] border-t border-slate-800/80 px-8 py-16">

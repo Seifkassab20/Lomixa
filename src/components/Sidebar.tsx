@@ -82,7 +82,7 @@ export function Sidebar() {
 
   return (
     <div className={cn(
-      'relative bg-white dark:bg-[#0f172a] border-r border-gray-200 dark:border-slate-800 flex flex-col transition-all duration-300',
+      'relative bg-app-bg-sidebar border-r border-slate-200 dark:border-slate-800 flex flex-col transition-all duration-300',
       collapsed ? 'w-16' : 'w-64'
     )}>
       {/* Logo */}
@@ -118,11 +118,11 @@ export function Sidebar() {
                     'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 relative group',
                     collapsed ? 'justify-center' : '',
                     isActive
-                      ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 shadow-sm'
-                      : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800/60 hover:text-gray-900 dark:hover:text-slate-200'
+                      ? 'bg-brand-muted text-brand shadow-sm'
+                      : 'text-gray-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-gray-900 dark:hover:text-slate-200'
                   )}
                 >
-                  <Icon className={cn('h-5 w-5 shrink-0', isActive ? 'text-emerald-600 dark:text-emerald-400' : '')} />
+                  <Icon className={cn('h-5 w-5 shrink-0', isActive ? 'text-brand' : '')} />
                   {!collapsed && <span className="truncate">{link.name}</span>}
                   {badge > 0 && (
                     <span className={cn(

@@ -125,18 +125,11 @@ export function AdminDashboard() {
     }
   };
 
-  const togglePharmaStatus = (pc: PharmaCompany) => {
-    const updated = { ...pc, isActive: !pc.isActive };
+  const togglePharmaStatus = (pc: PharmaCompany, forceValue?: boolean) => {
+    const updated = { ...pc, isActive: forceValue !== undefined ? forceValue : !pc.isActive };
     savePharmaCompany(updated);
     refresh();
     toast(`${pc.name} ${updated.isActive ? 'Activated' : 'Deactivated'}`, 'info');
-  };
-
-  const handleUpdateCredits = (pc: PharmaCompany, amount: number) => {
-    const updated = { ...pc, credits: (pc.credits || 0) + amount };
-    savePharmaCompany(updated);
-    refresh();
-    toast(`Added ${amount} credits to ${pc.name}`, 'success');
   };
 
   const handleApproveRequest = (req: BundleRequest) => {
@@ -186,47 +179,46 @@ export function AdminDashboard() {
     toast('Bundle request rejected.', 'error');
   };
 
-  const filteredPharma = pharma.filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()));
   const pendingRequests = requests.filter(r => r.status === 'pending');
   
-  const pendingHosps = hospitals.filter(h => h.isVerified === false);
-  const pendingPharmas = pharma.filter(p => p.isVerified === false);
+  // Deduplicate everything
+  const uniquePharma = Array.from(new Map<string, PharmaCompany>(pharma.map(p => [p.id, p])).values());
+  const uniqueHospitals = Array.from(new Map<string, Hospital>(hospitals.map(h => [h.id, h])).values());
+
+  const pendingHosps = uniqueHospitals.filter(h => h.isVerified === false);
+  const pendingPharmas = uniquePharma.filter(p => p.isVerified === false);
   const totalPendingVerification = pendingHosps.length + pendingPharmas.length;
 
+  const filteredPharma = uniquePharma.filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()));
+
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-8 pb-12" dir={t('appName') === 'لوميكسا' ? 'rtl' : 'ltr'}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-8">
            <div>
               <h1 className="text-3xl font-black tracking-tighter text-gray-900 dark:text-white uppercase italic">
-                Lomixa <span className="text-emerald-500">Nexus</span> Admin
+                {t('appName')} <span className="text-brand">Nexus</span> Admin
               </h1>
-              <p className="text-sm text-gray-500 dark:text-slate-400 mt-1 uppercase tracking-widest font-bold opacity-60">System Overlord Command Center</p>
+              <p className="text-sm text-gray-500 dark:text-slate-400 mt-1 uppercase tracking-widest font-bold opacity-60">{t('systemOverlord')}</p>
            </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <Badge className="bg-purple-500/10 text-purple-500 border-purple-500/20 px-4 py-1.5 rounded-xl font-black uppercase italic tracking-widest text-[10px]">Developer Mode Active</Badge>
-          <div className="flex -space-x-3 overflow-hidden">
-             {[...Array(4)].map((_, i) => (
-               <div key={i} className="inline-block h-8 w-8 rounded-full ring-2 ring-white dark:ring-slate-900 bg-slate-200 dark:bg-slate-800 border dark:border-slate-700" />
-             ))}
-          </div>
         </div>
       </div>
 
       {/* Command Tabs */}
       <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900/50 p-1.5 rounded-[1.5rem] border dark:border-slate-800 w-fit">
         {[
-          { id: 'verification', label: 'Facility Verification', icon: ShieldCheck, color: 'emerald', count: totalPendingVerification },
-          { id: 'bundles', label: 'Bundle Requests', icon: CreditCard, color: 'blue', count: pendingRequests.length },
-          { id: 'pharma', label: 'Network Management', icon: Building2, color: 'purple' },
+          { id: 'verification', label: t('facilityVerificationDesk'), icon: ShieldCheck, color: 'emerald', count: totalPendingVerification },
+          { id: 'bundles', label: t('pendingApprovalDesk'), icon: CreditCard, color: 'blue', count: pendingRequests.length },
+          { id: 'pharma', label: t('pharmaEcosystemManagement'), icon: Building2, color: 'purple' },
         ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black uppercase italic tracking-widest text-[10px] transition-all duration-300 relative ${
+            className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black uppercase italic tracking-widest text-[10px] transition-all duration-300 relative whitespace-nowrap ${
               activeTab === tab.id 
-                ? `bg-${tab.color}-500 text-white shadow-lg shadow-${tab.color || 'emerald'}-500/20 scale-[1.02]`
+                ? (tab.color === 'emerald' ? 'bg-brand shadow-brand/20' : 
+                   tab.color === 'blue' ? 'bg-blue-600 shadow-blue-500/20' : 
+                   'bg-purple-600 shadow-purple-500/20') + ' text-white shadow-lg scale-[1.02]'
                 : "text-slate-500 hover:text-slate-900 dark:hover:text-slate-300"
             }`}
           >
@@ -234,7 +226,7 @@ export function AdminDashboard() {
             {tab.label}
             {tab.count !== undefined && tab.count > 0 && (
               <span className={`absolute -top-1 -right-1 h-5 w-5 rounded-full flex items-center justify-center text-[8px] font-black border-2 border-white dark:border-slate-900 ${
-                activeTab === tab.id ? 'bg-white text-emerald-600' : 'bg-red-500 text-white'
+                activeTab === tab.id ? 'bg-white text-brand-dark' : 'bg-red-500 text-white'
               }`}>
                 {tab.count}
               </span>
@@ -246,16 +238,16 @@ export function AdminDashboard() {
       {/* --- TAB: VERIFICATION --- */}
       {activeTab === 'verification' && (
         <section className="space-y-6">
-          <div className="flex items-center gap-3 text-emerald-500 mb-2">
+          <div className="flex items-center gap-3 text-brand mb-2">
             <ShieldCheck className="w-6 h-6 shadow-[0_0_10px_rgba(16,185,129,0.3)]" />
-            <h2 className="text-xl font-black uppercase italic tracking-tighter">Facility Verification Desk</h2>
+            <h2 className="text-xl font-black uppercase italic tracking-tighter">{t('facilityVerificationDesk')}</h2>
           </div>
 
           {totalPendingVerification === 0 ? (
-            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-[3rem] p-16 text-center">
-               <ShieldCheck className="w-16 h-16 text-emerald-500/20 mx-auto mb-6" />
-               <h3 className="text-2xl font-black text-emerald-500 uppercase italic tracking-tighter">Regional Grid Secure</h3>
-               <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mt-2">All active healthcare providers have been verified by Nexus Admin</p>
+            <div className="bg-brand/5 border border-brand/20 rounded-[3rem] p-16 text-center">
+               <ShieldCheck className="w-16 h-16 text-brand/20 mx-auto mb-6" />
+               <h3 className="text-2xl font-black text-brand uppercase italic tracking-tighter">{t('regionalGridSecure')}</h3>
+               <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mt-2">{t('allFacilityVerified')}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -268,24 +260,24 @@ export function AdminDashboard() {
                        <div className="p-4 bg-blue-500/10 rounded-2xl text-blue-500">
                           <HospitalIcon className="w-6 h-6" />
                        </div>
-                       <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20 font-black uppercase tracking-widest text-[8px]">Facility Credentials</Badge>
+                       <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20 font-black uppercase tracking-widest text-[8px]">{t('facilityCredentials')}</Badge>
                     </div>
                     <h4 className="text-xl font-black text-gray-900 dark:text-white uppercase italic tracking-tighter mb-1">{hosp.name}</h4>
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">{hosp.location}</p>
                     
                     <div className="grid grid-cols-2 gap-3 mt-auto">
                       <Button 
-                        className="rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase italic tracking-widest text-[10px] h-12 shadow-lg shadow-emerald-500/20"
+                        className="rounded-2xl bg-brand-dark hover:bg-brand text-white font-black uppercase italic tracking-widest text-[10px] h-12 shadow-lg shadow-brand/20"
                         onClick={() => handleVerifyUser('hospital', hosp.id)}
                       >
-                        Verify
+                        {t('accept')}
                       </Button>
                       <Button 
                         variant="ghost" 
                         className="rounded-2xl border border-slate-800 text-slate-500 hover:bg-red-500/10 hover:text-red-500 font-black uppercase italic tracking-widest text-[10px] h-12"
                         onClick={() => initiateReject('hospital', hosp.id)}
                       >
-                        Reject
+                        {t('reject')}
                       </Button>
                     </div>
                  </div>
@@ -299,24 +291,24 @@ export function AdminDashboard() {
                        <div className="p-4 bg-purple-500/10 rounded-2xl text-purple-500">
                           <Building2 className="w-6 h-6" />
                        </div>
-                       <Badge className="bg-purple-500/10 text-purple-500 border-purple-500/20 font-black uppercase tracking-widest text-[8px]">Legal Organization</Badge>
+                       <Badge className="bg-purple-500/10 text-purple-500 border-purple-500/20 font-black uppercase tracking-widest text-[8px]">{t('legalOrganization')}</Badge>
                     </div>
                     <h4 className="text-xl font-black text-gray-900 dark:text-white uppercase italic tracking-tighter mb-1">{p.name}</h4>
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">Pharmaceutical Global Grid</p>
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">{t('pharmaEcosystemManagement')}</p>
                     
                     <div className="grid grid-cols-2 gap-3 mt-auto">
                       <Button 
-                        className="rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase italic tracking-widest text-[10px] h-12 shadow-lg shadow-emerald-500/20"
+                        className="rounded-2xl bg-brand-dark hover:bg-brand text-white font-black uppercase italic tracking-widest text-[10px] h-12 shadow-lg shadow-brand/20"
                         onClick={() => handleVerifyUser('pharma', p.id)}
                       >
-                        Verify
+                        {t('accept')}
                       </Button>
                       <Button 
                         variant="ghost" 
                         className="rounded-2xl border border-slate-800 text-slate-500 hover:bg-red-500/10 hover:text-red-500 font-black uppercase italic tracking-widest text-[10px] h-12"
                         onClick={() => initiateReject('pharma', p.id)}
                       >
-                        Reject
+                        {t('reject')}
                       </Button>
                     </div>
                  </div>
@@ -340,14 +332,14 @@ export function AdminDashboard() {
              animate={{ scale: 1, opacity: 1, y: 0 }}
              className="relative w-full max-w-4xl bg-[#0f172a] border border-slate-800 rounded-[3rem] shadow-3xl flex flex-col max-h-[90vh] overflow-hidden"
            >
-              <div className="p-10 border-b border-slate-800 flex items-center justify-between bg-emerald-500/5">
+              <div className="p-10 border-b border-slate-800 flex items-center justify-between bg-brand/5">
                  <div className="flex items-center gap-6">
-                    <div className="h-20 w-20 rounded-3xl bg-emerald-500/20 flex items-center justify-center text-emerald-500 font-black text-4xl shadow-inner border border-emerald-500/30">
+                    <div className="h-20 w-20 rounded-3xl bg-brand/20 flex items-center justify-center text-brand font-black text-4xl shadow-inner border border-brand/30">
                        {editingPharma.name[0]}
                     </div>
                     <div>
-                      <h3 className="text-3xl font-black text-white uppercase italic tracking-tighter">Edit Custom Bundles</h3>
-                      <p className="text-slate-400 font-bold uppercase tracking-widest text-xs mt-1">Modifying pricing structure for {editingPharma.name}</p>
+                      <h3 className="text-3xl font-black text-white uppercase italic tracking-tighter">{t('editCustomBundles')}</h3>
+                      <p className="text-slate-400 font-bold uppercase tracking-widest text-xs mt-1">{t('modifyingPricingFor').replace('{{name}}', editingPharma.name)}</p>
                     </div>
                  </div>
                  <Button variant="ghost" className="h-14 w-14 rounded-2xl hover:bg-red-500/10 group" onClick={() => setEditingPharma(null)}>
@@ -357,11 +349,11 @@ export function AdminDashboard() {
 
               <div className="p-10 overflow-y-auto flex-1 space-y-6">
                  {customBundles.map((b, bIdx) => (
-                    <div key={b.id} className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8 hover:border-emerald-500/30 transition-all flex flex-col sm:flex-row items-center gap-8 group">
+                    <div key={b.id} className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8 hover:border-brand/30 transition-all flex flex-col sm:flex-row items-center gap-8 group">
                        <div className="flex-1 w-full space-y-4">
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                              <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase text-slate-500 px-1">Bundle Name</Label>
+                                <Label className="text-[10px] font-black uppercase text-slate-500 px-1">{t('bundleNameLabel')}</Label>
                                 <Input 
                                   value={b.name} 
                                   onChange={e => handleUpdateBundleField(bIdx, 'name', e.target.value)}
@@ -369,7 +361,7 @@ export function AdminDashboard() {
                                 />
                              </div>
                              <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase text-slate-500 px-1">Credits Included</Label>
+                                <Label className="text-[10px] font-black uppercase text-slate-500 px-1">{t('creditsIncluded')}</Label>
                                 <Input 
                                   type="number"
                                   value={b.credits} 
@@ -378,7 +370,7 @@ export function AdminDashboard() {
                                 />
                              </div>
                              <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase text-slate-500 px-1">Price (EGP)</Label>
+                                <Label className="text-[10px] font-black uppercase text-slate-500 px-1">{t('priceSAR')}</Label>
                                 <Input 
                                   type="number"
                                   value={b.price} 
@@ -388,12 +380,12 @@ export function AdminDashboard() {
                              </div>
                           </div>
                           <div className="space-y-2">
-                             <Label className="text-[10px] font-black uppercase text-slate-500 px-1">Key Value Proposition (Comma separated)</Label>
+                             <Label className="text-[10px] font-black uppercase text-slate-500 px-1">{t('keyValueProp')}</Label>
                              <Input 
                                value={b.features.join(', ')} 
                                onChange={e => handleUpdateBundleField(bIdx, 'features', e.target.value.split(',').map(s => s.trim()))}
                                className="h-12 bg-black/40 border-slate-800 rounded-xl"
-                               placeholder="e.g. 50 Visits, HD Support, etc."
+                               placeholder="..."
                              />
                           </div>
                        </div>
@@ -411,10 +403,10 @@ export function AdminDashboard() {
 
                  <Button 
                    variant="outline" 
-                   className="w-full h-16 border-dashed border-slate-800 rounded-3xl text-slate-500 hover:text-emerald-500 hover:border-emerald-500/50 hover:bg-emerald-500/5 font-black uppercase italic tracking-widest text-xs gap-3"
+                   className="w-full h-16 border-dashed border-slate-800 rounded-3xl text-slate-500 hover:text-brand hover:border-brand/50 hover:bg-brand/5 font-black uppercase italic tracking-widest text-xs gap-3"
                    onClick={handleAddCustomBundle}
                  >
-                    <Plus className="w-4 h-4" /> Add Premium Bundle Slot
+                    <Plus className="w-4 h-4" /> {t('addPremiumBundleSlot')}
                  </Button>
               </div>
 
@@ -424,13 +416,13 @@ export function AdminDashboard() {
                    className="h-14 px-8 rounded-2xl text-slate-500 font-bold uppercase tracking-widest text-xs"
                    onClick={() => setEditingPharma(null)}
                  >
-                    Discard Changes
+                    {t('discardChanges')}
                  </Button>
                  <Button 
-                   className="h-14 px-10 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase italic tracking-widest text-xs gap-3 shadow-xl shadow-emerald-500/20"
+                   className="h-14 px-10 rounded-2xl bg-brand-dark hover:bg-brand text-white font-black uppercase italic tracking-widest text-xs gap-3 shadow-xl shadow-brand/20"
                    onClick={handleSaveAllBundles}
                  >
-                    <Save className="w-4 h-4" /> Apply Custom Pricing
+                    <Save className="w-4 h-4" /> {t('applyCustomPricing')}
                  </Button>
               </div>
            </motion.div>
@@ -466,7 +458,7 @@ export function AdminDashboard() {
                         </div>
                      </div>
                      <div className="text-right">
-                        <div className="text-xl font-black text-emerald-500 tracking-tighter">{req.price.toLocaleString()} EGP</div>
+                        <div className="text-xl font-black text-brand tracking-tighter">{req.price.toLocaleString()} SAR</div>
                         <div className="text-[10px] text-slate-500 font-bold">{req.credits} Credits</div>
                      </div>
                   </div>
@@ -474,7 +466,7 @@ export function AdminDashboard() {
                   <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 mb-6 border dark:border-slate-800">
                      <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">
                         <span>{t('cardIdentification')}</span>
-                        <span className="text-emerald-500 font-bold flex items-center gap-1">{t('verified')} <ShieldCheck className="w-3 h-3" /></span>
+                        <span className="text-brand font-bold flex items-center gap-1">{t('verified')} <ShieldCheck className="w-3 h-3" /></span>
                      </div>
                      <div className="flex items-center justify-between text-xs font-bold text-slate-400">
                         <span>{req.cardNumber}</span>
@@ -484,7 +476,7 @@ export function AdminDashboard() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <Button 
-                      className="rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase italic tracking-widest text-[10px] h-11 shadow-lg"
+                      className="rounded-xl bg-brand-dark hover:bg-brand text-white font-black uppercase italic tracking-widest text-[10px] h-11 shadow-lg"
                       onClick={() => handleApproveRequest(req)}
                     >
                       {t('confirmAndFund')}
@@ -510,18 +502,28 @@ export function AdminDashboard() {
           {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
-          { label: 'Total Pharma', value: pharma.length, icon: Building2, color: 'emerald', trend: '+12%' },
-          { label: 'Total Hospitals', value: hospitals.length, icon: HospitalIcon, color: 'blue', trend: '+5%' },
-          { label: 'Active Reps', value: getSalesReps().length, icon: Users, color: 'purple', trend: '+18%' },
-          { label: 'Network Doctors', value: getDoctors().length, icon: Stethoscope, color: 'amber', trend: '+31%' },
+          { label: t('totalPharma'), value: uniquePharma.length, icon: Building2, color: 'emerald', trend: '+12%' },
+          { label: t('totalHospitals'), value: uniqueHospitals.length, icon: HospitalIcon, color: 'blue', trend: '+5%' },
+          { label: t('activeReps'), value: getSalesReps().length, icon: Users, color: 'purple', trend: '+18%' },
+          { label: t('networkDoctors'), value: getDoctors().length, icon: Stethoscope, color: 'amber', trend: '+31%' },
         ].map((stat, i) => (
-          <div key={i} className="bg-white dark:bg-slate-900/50 border dark:border-slate-800 rounded-3xl p-6 relative overflow-hidden group">
-            <div className={`absolute top-0 right-0 w-24 h-24 bg-${stat.color}-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-${stat.color}-500/10 transition-colors`}></div>
+          <div key={i} className="bg-app-card border dark:border-slate-800 rounded-3xl p-6 relative overflow-hidden group">
+            <div className={`absolute top-0 right-0 w-24 h-24 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 transition-colors ${
+              stat.color === 'emerald' ? 'bg-brand/5 group-hover:bg-brand/10' :
+              stat.color === 'blue' ? 'bg-blue-500/5 group-hover:bg-blue-500/10' :
+              stat.color === 'purple' ? 'bg-purple-500/5 group-hover:bg-purple-500/10' :
+              'bg-amber-500/5 group-hover:bg-amber-500/10'
+            }`}></div>
             <div className="flex items-center justify-between mb-4">
-              <div className={`p-3 rounded-2xl bg-${stat.color}-500/10 text-${stat.color}-500`}>
+              <div className={`p-3 rounded-2xl ${
+                stat.color === 'emerald' ? 'bg-brand/10 text-brand' :
+                stat.color === 'blue' ? 'bg-blue-500/10 text-blue-500' :
+                stat.color === 'purple' ? 'bg-purple-500/10 text-purple-500' :
+                'bg-amber-500/10 text-amber-500'
+              }`}>
                 <stat.icon className="w-5 h-5" />
               </div>
-              <span className="text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-lg flex items-center gap-1">
+              <span className="text-[10px] font-black text-brand bg-brand/10 px-2 py-1 rounded-lg flex items-center gap-1">
                 <ArrowUpRight className="w-3 h-3" /> {stat.trend}
               </span>
             </div>
@@ -537,7 +539,7 @@ export function AdminDashboard() {
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-xl font-bold dark:text-white flex items-center gap-2 uppercase tracking-tighter italic">
-              <Package className="w-5 h-5 text-emerald-500" /> Pharma Ecosystem Management
+              <Package className="w-5 h-5 text-brand" /> {t('pharmaEcosystemManagement')}
             </h3>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
@@ -552,130 +554,81 @@ export function AdminDashboard() {
 
           <div className="space-y-3">
             {filteredPharma.map(pc => (
-              <div key={pc.id} className="bg-white dark:bg-slate-900/80 border dark:border-slate-800 rounded-[2rem] p-6 hover:shadow-2xl hover:shadow-emerald-500/5 transition-all group border-l-4 border-l-transparent hover:border-l-emerald-500">
+              <div 
+                key={pc.id} 
+                className={`bg-white dark:bg-slate-900/80 border dark:border-slate-800 rounded-[2rem] p-6 hover:shadow-2xl transition-all group border-l-4 ${
+                  pc.isActive 
+                    ? "border-l-brand hover:shadow-brand/5" 
+                    : "border-l-red-500 grayscale opacity-60 bg-slate-50 dark:bg-slate-900/40"
+                }`}
+              >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-5">
-                    <div className="h-14 w-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-emerald-500 font-black text-xl shadow-inner border dark:border-slate-700">
+                    <div className="h-14 w-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-brand font-black text-xl shadow-inner border dark:border-slate-700">
                       {pc.name[0]}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
                         <h4 className="font-black text-lg text-gray-900 dark:text-white uppercase italic tracking-tighter">{pc.name}</h4>
                         {pc.isActive ? (
-                          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[8px] font-black uppercase tracking-widest">
-                            <ShieldCheck className="w-2.5 h-2.5" /> Established
+                          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand/10 border border-brand/20 text-brand text-[8px] font-black uppercase tracking-widest">
+                            <ShieldCheck className="w-2.5 h-2.5" /> {t('establishedStatus')}
                           </div>
                         ) : (
                           <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-500 text-[8px] font-black uppercase tracking-widest">
-                            <ShieldAlert className="w-2.5 h-2.5" /> Restricted
+                            <ShieldAlert className="w-2.5 h-2.5" /> {t('restrictedStatus')}
                           </div>
                         )}
                       </div>
                       <div className="flex items-center gap-4 mt-2">
                          <div className="flex flex-col">
-                           <span className="text-[8px] uppercase font-black text-slate-500 tracking-widest">Network Liquidity</span>
-                           <span className="text-sm font-bold text-emerald-500">{pc.credits || 0} EGP</span>
+                           <span className="text-[8px] uppercase font-black text-slate-500 tracking-widest">{t('networkLiquidity')}</span>
+                           <span className="text-sm font-bold text-brand">{pc.credits || 0} SAR</span>
                          </div>
                          <div className="w-[1px] h-6 bg-slate-200 dark:bg-slate-800" />
                          <div className="flex flex-col">
-                           <span className="text-[8px] uppercase font-black text-slate-500 tracking-widest">Field Personnel</span>
-                           <span className="text-sm font-bold text-slate-400">{getSalesReps().filter(r => r.pharmaId === pc.id).length} Reps</span>
+                           <span className="text-[8px] uppercase font-black text-slate-500 tracking-widest">{t('fieldPersonnel')}</span>
+                           <span className="text-sm font-bold text-slate-400">{getSalesReps().filter(r => r.pharmaId === pc.id).length} {t('activeReps')}</span>
                          </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4">
-                    <div className="flex flex-col items-end gap-2">
-                       <div className="flex items-center gap-2">
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="h-8 rounded-lg border-blue-500/30 text-blue-500 text-[10px] font-black uppercase hover:bg-blue-500/10" 
-                            onClick={() => {
-                              setEditingPharma(pc);
-                              setCustomBundles(getPharmaBundles(pc.id));
-                            }}
-                          >
-                            <Package className="w-3 h-3 mr-1" /> Custom Bundles
-                          </Button>
-                          <div className="flex items-center gap-1">
-                             <Button size="sm" variant="outline" className="h-8 rounded-lg border-emerald-500/30 text-emerald-500 text-[10px] font-black uppercase" onClick={() => handleUpdateCredits(pc, 1000)}>+1K</Button>
-                             <Button size="sm" variant="outline" className="h-8 rounded-lg border-emerald-500/30 text-emerald-500 text-[10px] font-black uppercase" onClick={() => handleUpdateCredits(pc, 5000)}>+5K</Button>
-                          </div>
-                       </div>
-                       <div className="flex items-center gap-3 bg-slate-100 dark:bg-slate-800/80 px-4 py-2 rounded-xl border dark:border-slate-800">
-                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 italic">Access Status</span>
-                         <Switch 
-                           checked={pc.isActive} 
-                           onCheckedChange={() => togglePharmaStatus(pc)}
-                           className="scale-90"
-                         />
-                       </div>
+                    <div className="flex items-center gap-4">
+                      <div className="flex flex-col items-end gap-2">
+                         <div className="flex items-center gap-2">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="h-8 rounded-lg border-blue-500/30 text-blue-500 text-[10px] font-black uppercase hover:bg-blue-500/10" 
+                              onClick={() => {
+                                setEditingPharma(pc);
+                                setCustomBundles(getPharmaBundles(pc.id));
+                              }}
+                            >
+                              <Package className="w-3 h-3 mr-1" /> {t('editCustomBundles')}
+                            </Button>
+                         </div>
+                         <div className={`flex items-center gap-3 px-4 py-2 rounded-xl border transition-all duration-300 shadow-sm ${
+                           pc.isActive 
+                             ? "bg-brand border-brand-dark text-white" 
+                             : "bg-red-500 border-red-600 text-white"
+                         }`}>
+                           <span className="text-[10px] font-black uppercase tracking-widest italic">{pc.isActive ? t('active') : t('inactive')}</span>
+                           <Switch 
+                             checked={pc.isActive} 
+                             onCheckedChange={(val) => togglePharmaStatus(pc, val)}
+                             className="scale-90"
+                           />
+                         </div>
+                      </div>
                     </div>
-                  </div>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Global Pricing Overrides / Bundle Logic */}
-        <div className="space-y-6">
-           <div className="bg-gradient-to-br from-emerald-600 to-[#0d7a5b] rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden">
-             <DollarSign className="absolute -bottom-12 -right-12 w-48 h-48 opacity-10" />
-             <h3 className="text-2xl font-black uppercase italic tracking-tighter mb-4">Pricing Control</h3>
-             <p className="text-xs text-white/70 mb-6 leading-relaxed">Adjust the global pricing multipliers for the EGP market. All changes ripple through the ecosystem instantly.</p>
-             
-             <div className="space-y-5 relative z-10">
-               <div className="p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10">
-                 <div className="flex justify-between items-center mb-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest">Base Multiplier</span>
-                    <span className="font-bold">1.4x</span>
-                 </div>
-                 <div className="h-1 bg-white/20 rounded-full overflow-hidden">
-                   <div className="h-full w-[70%] bg-white rounded-full shadow-[0_0_10px_white]" />
-                 </div>
-               </div>
-               
-               <div className="p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10">
-                 <div className="flex justify-between items-center mb-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest">Tax Offset (VAT)</span>
-                    <span className="font-bold">14%</span>
-                 </div>
-                 <div className="h-1 bg-white/20 rounded-full overflow-hidden">
-                   <div className="h-full w-[14%] bg-white rounded-full shadow-[0_0_10px_white]" />
-                 </div>
-               </div>
-
-               <Button 
-                onClick={() => toast('Global multipliers synchronized with regional nodes.', 'success')}
-                className="w-full h-12 bg-white text-emerald-700 font-black uppercase italic tracking-widest rounded-2xl hover:bg-emerald-50 transition-all"
-               >
-                 Apply Global Updates
-               </Button>
-             </div>
-           </div>
-
-           <div className="bg-white dark:bg-slate-900/50 border dark:border-slate-800 rounded-[2.5rem] p-8">
-             <div className="flex items-center gap-2 mb-6 text-emerald-500">
-               <TrendingUp className="w-5 h-5" />
-               <h3 className="font-black uppercase tracking-tighter italic">System Pulse</h3>
-             </div>
-             <div className="space-y-4">
-                {[
-                  { label: 'Booking Traffic', value: 'Critical', color: 'red' },
-                  { label: 'API Uptime', value: '99.99%', color: 'emerald' },
-                  { label: 'Storage Usage', value: '1.2TB', color: 'blue' },
-                ].map((p, i) => (
-                  <div key={i} className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-500">{p.label}</span>
-                    <span className={`text-xs font-black uppercase text-${p.color}-500`}>{p.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
         </div>
       </>
     )}
@@ -699,19 +652,19 @@ export function AdminDashboard() {
             <div className="p-10 border-b border-white/5 bg-red-500/5">
               <div className="flex items-center gap-4 mb-2">
                 <AlertCircle className="w-6 h-6 text-red-500" />
-                <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter">Decline Registration</h3>
+                <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter">{t('declineRegistration')}</h3>
               </div>
-              <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Purging <span className="text-white">{rejectingUser.name}</span> from the regional grid</p>
+              <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">{t('rejectionReasonLabel')} <span className="text-white">{rejectingUser.name}</span></p>
             </div>
 
             <div className="p-10 space-y-6">
               <div className="space-y-3">
-                <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest px-1">Rejection Reason (Sent to User)</Label>
+                <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest px-1">{t('rejectionReasonLabel')}</Label>
                 <textarea 
                   autoFocus
                   value={rejectionReason}
                   onChange={e => setRejectionReason(e.target.value)}
-                  placeholder="e.g. Identity documents invalid or organization verification failed."
+                  placeholder="..."
                   className="w-full min-h-[120px] bg-black/40 border border-slate-800 rounded-2xl p-4 text-white placeholder:text-slate-700 focus:border-red-500/50 outline-none transition-all font-medium text-sm"
                 />
               </div>
@@ -722,14 +675,14 @@ export function AdminDashboard() {
                   className="h-14 rounded-2xl border border-slate-800 text-slate-500 hover:text-white font-black uppercase italic tracking-widest text-[10px]"
                   onClick={() => setRejectingUser(null)}
                 >
-                  Cancel
+                  {t('cancel')}
                 </Button>
                 <Button 
                   disabled={!rejectionReason.trim()}
                   className="h-14 rounded-2xl bg-red-600 hover:bg-red-500 text-white font-black uppercase italic tracking-widest text-[10px] shadow-lg shadow-red-500/20"
                   onClick={handleConfirmReject}
                 >
-                  Confirm Rejection
+                  {t('confirmRejection')}
                 </Button>
               </div>
             </div>

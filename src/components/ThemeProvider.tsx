@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react"
 
 type Theme = "dark" | "light" | "system"
+type Preset = "emerald" | "sapphire" | "oasis"
 
 type ThemeProviderProps = {
   children: React.ReactNode
@@ -10,12 +11,16 @@ type ThemeProviderProps = {
 
 type ThemeProviderState = {
   theme: Theme
+  preset: Preset
   setTheme: (theme: Theme) => void
+  setPreset: (preset: Preset) => void
 }
 
 const initialState: ThemeProviderState = {
   theme: "system",
+  preset: "emerald",
   setTheme: () => null,
+  setPreset: () => null,
 }
 
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState)
@@ -29,11 +34,15 @@ export function ThemeProvider({
   const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
   )
+  const [preset, setPreset] = useState<Preset>(
+    () => (localStorage.getItem("lomixa-preset") as Preset) || "emerald"
+  )
 
   useEffect(() => {
     const root = window.document.documentElement
 
     root.classList.remove("light", "dark")
+    root.removeAttribute("data-theme")
 
     if (theme === "system") {
       const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
@@ -42,18 +51,30 @@ export function ThemeProvider({
         : "light"
 
       root.classList.add(systemTheme)
-      return
+    } else {
+      root.classList.add(theme)
     }
 
-    root.classList.add(theme)
-  }, [theme])
+    if (preset !== "emerald") {
+      root.setAttribute("data-theme", preset);
+      document.body.setAttribute("data-theme", preset);
+    } else {
+      root.removeAttribute("data-theme");
+      document.body.removeAttribute("data-theme");
+    }
+  }, [theme, preset])
 
   const value = {
     theme,
+    preset,
     setTheme: (theme: Theme) => {
       localStorage.setItem(storageKey, theme)
       setTheme(theme)
     },
+    setPreset: (preset: Preset) => {
+      localStorage.setItem("lomixa-preset", preset)
+      setPreset(preset)
+    }
   }
 
   return (

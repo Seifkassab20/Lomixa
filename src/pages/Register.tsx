@@ -192,32 +192,19 @@ export function Register() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050b14] flex text-white font-sans" dir={isRTL ? 'rtl' : 'ltr'}>
-      {/* Sidebar Context */}
-      <div className={cn("hidden lg:flex w-[35%] bg-gradient-to-br from-[#0d7a5b]/20 to-[#050b14] border-slate-800 p-12 flex-col justify-between fixed h-full z-10", isRTL ? "border-l right-0" : "border-r left-0")}>
-        <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/5 blur-[120px] rounded-full -z-10"></div>
-        <div>
-          <Link to="/" className="flex items-center gap-4 mb-16 group">
-            <div className="bg-white rounded-2xl p-2 w-12 h-12 shadow-2xl group-hover:scale-110 transition-transform">
-               <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
-            </div>
-            <span className="text-3xl font-black">{t('appName')}</span>
-          </Link>
-          <div className="space-y-6">
-            <h1 className="text-5xl font-black leading-tight italic bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
-               {t('joinPlatform')}
-            </h1>
-            <p className="text-slate-400 text-xl max-w-sm">{t('platformDesc')}</p>
+    <div className="min-h-screen bg-[#050b14] text-white font-sans flex flex-col items-center py-16 px-6" dir={isRTL ? 'rtl' : 'ltr'}>
+      {/* Logo Header */}
+      <div className="w-full max-w-3xl mx-auto mb-16 flex flex-col items-center gap-6">
+        <Link to="/" className="flex flex-col items-center gap-4 group">
+          <div className="bg-white rounded-[2.5rem] p-3 w-20 h-20 shadow-2xl group-hover:scale-105 transition-transform hover:rotate-2">
+             <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
           </div>
-        </div>
-        <div className="p-8 rounded-[2rem] bg-white/5 border border-white/10 backdrop-blur-xl">
-           <p className="text-[10px] font-black tracking-[0.4em] text-emerald-500 mb-2 uppercase italic">Verification Phase</p>
-           <h4 className="font-bold text-white tracking-wide">{t('syncingCredentials')}</h4>
-        </div>
+          <span className="text-4xl font-black italic tracking-tighter uppercase">{t('appName')}</span>
+        </Link>
       </div>
 
       {/* Main Form Area */}
-      <div className={cn("flex-1 px-8 lg:px-20 py-24 min-h-screen", isRTL ? "lg:mr-[35%]" : "lg:ml-[35%]")}>
+      <div className="flex-1 w-full max-w-3xl mx-auto">
         <div className="max-w-3xl mx-auto space-y-16">
           <div className="flex justify-between items-center">
             <button onClick={() => navigate('/select-role')} className="text-slate-500 hover:text-white transition-all flex items-center gap-2 text-sm font-bold group px-4 py-2">
