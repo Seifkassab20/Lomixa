@@ -4,25 +4,31 @@
 create extension if not exists "uuid-ossp";
 
 -- 1. Hospitals Table
-create table public.hospitals (
+create table if not exists public.hospitals (
     id uuid primary key default uuid_generate_v4(),
     user_id uuid references auth.users(id),
     name text not null,
     location text,
+    type text default 'hospital',
+    is_active boolean default true,
+    is_verified boolean default false,
     created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
 -- 2. Pharma Companies Table
-create table public.pharma_companies (
+create table if not exists public.pharma_companies (
     id uuid primary key default uuid_generate_v4(),
     user_id uuid references auth.users(id),
     name text not null,
     credits integer default 0,
+    is_active boolean default true,
+    is_verified boolean default false,
+    custom_bundles text, -- JSON string storage for custom pricing
     created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
 -- 3. Doctors Table
-create table public.doctors (
+create table if not exists public.doctors (
     id uuid primary key default uuid_generate_v4(),
     user_id uuid references auth.users(id),
     hospital_id uuid references public.hospitals(id) on delete cascade,
@@ -32,11 +38,13 @@ create table public.doctors (
     experience_years integer default 0,
     phone text,
     email text,
+    is_active boolean default true,
+    is_verified boolean default false,
     created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
 -- 4. Doctor Availability Slots Table
-create table public.availability_slots (
+create table if not exists public.availability_slots (
     id uuid primary key default uuid_generate_v4(),
     doctor_id uuid references public.doctors(id) on delete cascade,
     date date not null,
@@ -48,7 +56,7 @@ create table public.availability_slots (
 );
 
 -- 5. Sales Representatives Table
-create table public.sales_reps (
+create table if not exists public.sales_reps (
     id uuid primary key default uuid_generate_v4(),
     user_id uuid references auth.users(id),
     pharma_id uuid references public.pharma_companies(id) on delete cascade,
@@ -58,11 +66,14 @@ create table public.sales_reps (
     phone text,
     target integer default 25,
     visits_this_month integer default 0,
+    credits integer default 0,
+    is_active boolean default true,
+    is_verified boolean default false,
     created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
 -- 6. Visits (Bookings) Table
-create table public.visits (
+create table if not exists public.visits (
     id uuid primary key default uuid_generate_v4(),
     doctor_id uuid references public.doctors(id) on delete cascade,
     doctor_name text not null,
@@ -85,7 +96,7 @@ create table public.visits (
 );
 
 -- 7. Notifications Table
-create table public.notifications (
+create table if not exists public.notifications (
     id uuid primary key default uuid_generate_v4(),
     user_id uuid references auth.users(id) on delete cascade,
     title text not null,
@@ -95,8 +106,32 @@ create table public.notifications (
     created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
+-- 8. Bundle Requests (New)
+create table if not exists public.bundle_requests (
+    id uuid primary key default uuid_generate_v4(),
+    pharma_id uuid references public.pharma_companies(id) on delete cascade,
+    pharma_name text,
+    bundle_name text,
+    credits integer,
+    price integer,
+    card_number text,
+    card_holder text,
+    status text default 'pending',
+    created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 9. Transactions (New)
+create table if not exists public.transactions (
+    id uuid primary key default uuid_generate_v4(),
+    pharma_id uuid references public.pharma_companies(id) on delete cascade,
+    bundle_name text,
+    credits_added integer,
+    amount_egp integer,
+    date text,
+    created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
 -- Set up Row Level Security (RLS) policies 
--- (For this demo, we allow authenticated users to read/insert. In production, policies should be stricter based on user ID and roles).
 alter table public.hospitals enable row level security;
 alter table public.pharma_companies enable row level security;
 alter table public.doctors enable row level security;
@@ -104,8 +139,10 @@ alter table public.availability_slots enable row level security;
 alter table public.sales_reps enable row level security;
 alter table public.visits enable row level security;
 alter table public.notifications enable row level security;
+alter table public.bundle_requests enable row level security;
+alter table public.transactions enable row level security;
 
--- Basic liberal policies to get the app running without blockage (read/write if logged in)
+-- Basic liberal policies (read/write if logged in)
 create policy "Enable all for authenticated users" on public.hospitals for all to authenticated using (true);
 create policy "Enable all for authenticated users" on public.pharma_companies for all to authenticated using (true);
 create policy "Enable all for authenticated users" on public.doctors for all to authenticated using (true);
@@ -113,3 +150,5 @@ create policy "Enable all for authenticated users" on public.availability_slots 
 create policy "Enable all for authenticated users" on public.sales_reps for all to authenticated using (true);
 create policy "Enable all for authenticated users" on public.visits for all to authenticated using (true);
 create policy "Enable all for authenticated users" on public.notifications for all to authenticated using (true);
+create policy "Enable all for authenticated users" on public.bundle_requests for all to authenticated using (true);
+create policy "Enable all for authenticated users" on public.transactions for all to authenticated using (true);
