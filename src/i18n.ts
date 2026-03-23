@@ -76,19 +76,19 @@ const resources = {
         subtitle: 'Select your role to get started',
         pharma: {
           title: 'Pharmaceutical Company',
-          desc: 'Register as a pharma admin to manage reps and visit bundles.'
+          desc: 'Manage reps and visit bundles'
         },
         hospital: {
           title: 'Hospital / Clinic',
-          desc: 'Register as a hospital admin to manage doctors and schedules.'
+          desc: 'Manage doctors and facility schedules'
         },
         doctor: {
           title: 'Doctor',
-          desc: 'Register as an independent or hospital-affiliated doctor.'
+          desc: 'Independent or hospital-affiliated medical professional'
         },
         rep: {
-          title: 'Professional Medical Sales Representative',
-          desc: 'Register as a medical/sales rep linked to your pharma company.'
+          title: 'Sales Representative',
+          desc: 'Manage your field work and scheduling'
         }
       },
 
@@ -806,19 +806,19 @@ const resources = {
         subtitle: 'حدد دورك للبدء',
         pharma: {
           title: 'شركة صيدلانية',
-          desc: 'سجل كمسؤول شركة لإدارة المندوبين وباقات الزيارات.'
+          desc: 'إدارة المناديب وباقات الزيارات'
         },
         hospital: {
           title: 'مستشفى / عيادة',
-          desc: 'سجل كمسؤول مستشفى لإدارة الأطباء والجداول الزمنية.'
+          desc: 'إدارة الأطباء وجداول المواعيد'
         },
         doctor: {
           title: 'طبيب',
-          desc: 'سجل كطبيب مستقل أو تابع لمستشفى.'
+          desc: 'طبيب مستقل أو تابع لمستشفى'
         },
         rep: {
-          title: 'مندوب مبيعات طبية محترف',
-          desc: 'سجل كمندوب طبي/مبيعات مرتبط بشركتك الدوائية.'
+          title: 'مندوب مبيعات',
+          desc: 'إدارة عملك الميداني والجدولة'
         }
       },
 

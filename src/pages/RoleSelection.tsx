@@ -45,8 +45,8 @@ export function RoleSelection() {
     },
     {
       id: 'rep',
-      title: t('salesRep'),
-      desc: t('salesRepDesc'),
+      title: t('roleSelection.rep.title'),
+      desc: t('roleSelection.rep.desc'),
       icon: Users,
       path: '/register/rep',
       gradient: 'from-orange-500 to-amber-600'
