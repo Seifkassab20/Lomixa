@@ -87,7 +87,7 @@ const resources = {
           desc: 'Register as an independent or hospital-affiliated doctor.'
         },
         rep: {
-          title: 'Sales Representative',
+          title: 'Professional Medical Sales Representative',
           desc: 'Register as a medical/sales rep linked to your pharma company.'
         }
       },
@@ -399,7 +399,7 @@ const resources = {
       pharmaCompany: 'Pharma Company',
       pharmaCompanyFull: 'Pharmaceutical Company',
       pharmaDesc: 'Pharmaceutical innovation thrives on effective communication with the medical community in a respectful manner. Connect your teams directly with the right healthcare professionals through structured and scheduled meeting workflows. Monitor field performance with detailed analytics and manage visit bundles to optimize your regional engagement strategy. Build stronger, more professional relationships based on data-driven insights and mutual respect.',
-      salesRep: 'Sales Representative',
+      salesRep: 'Professional Medical Sales Representative',
       salesRepShort: 'Sales Rep',
       salesRepDesc: 'Professional field work requires organized scheduling and clear communication pathways with medical experts. Book visits directly into the available time slots of doctors to ensure high-impact, focused professional discussions. Track your upcoming meetings, manage your visit portfolio, and provide detailed reports on professional outcomes. Stand out as a professional representative by respecting the clinician\'s digital workflow and availability.',
       adminRole: 'LOMIXA Admin',
@@ -817,7 +817,7 @@ const resources = {
           desc: 'سجل كطبيب مستقل أو تابع لمستشفى.'
         },
         rep: {
-          title: 'مندوب مبيعات',
+          title: 'مندوب مبيعات طبية محترف',
           desc: 'سجل كمندوب طبي/مبيعات مرتبط بشركتك الدوائية.'
         }
       },
@@ -1130,7 +1130,7 @@ const resources = {
       pharmaCompany: 'شركة أدوية',
       pharmaCompanyFull: 'شركة صيدلانية',
       pharmaDesc: 'يزدهر الابتكار الصيدلاني من خلال التواصل الفعال مع المجتمع الطبي بطريقة محترمة. اربط فرقك مباشرة مع المتخصصين المناسبين في الرعاية الصحية من خلال سير عمل اجتماعات منظم ومجدول. راقب الأداء الميداني بتحليلات مفصلة وأدر باقات الزيارات لتحسين استراتيجية التفاعل الإقليمي الخاصة بك. ابنِ علاقات مهنية أقوى وأكثر احترافية تعتمد على الرؤى المدعومة بالبيانات والاحترام المتبادل.',
-      salesRep: 'مندوب مبيعات',
+      salesRep: 'مندوب مبيعات طبية محترف',
       salesRepShort: 'مندوب',
       salesRepDesc: 'يتطلب العمل الميداني المهني جدولة منظمة ومسارات تواصل واضحة مع الخبراء الطبيين. احجز الزيارات مباشرة في الفترات الزمنية المتاحة للأطباء لضمان نقاشات مهنية مركزة وعالية التأثير. تتبع اجتماعاتك القادمة، وأدر محفظة زياراتك، وقدم تقارير مفصلة عن النتائج المهنية. تميز كمندوب محترف من خلال احترام سير العمل الرقمي للطبيب وتوافره.',
       adminRole: 'مسؤول لوميكسا',
