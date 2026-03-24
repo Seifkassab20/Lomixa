@@ -57,10 +57,13 @@ export function ManageDoctors() {
     e.preventDefault();
     const fullPhone = `${form.phoneCode}${form.phone}`;
     
+    let finalUserId = editingDoc?.userId || editingDoc?.id || generateId();
+    let finalId = editingDoc?.id || finalUserId;
+
     // If we're adding a new doctor, create their Supabase account too
     if (!editingDoc && form.email && form.password) {
       const tempSupabase = createTempClient();
-      const { error } = await tempSupabase.auth.signUp({
+      const { data: authData, error } = await tempSupabase.auth.signUp({
         email: form.email,
         password: form.password,
         options: {
@@ -76,10 +79,16 @@ export function ManageDoctors() {
         alert(`${t('errorCreatingAccount') || 'Error creating account'}: ${error.message}`);
         return;
       }
+      
+      if (authData?.user?.id) {
+        finalUserId = authData.user.id;
+        finalId = finalUserId;
+      }
     }
 
     const doc: Doctor = {
-      id: editingDoc?.id || generateId(),
+      id: finalId,
+      userId: finalUserId,
       name: editingDoc ? form.name : `${t(`title_${form.title}`)} ${form.name}`,
       specialty: form.specialty,
       experienceYears: form.experienceYears,
@@ -128,6 +137,12 @@ export function ManageDoctors() {
 
   const toggleActivation = (doc: Doctor) => {
     const updated = { ...doc, isActive: !doc.isActive };
+    saveDoctor(updated);
+    refresh();
+  };
+
+  const handleApprove = (doc: Doctor) => {
+    const updated = { ...doc, isVerified: true, isActive: true };
     saveDoctor(updated);
     refresh();
   };
@@ -349,31 +364,49 @@ export function ManageDoctors() {
                   <div>
                     <h3 className="font-semibold dark:text-white line-clamp-1">{doc.name}</h3>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      {doc.isActive ? (
-                        <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                      {doc.isVerified ? (
+                        doc.isActive ? (
+                          <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                        ) : (
+                          <ShieldAlert className="w-3 h-3 text-red-500" />
+                        )
                       ) : (
-                        <ShieldAlert className="w-3 h-3 text-red-500" />
+                        <Clock className="w-3 h-3 text-amber-500" />
                       )}
                       <span className={cn(
                         "text-[10px] font-black uppercase tracking-widest italic",
-                        doc.isActive ? "text-emerald-500" : "text-red-500"
+                        doc.isVerified ? (doc.isActive ? "text-emerald-500" : "text-red-500") : "text-amber-500"
                       )}>
-                        {doc.isActive ? t('active') : t('inactive') || 'Inactive'}
+                        {doc.isVerified ? (doc.isActive ? t('active') : t('inactive') || 'Inactive') : 'PENDING'}
                       </span>
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 border-r dark:border-slate-700 pr-2 mr-1">
-                  <Switch 
-                    checked={doc.isActive}
-                    onCheckedChange={() => toggleActivation(doc)}
-                    className="scale-75"
-                  />
-                </div>
-                <div className="flex gap-1">
-                  <button onClick={() => handleEdit(doc)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700">
-                    <Edit2 className="h-4 w-4 text-gray-400" />
-                  </button>
+
+                {doc.isVerified ? (
+                  <>
+                    <div className="flex items-center gap-1.5 border-r dark:border-slate-700 pr-2 mr-1">
+                      <Switch 
+                        checked={doc.isActive}
+                        onCheckedChange={() => toggleActivation(doc)}
+                        className="scale-75"
+                      />
+                    </div>
+                    <div className="flex gap-1">
+                      <button onClick={() => handleEdit(doc)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700">
+                        <Edit2 className="h-4 w-4 text-gray-400" />
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-1.5 border-r dark:border-slate-700 pr-2 mr-1">
+                    <Button size="sm" onClick={() => handleApprove(doc)} className="bg-emerald-500 hover:bg-emerald-400 text-black h-8 text-[10px] uppercase font-black tracking-widest italic rounded-lg">
+                      Approve
+                    </Button>
+                  </div>
+                )}
+                
+                <div className="flex gap-1 ml-1">
                   <button onClick={() => handleDelete(doc.id, doc.name)} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10">
                     <Trash2 className="h-4 w-4 text-red-400" />
                   </button>

@@ -51,10 +51,13 @@ export function Login() {
   React.useEffect(() => {
     const checkRedirect = async () => {
       if (user && !loading) {
-        const { isUserAuthorized } = await import('@/lib/store');
-        const authorized = await isUserAuthorized(user.id, user.user_metadata?.role);
+        const { getAuthorizationDetails } = await import('@/lib/store');
+        const { authorized } = await getAuthorizationDetails(user.id, user.user_metadata?.role);
         if (authorized) {
            navigate('/dashboard', { replace: true });
+        } else {
+           const { supabase } = await import('@/lib/supabase');
+           await supabase.auth.signOut();
         }
       }
     };
@@ -95,14 +98,6 @@ export function Login() {
 
       localStorage.setItem('lomixa_target_role', selectedRole);
 
-      if (selectedRole !== 'admin') {
-        const { checkUserExistence } = await import('@/lib/store');
-        const emailExists = await checkUserExistence('email', email);
-        if (!emailExists) {
-          throw new Error(`The workspace identity '${email}' does not exist in our grid.`);
-        }
-      }
-
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
 
@@ -112,6 +107,15 @@ export function Login() {
       if (actualRole && actualRole !== selectedRole) {
         await supabase.auth.signOut();
         throw new Error(`Invalid role. This account is registered as a ${actualRole}.`);
+      }
+
+      if (freshUser && actualRole && actualRole !== 'admin') {
+        const { getAuthorizationDetails } = await import('@/lib/store');
+        const { authorized, reason } = await getAuthorizationDetails(freshUser.id, actualRole);
+        if (!authorized) {
+          await supabase.auth.signOut();
+          throw new Error(reason || 'Account access suspended by administration.');
+        }
       }
 
       navigate('/', { replace: true });

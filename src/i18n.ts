@@ -759,7 +759,6 @@ const resources = {
       systemOverlord: 'System Overlord Command Center',
       totalPharma: 'Total Pharma',
       totalHospitals: 'Total Hospitals',
-      activeReps: 'Active Reps',
       networkDoctors: 'Network Doctors',
     }
   },
@@ -1436,7 +1435,6 @@ const resources = {
       update: 'تحديث',
       yearsExperienceLabel: 'سنوات خبرة',
       slotsAvailable: 'مواعيد متاحة',
-      activeReps: 'المناديب النشطين',
       networkDoctors: 'أطباء الشبكة',
       // --- Admin Specific ---
       facilityVerificationDesk: 'مكتب التحقق من المنشآت',

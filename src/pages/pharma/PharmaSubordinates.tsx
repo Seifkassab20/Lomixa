@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Users, Plus, Trash2, Edit2, X, Phone, Mail, Target, TrendingUp, Trophy, ShieldCheck, ShieldAlert, ArrowRight, ChevronDown } from 'lucide-react';
+import { Users, Plus, Trash2, Edit2, X, Phone, Mail, Target, TrendingUp, Trophy, ShieldCheck, ShieldAlert, ArrowRight, ChevronDown, Clock } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '@/components/ui/Toast';
 import { Switch } from '@/components/ui/switch';
@@ -62,10 +62,13 @@ export function PharmaSubordinates() {
 
     const fullPhone = `${form.phoneCode}${form.phone}`;
 
+    let finalUserId = editingRep?.userId || editingRep?.id || generateId();
+    let finalId = editingRep?.id || finalUserId;
+
     // If we're adding a new rep, create their Supabase account too
     if (!editingRep && form.email && form.password) {
       const tempSupabase = createTempClient();
-      const { error } = await tempSupabase.auth.signUp({
+      const { data: authData, error } = await tempSupabase.auth.signUp({
         email: form.email,
         password: form.password,
         options: {
@@ -81,10 +84,16 @@ export function PharmaSubordinates() {
         toast(`${t('errorCreatingAccount') || 'Error creating account'}: ${error.message}`, 'error');
         return;
       }
+      
+      if (authData?.user?.id) {
+        finalUserId = authData.user.id;
+        finalId = finalUserId;
+      }
     }
 
     const rep: SalesRep = {
-      id: editingRep?.id || generateId(),
+      id: finalId,
+      userId: finalUserId,
       name: form.name,
       email: form.email,
       phone: fullPhone,
@@ -128,6 +137,13 @@ export function PharmaSubordinates() {
     saveSalesRep(updated);
     loadData();
     toast(updated.isActive ? t('repActivated') || 'Representative activated' : t('repDeactivated') || 'Representative deactivated', 'info');
+  };
+
+  const handleApprove = (rep: SalesRep) => {
+    const updated = { ...rep, isVerified: true, isActive: true };
+    saveSalesRep(updated);
+    toast(`${rep.name} registration approved and activated.`, 'success');
+    loadData();
   };
 
   const handleDelete = (id: string, name: string) => {
@@ -305,33 +321,49 @@ export function PharmaSubordinates() {
                     <div>
                       <h3 className="font-semibold text-gray-900 dark:text-white line-clamp-1">{rep.name}</h3>
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        {rep.isActive ? (
-                          <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                        {rep.isVerified ? (
+                          rep.isActive ? (
+                            <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                          ) : (
+                            <ShieldAlert className="w-3 h-3 text-red-500" />
+                          )
                         ) : (
-                          <ShieldAlert className="w-3 h-3 text-red-500" />
+                          <Clock className="w-3 h-3 text-amber-500" />
                         )}
                         <span className={cn(
                           "text-[10px] font-black uppercase tracking-widest italic",
-                          rep.isActive ? "text-emerald-500" : "text-red-500"
+                          rep.isVerified ? (rep.isActive ? "text-emerald-500" : "text-red-500") : "text-amber-500"
                         )}>
-                          {rep.isActive ? t('active') : t('inactive') || 'Inactive'}
+                          {rep.isVerified ? (rep.isActive ? t('active') : t('inactive') || 'Inactive') : 'PENDING'}
                         </span>
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 pr-2 border-r dark:border-slate-700">
-                    <span className="text-[10px] font-black uppercase tracking-tighter text-slate-500">
-                      {rep.isActive ? t('active') : t('inactive') || 'Inactive'}
-                    </span>
-                    <Switch 
-                      checked={rep.isActive} 
-                      onCheckedChange={() => toggleActivation(rep)}
-                      className="scale-75"
-                    />
-                  </div>
-                  <button onClick={() => handleEdit(rep)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
-                    <Edit2 className="h-4 w-4 text-gray-400 dark:text-slate-500" />
-                  </button>
+                  
+                  {rep.isVerified ? (
+                    <>
+                      <div className="flex items-center gap-2 pr-2 border-r dark:border-slate-700">
+                        <span className="text-[10px] font-black uppercase tracking-tighter text-slate-500">
+                          {rep.isActive ? t('active') : t('inactive') || 'Inactive'}
+                        </span>
+                        <Switch 
+                          checked={rep.isActive} 
+                          onCheckedChange={() => toggleActivation(rep)}
+                          className="scale-75"
+                        />
+                      </div>
+                      <button onClick={() => handleEdit(rep)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
+                        <Edit2 className="h-4 w-4 text-gray-400 dark:text-slate-500" />
+                      </button>
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-2 pr-2 border-r dark:border-slate-700">
+                      <Button size="sm" onClick={() => handleApprove(rep)} className="bg-emerald-500 hover:bg-emerald-400 text-black h-8 text-[10px] uppercase font-black tracking-widest italic rounded-xl">
+                        Approve
+                      </Button>
+                    </div>
+                  )}
+
                   <button onClick={() => handleDelete(rep.id, rep.name)} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors">
                     <Trash2 className="h-4 w-4 text-red-500/60 hover:text-red-500" />
                   </button>

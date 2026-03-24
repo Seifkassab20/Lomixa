@@ -136,10 +136,32 @@ export function Register() {
     setLoading(true);
     try {
       if (!selectedRole) throw new Error('Role selection missing.');
+      if (!formData.password) throw new Error('A security key is strictly required.');
       
-      const userId = generateId();
+      let finalUserId = generateId();
+
+      if (isSupabaseConfigured) {
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: formData.email,
+          password: formData.password,
+          options: {
+            data: {
+              role: selectedRole,
+              full_name: selectedRole === 'doctor' || selectedRole === 'rep' ? `${formData.firstName} ${formData.lastName}` : formData.organizationName,
+              phone: `${formData.phoneCode}${formData.phone}`
+            }
+          }
+        });
+        
+        if (authError) throw new Error(`Registration failed: ${authError.message}`);
+        if (authData?.user?.id) {
+          finalUserId = authData.user.id;
+        }
+      }
+
       const profileData = {
-        id: userId,
+        id: finalUserId,
+        userId: finalUserId,
         email: formData.email,
         phone: `${formData.phoneCode}${formData.phone}`,
         avatar: previewImage || '',
@@ -181,8 +203,8 @@ export function Register() {
           target: 100,
           visitsThisMonth: 0,
           credits: 0,
-          isVerified: true,
-          isActive: true,
+          isVerified: false, // Ensures self-registered reps start as PENDING
+          isActive: true, // Will go to false if rejected
         });
       } else if (selectedRole === 'pharma' || selectedRole === 'hospital') {
         const orgData = {

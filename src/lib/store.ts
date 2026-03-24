@@ -427,12 +427,18 @@ export async function syncCloudData() {
 
     if (Date.now() - getLastMutationTime() < 10000) return;
 
-    if (hospitals.data) save('hospitals', hospitals.data.map(mapHospitalFromDB));
-    if (doctors.data) save('doctors', doctors.data.map(mapDoctorFromDB));
-    if (reps.data) save('sales_reps', reps.data.map(mapRepFromDB));
-    if (pharma.data) save('pharma_companies', pharma.data.map(mapPharmaFromDB));
-    if (visits.data) save('visits', visits.data.map(mapVisitFromDB));
-    if (notifications.data) save('notifications', notifications.data.map(mapNotifFromDB).slice(0, 100));
+    const mergeData = (local: any[], cloud: any[]) => {
+      const map = new Map(local.map(i => [i.id, i]));
+      cloud.forEach(i => map.set(i.id, i));
+      return Array.from(map.values());
+    };
+
+    if (hospitals.data) save('hospitals', mergeData(getHospitals(), hospitals.data.map(mapHospitalFromDB)));
+    if (doctors.data) save('doctors', mergeData(getDoctors(), doctors.data.map(mapDoctorFromDB)));
+    if (reps.data) save('sales_reps', mergeData(getSalesReps(), reps.data.map(mapRepFromDB)));
+    if (pharma.data) save('pharma_companies', mergeData(getPharmaCompanies(), pharma.data.map(mapPharmaFromDB)));
+    if (visits.data) save('visits', mergeData(getVisits(), visits.data.map(mapVisitFromDB)));
+    if (notifications.data) save('notifications', mergeData(load('notifications', []), notifications.data.map(mapNotifFromDB).slice(0, 100)));
 
     const slots = await supabase.from('availability_slots').select('*');
     if (slots.data && Date.now() - getLastMutationTime() > 10000) {
@@ -707,6 +713,52 @@ export async function isUserAuthorized(uid?: string, role?: string): Promise<boo
     const active = data.is_active === null ? true : data.is_active !== false;
     return verified && active;
   } catch (err) { return false; }
+}
+
+export async function getAuthorizationDetails(uid: string, role: string): Promise<{ authorized: boolean; reason?: string }> {
+  try {
+    if (role === 'admin') return { authorized: true };
+    const table: Record<string, string> = { doctor: 'doctors', rep: 'sales_reps', pharma: 'pharma_companies', hospital: 'hospitals' };
+    if (!table[role]) return { authorized: false, reason: 'Invalid role configuration.' };
+
+    let verified = false;
+    let active = false;
+    let found = false;
+
+    const checkLocal = () => {
+      let entity: any;
+      if (role === 'doctor') entity = getDoctors().find(d => d.userId === uid);
+      else if (role === 'pharma') entity = getPharmaCompanies().find(p => p.userId === uid);
+      else if (role === 'hospital') entity = getHospitals().find(h => h.userId === uid);
+      else if (role === 'rep') entity = getSalesReps().find(r => r.userId === uid);
+      return entity;
+    };
+
+    const localEntity = checkLocal();
+    if (localEntity) {
+      found = true;
+      verified = !!localEntity.isVerified;
+      active = localEntity.isActive !== false;
+    } else if (isSupabaseConfigured) {
+      const { data, error } = await supabase.from(table[role]).select('is_verified, is_active').eq('user_id', uid).single();
+      if (!error && data) {
+        found = true;
+        verified = data.is_verified === null ? true : !!data.is_verified;
+        active = data.is_active === null ? true : data.is_active !== false;
+      }
+    }
+
+    if (!found) return { authorized: false, reason: 'Account record not found in the grid database. It may have been rejected or deleted.' };
+    
+    // Strict Status Logic Enforcement:
+    if (!verified && active) return { authorized: false, reason: `Your ${role} account is currently PENDING. It requires administrative approval before login is permitted.` };
+    if (!verified && !active) return { authorized: false, reason: `Your ${role} account registration has been REJECTED.` };
+    if (verified && !active) return { authorized: false, reason: `Your ${role} account is INACTIVE. Please contact LOMIXA administration or your parent organization for assistance.` };
+    
+    return { authorized: true };
+  } catch (err) {
+    return { authorized: false, reason: 'A system error occurred during security clearance.' };
+  }
 }
 
 export function getPharmaBundles(pharmaId: string): Bundle[] {
