@@ -13,7 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '@/components/ui/Toast';
-import { saveDoctor, saveHospital, savePharmaCompany, saveSalesRep, getPharmaCompanies, generateId } from '@/lib/store';
+import { saveDoctor, saveHospital, savePharmaCompany, saveSalesRep, getPharmaCompanies, generateId, pushNotification } from '@/lib/store';
 import { motion, AnimatePresence } from 'motion/react';
 import { ARABIC_COUNTRY_CODES, COUNTRIES, CITY_MAP } from '@/lib/constants';
 
@@ -206,6 +206,18 @@ export function Register() {
           isVerified: false, // Ensures self-registered reps start as PENDING
           isActive: true, // Will go to false if rejected
         });
+
+        if (formData.pharmaId && formData.pharmaId !== 'other') {
+          const parentPharma = existingPharmaCompanies.find(p => p.id === formData.pharmaId);
+          if (parentPharma && parentPharma.userId) {
+            pushNotification({
+              userId: parentPharma.userId,
+              title: 'New Representative Registration',
+              message: `A new sales representative (${formData.firstName} ${formData.lastName}) has registered and is pending your verification.`,
+              type: 'info'
+            });
+          }
+        }
       } else if (selectedRole === 'pharma' || selectedRole === 'hospital') {
         const orgData = {
           ...profileData,
@@ -221,6 +233,12 @@ export function Register() {
         };
         if (selectedRole === 'pharma') {
           savePharmaCompany({ ...orgData, credits: 50 });
+          pushNotification({
+            userId: 'admin',
+            title: 'New Pharma Registration',
+            message: `A new pharmaceutical company "${formData.organizationName}" has requested to join the network.`,
+            type: 'info'
+          });
         } else {
           saveHospital({ ...orgData, location: formData.address || '' });
         }

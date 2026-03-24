@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   getDoctors, saveVisit, saveDoctor, getSalesReps, getPharmaCompanies, savePharmaCompany,
-  generateId, Visit, VisitType, pushNotification, Doctor, saveSalesRep
+  generateId, Visit, VisitType, pushNotification, Doctor, saveSalesRep, saveDoctorAvailability
 } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -105,6 +105,9 @@ export function RepBookVisit() {
       s.id === selectedSlot ? { ...s, isBooked: true } : s
     );
     saveDoctor({ ...selectedDoctor, availability: updatedAvail });
+    
+    // Fix: Persist slot reservation fully to the cloud, preventing double booking!
+    saveDoctorAvailability(selectedDoctor.id, updatedAvail);
 
     const reps = getSalesReps();
     const myRep = reps.find(r => r.id === repData.id);

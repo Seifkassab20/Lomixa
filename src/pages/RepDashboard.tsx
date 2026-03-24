@@ -43,9 +43,7 @@ export function RepDashboard() {
       setRepInfo({ name: myRep.name, pharmaId: myRep.pharmaId, pharmaName: myRep.pharmaName, target: myRep.target });
       const myVisits = getVisits().filter(v => v.repId === myRep!.id);
       setVisits(myVisits.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
-      const companies = getPharmaCompanies();
-      const company = companies.find(c => c.id === myRep!.pharmaId);
-      setCredits(company?.credits || 0);
+      setCredits(myRep!.credits || 0);
     }
   }, [userId]);
 
@@ -74,7 +72,7 @@ export function RepDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: t('visitsThisMonth'), value: monthVisits, sub: `${t('target')}: ${repInfo.target}`, icon: Calendar, color: 'emerald' },
-          { label: t('companyCredits'), value: credits.toLocaleString(), sub: t('availableForBookings'), icon: CreditCard, color: 'blue' },
+          { label: t('myCredits') || 'My Credits', value: credits.toLocaleString(), sub: t('availableForBookings'), icon: CreditCard, color: 'blue' },
           { label: t('pendingApprovals'), value: pendingVisits.length, sub: t('awaitingResponse'), icon: Clock, color: 'amber' },
           { label: t('confirmedVisits'), value: confirmedVisits.length, sub: t('readyToAttend'), icon: Target, color: 'purple' },
         ].map(({ label, value, sub, icon: Icon, color }) => (
@@ -171,7 +169,7 @@ export function RepDashboard() {
           </div>
 
           <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-xl p-5">
-            <div className="text-sm font-semibold text-emerald-800 dark:text-emerald-300 mb-1">{t('companyCredits')}</div>
+            <div className="text-sm font-semibold text-emerald-800 dark:text-emerald-300 mb-1">{t('myCredits') || 'My Credits'}</div>
             <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">{credits}</div>
             <div className="text-xs text-emerald-600 dark:text-emerald-500 mt-1">{t('availableForBookings')}</div>
           </div>

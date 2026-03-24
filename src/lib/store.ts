@@ -262,16 +262,13 @@ function mapDoctorToDB(d: Doctor) {
     hospital_id: d.hospitalId === 'default' || !d.hospitalId ? null : d.hospitalId,
     hospital_name: d.hospitalName,
     name: d.name,
-    title: d.title,
     specialty: d.specialty,
     experience_years: d.experienceYears,
     phone: d.phone,
     email: d.email,
     is_active: d.isActive,
-    is_verified: d.isVerified,
-    role: d.role,
-    avatar: d.avatar,
-    location: d.location ? JSON.stringify(d.location) : null
+    is_verified: d.isVerified
+    // stripped title, role, avatar, location because they lack SQL columns in Supabase
   };
 }
 
@@ -306,12 +303,8 @@ function mapHospitalToDB(h: Hospital) {
     location: h.location, 
     is_active: h.isActive, 
     is_verified: h.isVerified,
-    type: h.type,
-    phone: h.phone,
-    email: h.email,
-    role: h.role,
-    avatar: h.avatar,
-    documents: h.documents ? JSON.stringify(h.documents) : null
+    type: h.type
+    // stripped phone, email, role, avatar, documents because they lack SQL columns in Supabase
   };
 }
 
@@ -337,9 +330,8 @@ function mapHospitalFromDB(db: any): Hospital {
 function mapPharmaToDB(p: PharmaCompany) {
   const data: any = { 
     id: p.id, user_id: p.userId, name: p.name, credits: p.credits, 
-    is_active: p.isActive, is_verified: p.isVerified, phone: p.phone, email: p.email,
-    role: p.role, avatar: p.avatar,
-    documents: p.documents ? JSON.stringify(p.documents) : null
+    is_active: p.isActive, is_verified: p.isVerified
+    // stripped phone, email, role, avatar, documents because they lack SQL columns in Supabase
   };
   if (p.customBundles) data.custom_bundles = JSON.stringify(p.customBundles);
   return data;
@@ -363,19 +355,19 @@ function mapPharmaFromDB(db: any): PharmaCompany {
 
 function mapRepToDB(r: SalesRep) {
   return {
-    id: r.id, user_id: r.userId, 
+    id: r.id, 
+    user_id: r.userId, 
     pharma_id: r.pharmaId === 'default' || !r.pharmaId ? null : r.pharmaId, 
     pharma_name: r.pharmaName,
     name: r.name, 
-    first_name: r.firstName,
-    last_name: r.lastName,
-    role_title: r.roleTitle,
-    email: r.email, phone: r.phone, target: r.target, 
-    visits_this_month: r.visitsThisMonth, credits: r.credits || 0,
-    is_active: r.isActive, is_verified: r.isVerified, role: r.role,
-    avatar: r.avatar,
-    location: r.location ? JSON.stringify(r.location) : null,
-    products: r.products ? JSON.stringify(r.products) : null
+    email: r.email, 
+    phone: r.phone, 
+    target: r.target, 
+    visits_this_month: r.visitsThisMonth, 
+    credits: r.credits || 0,
+    is_active: r.isActive, 
+    is_verified: r.isVerified
+    // stripped first_name, last_name, role_title, role, avatar, location, products because they lack SQL columns in Supabase
   };
 }
 
@@ -427,15 +419,25 @@ export async function syncCloudData() {
 
     if (Date.now() - getLastMutationTime() < 10000) return;
 
-    const mergeData = (local: any[], cloud: any[]) => {
+    const mergeData = (local: any[], cloud: any[], fallbackKeys: string[] = []) => {
       const map = new Map(local.map(i => [i.id, i]));
-      cloud.forEach(i => map.set(i.id, i));
+      cloud.forEach(i => {
+        const existing = map.get(i.id);
+        if (existing) {
+          fallbackKeys.forEach(k => {
+            if (i[k] === 0 || i[k] === null || i[k] === undefined) {
+              i[k] = existing[k] !== undefined ? existing[k] : i[k];
+            }
+          });
+        }
+        map.set(i.id, i);
+      });
       return Array.from(map.values());
     };
 
     if (hospitals.data) save('hospitals', mergeData(getHospitals(), hospitals.data.map(mapHospitalFromDB)));
     if (doctors.data) save('doctors', mergeData(getDoctors(), doctors.data.map(mapDoctorFromDB)));
-    if (reps.data) save('sales_reps', mergeData(getSalesReps(), reps.data.map(mapRepFromDB)));
+    if (reps.data) save('sales_reps', mergeData(getSalesReps(), reps.data.map(mapRepFromDB), ['credits', 'target', 'visitsThisMonth']));
     if (pharma.data) save('pharma_companies', mergeData(getPharmaCompanies(), pharma.data.map(mapPharmaFromDB)));
     if (visits.data) save('visits', mergeData(getVisits(), visits.data.map(mapVisitFromDB)));
     if (notifications.data) save('notifications', mergeData(load('notifications', []), notifications.data.map(mapNotifFromDB).slice(0, 100)));
@@ -528,18 +530,21 @@ export function allocateCreditsToRep(repId: string, amount: number): boolean {
   const reps = getSalesReps();
   const repIdx = reps.findIndex(r => r.id === repId);
   if (repIdx < 0) return false;
+  
   const pharmaId = reps[repIdx].pharmaId;
   const companies = getPharmaCompanies();
   const companyIdx = companies.findIndex(c => c.id === pharmaId);
   if (companyIdx < 0) return false;
   if (companies[companyIdx].credits < amount) return false;
+  
+  // Deduct from company and persist
   companies[companyIdx].credits -= amount;
+  savePharmaCompany(companies[companyIdx]);
+  
+  // Add to rep and persist using robust upsert mechanism
   reps[repIdx].credits = (reps[repIdx].credits || 0) + amount;
-  save('pharma_companies', companies);
-  if (isSupabaseConfigured) supabase.from('pharma_companies').update({ credits: companies[companyIdx].credits }).eq('id', pharmaId).then();
-  save('sales_reps', reps);
-  if (isSupabaseConfigured) supabase.from('sales_reps').update({ credits: reps[repIdx].credits }).eq('id', repId).then();
-  notifyMutation();
+  saveSalesRep(reps[repIdx]);
+  
   return true;
 }
 
@@ -739,7 +744,9 @@ export async function getAuthorizationDetails(uid: string, role: string): Promis
       found = true;
       verified = !!localEntity.isVerified;
       active = localEntity.isActive !== false;
-    } else if (isSupabaseConfigured) {
+    } 
+
+    if (isSupabaseConfigured && (!localEntity || !verified)) {
       const { data, error } = await supabase.from(table[role]).select('is_verified, is_active').eq('user_id', uid).single();
       if (!error && data) {
         found = true;
@@ -751,7 +758,30 @@ export async function getAuthorizationDetails(uid: string, role: string): Promis
     if (!found) return { authorized: false, reason: 'Account record not found in the grid database. It may have been rejected or deleted.' };
     
     // Strict Status Logic Enforcement:
-    if (!verified && active) return { authorized: false, reason: `Your ${role} account is currently PENDING. It requires administrative approval before login is permitted.` };
+    if (!verified && active) {
+      if (role === 'pharma') {
+        pushNotification({
+          userId: 'admin',
+          title: 'Pending Pharma Connection',
+          message: 'An unverified Pharmaceutical company attempted to login. Please review their application in the Verification Desk.',
+          type: 'info'
+        });
+      } else if (role === 'rep') {
+        const rep = getSalesReps().find(r => r.userId === uid);
+        if (rep && rep.pharmaId) {
+          const parentPharma = getPharmaCompanies().find(p => p.id === rep.pharmaId);
+          if (parentPharma && parentPharma.userId) {
+            pushNotification({
+              userId: parentPharma.userId,
+              title: 'Pending Representative Connection',
+              message: `An unverified sales representative (${rep.name}) from your organization attempted to login. Please review their application.`,
+              type: 'info'
+            });
+          }
+        }
+      }
+      return { authorized: false, reason: `Your ${role} account is currently PENDING. It requires administrative approval before login is permitted.` };
+    }
     if (!verified && !active) return { authorized: false, reason: `Your ${role} account registration has been REJECTED.` };
     if (verified && !active) return { authorized: false, reason: `Your ${role} account is INACTIVE. Please contact LOMIXA administration or your parent organization for assistance.` };
     
@@ -830,6 +860,7 @@ export async function ensureUserEntityExists(user: any) {
           availability: []
         });
       } else if (role === 'rep' && m) {
+        const existingRep = getSalesReps().find(r => r.userId === user.id);
         saveSalesRep({
           id: user.id,
           userId: user.id,
@@ -838,11 +869,11 @@ export async function ensureUserEntityExists(user: any) {
           email: user.email || '',
           pharmaId: m.pharma_id || 'default',
           pharmaName: m.pharma_name || 'Pharma',
-          target: isNaN(parseInt(m.target)) ? 25 : parseInt(m.target),
-          visitsThisMonth: 0,
-          credits: 0,
-          isVerified: true, // Pre-verified since assigned by Pharma
-          isActive: true,
+          target: existingRep?.target ?? (isNaN(parseInt(m.target)) ? 25 : parseInt(m.target)),
+          visitsThisMonth: existingRep?.visitsThisMonth || 0,
+          credits: existingRep?.credits || 0,
+          isVerified: existingRep?.isVerified ?? true,
+          isActive: existingRep?.isActive ?? true,
           role: 'rep'
         });
       }

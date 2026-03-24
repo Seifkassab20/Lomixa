@@ -337,7 +337,7 @@ export function PharmaSubordinates() {
                           "text-[10px] font-black uppercase tracking-widest italic",
                           rep.isVerified ? (rep.isActive ? "text-emerald-500" : "text-red-500") : "text-amber-500"
                         )}>
-                          {rep.isVerified ? (rep.isActive ? t('active') : t('inactive') || 'Inactive') : 'PENDING'}
+                          {rep.isVerified ? (rep.isActive ? t('active') : t('inactive') || 'Inactive') : (t('pending') || 'PENDING')}
                         </span>
                       </div>
                     </div>
@@ -362,7 +362,7 @@ export function PharmaSubordinates() {
                   ) : (
                     <div className="flex items-center gap-2 pr-2 border-r dark:border-slate-700">
                       <Button size="sm" onClick={() => handleApprove(rep)} className="bg-emerald-500 hover:bg-emerald-400 text-black h-8 text-[10px] uppercase font-black tracking-widest italic rounded-xl">
-                        Approve
+                        {t('approve') || 'Approve'}
                       </Button>
                     </div>
                   )}
