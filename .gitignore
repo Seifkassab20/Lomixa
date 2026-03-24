@@ -7,3 +7,4 @@ coverage/
 .env*
 !.env.example
 PUBLISH_CHECKLIST.md
+logo.png
