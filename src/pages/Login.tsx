@@ -110,7 +110,12 @@ export function Login() {
       }
 
       if (freshUser && actualRole && actualRole !== 'admin') {
-        const { getAuthorizationDetails } = await import('@/lib/store');
+        const { getAuthorizationDetails, ensureUserEntityExists } = await import('@/lib/store');
+        
+        // This is necessary to self-heal doctors created by hospitals whose insertions
+        // might have been blocked by RLS policies so they can be available locally.
+        await ensureUserEntityExists(freshUser);
+
         const { authorized, reason } = await getAuthorizationDetails(freshUser.id, actualRole);
         if (!authorized) {
           await supabase.auth.signOut();

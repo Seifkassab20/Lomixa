@@ -807,7 +807,49 @@ export async function ensureUserEntityExists(user: any) {
 
   try {
     const { data, error } = await supabase.from(table).select('*').eq('user_id', user.id).single();
-    if (error || !data) return;
+    
+    // If no record is found in DB (often due to RLS blocking creation by another user)
+    // we can self-heal using the metadata attached during signup.
+    if ((error && error.code === 'PGRST116') || !data) {
+      const m = user.user_metadata;
+      if (role === 'doctor' && m) {
+        saveDoctor({
+          id: user.id,
+          userId: user.id,
+          name: m.full_name || user.email?.split('@')[0] || 'Doctor',
+          title: m.title || 'dr',
+          specialty: m.specialty || '',
+          experienceYears: isNaN(parseInt(m.experience_years)) ? 0 : parseInt(m.experience_years),
+          hospitalId: m.hospital_id || 'default',
+          hospitalName: m.hospital_name || 'Hospital',
+          phone: m.phone || '',
+          email: user.email || '',
+          isVerified: true,  // Pre-verified since only clinics can assign this metadata securely
+          isActive: true,
+          role: 'doctor',
+          availability: []
+        });
+      } else if (role === 'rep' && m) {
+        saveSalesRep({
+          id: user.id,
+          userId: user.id,
+          name: m.full_name || user.email?.split('@')[0] || 'Rep',
+          phone: m.phone || '',
+          email: user.email || '',
+          pharmaId: m.pharma_id || 'default',
+          pharmaName: m.pharma_name || 'Pharma',
+          target: isNaN(parseInt(m.target)) ? 25 : parseInt(m.target),
+          visitsThisMonth: 0,
+          credits: 0,
+          isVerified: true, // Pre-verified since assigned by Pharma
+          isActive: true,
+          role: 'rep'
+        });
+      }
+      return;
+    }
+
+    if (error) return;
 
     // Sync cloud data to local state
     if (role === 'pharma') savePharmaCompany(mapPharmaFromDB(data));

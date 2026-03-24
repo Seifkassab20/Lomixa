@@ -70,7 +70,12 @@ export function ManageDoctors() {
           data: {
             role: 'doctor',
             full_name: `${t(`title_${form.title}`)} ${form.name}`,
-            phone: fullPhone
+            phone: fullPhone,
+            title: form.title,
+            specialty: form.specialty,
+            experience_years: form.experienceYears,
+            hospital_id: myHospital?.id || 'default',
+            hospital_name: myHospital?.name || 'Hospital'
           }
         }
       });

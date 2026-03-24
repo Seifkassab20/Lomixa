@@ -75,7 +75,10 @@ export function PharmaSubordinates() {
           data: {
             role: 'rep',
             full_name: form.name,
-            phone: fullPhone
+            phone: fullPhone,
+            target: form.target,
+            pharma_id: myCompany.id,
+            pharma_name: myCompany.name
           }
         }
       });
