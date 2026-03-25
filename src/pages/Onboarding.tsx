@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
-import { Calendar, Stethoscope, Video, ArrowRight, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Calendar, Stethoscope, Video, ArrowRight, ChevronRight, ChevronLeft, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -13,6 +13,14 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   const { t, i18n } = useTranslation();
   const [currentSlide, setCurrentSlide] = useState(0);
   const isRTL = i18n.language === 'ar';
+
+  const toggleLanguage = () => {
+    const newLang = i18n.language === 'en' ? 'ar' : 'en';
+    i18n.changeLanguage(newLang);
+    document.documentElement.dir = newLang === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.lang = newLang;
+    localStorage.setItem('lomixa_lang', newLang);
+  };
 
   const slides = [
     {
@@ -87,7 +95,25 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   const IconComponent = slides[currentSlide].icon;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-[#050b14] overflow-hidden flex flex-col items-center select-none">
+    <div 
+      className="fixed inset-0 z-[100] bg-[#050b14] overflow-hidden flex flex-col items-center select-none"
+      dir={isRTL ? 'rtl' : 'ltr'}
+    >
+      {/* Language Switcher */}
+      <div className="fixed top-8 right-8 z-[110]">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={toggleLanguage}
+          className="bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 px-4 py-2 rounded-2xl flex items-center gap-2 transition-colors group"
+        >
+          <Globe className="w-4 h-4 text-emerald-500 group-hover:rotate-12 transition-transform" />
+          <span className="text-sm font-black tracking-tighter uppercase italic text-white">
+            {i18n.language === 'en' ? 'عربي' : 'EN'}
+          </span>
+        </motion.button>
+      </div>
+
       {/* Background decoration */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-[120px] -z-10 -translate-y-1/2 translate-x-1/2"></div>
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/5 rounded-full blur-[120px] -z-10 translate-y-1/2 -translate-x-1/2"></div>

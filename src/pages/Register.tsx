@@ -37,6 +37,14 @@ export function Register() {
   const { toast } = useToast();
   const isRTL = i18n.language === 'ar';
 
+  const toggleLanguage = () => {
+    const newLang = i18n.language === 'en' ? 'ar' : 'en';
+    i18n.changeLanguage(newLang);
+    document.documentElement.dir = newLang === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.lang = newLang;
+    localStorage.setItem('lomixa_lang', newLang);
+  };
+
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -274,7 +282,10 @@ export function Register() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050b14] text-white font-sans flex flex-col items-center py-20 px-6 relative overflow-x-hidden">
+    <div 
+      className="min-h-screen bg-[#050b14] text-white font-sans flex flex-col items-center py-20 px-6 relative overflow-x-hidden"
+      dir={isRTL ? 'rtl' : 'ltr'}
+    >
       {/* Background Decor */}
       <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] -z-10 animate-pulse-slow"></div>
       <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none -z-10"></div>
@@ -300,7 +311,7 @@ export function Register() {
                <ArrowRight className={cn("w-4 h-4", !isRTL && "rotate-180")} />
                Back to Selection
             </button>
-            <button onClick={() => i18n.changeLanguage(isRTL ? 'en' : 'ar')} className="px-6 py-2.5 rounded-2xl bg-slate-900 border border-slate-800 text-[10px] font-black uppercase tracking-[0.2em] hover:border-emerald-500 transition-all font-sans">
+            <button onClick={toggleLanguage} className="px-6 py-2.5 rounded-2xl bg-slate-900 border border-slate-800 text-[10px] font-black uppercase tracking-[0.2em] hover:border-emerald-500 transition-all font-sans">
                {isRTL ? 'English' : 'عربي'}
             </button>
           </div>

@@ -77,20 +77,30 @@ const resources = {
         subtitle: 'Select your role to get started',
         pharma: {
           title: 'Pharmaceutical Company',
-          desc: 'Manage reps and visit bundles'
+          desc: 'Manage reps and visit bundles',
+          badge: 'Enterprise'
         },
         hospital: {
           title: 'Hospital / Clinic',
-          desc: 'Manage doctors and facility schedules'
+          desc: 'Manage doctors and facility schedules',
+          badge: 'Facility'
         },
         doctor: {
           title: 'Doctor',
-          desc: 'Independent or hospital-affiliated medical professional'
+          desc: 'Independent or hospital-affiliated medical professional',
+          badge: 'Provider'
         },
         rep: {
           title: 'Sales Representative',
-          desc: 'Manage your field work and scheduling'
-        }
+          desc: 'Manage your field work and scheduling',
+          badge: 'Field Team'
+        },
+        admin: {
+          title: 'LOMIXA Admin',
+          desc: 'System Overlord Registration - Root Access',
+          badge: 'System'
+        },
+        initialize: 'Initialize'
       },
 
       // ── Auth / Login ───────────────────────────────────────────
@@ -840,20 +850,30 @@ const resources = {
         subtitle: 'حدد دورك للبدء',
         pharma: {
           title: 'شركة صيدلانية',
-          desc: 'إدارة المناديب وباقات الزيارات'
+          desc: 'إدارة المناديب وباقات الزيارات',
+          badge: 'مؤسسة'
         },
         hospital: {
           title: 'مستشفى / عيادة',
-          desc: 'إدارة الأطباء وجداول المواعيد'
+          desc: 'إدارة الأطباء وجداول المواعيد',
+          badge: 'منشأة'
         },
         doctor: {
           title: 'طبيب',
-          desc: 'طبيب مستقل أو تابع لمستشفى'
+          desc: 'طبيب مستقل أو تابع لمستشفى',
+          badge: 'طبيب'
         },
         rep: {
           title: 'مندوب مبيعات',
-          desc: 'إدارة عملك الميداني والجدولة'
-        }
+          desc: 'إدارة عملك الميداني والجدولة',
+          badge: 'مندوب ميداني'
+        },
+        admin: {
+          title: 'مسؤول لوميكسا',
+          desc: 'مركز تحكم المطورين الآمن والمتقدم',
+          badge: 'نظام'
+        },
+        initialize: 'تهيئة'
       },
 
       // ── Auth / Login ───────────────────────────────────────────

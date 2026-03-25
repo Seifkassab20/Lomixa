@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
-import { Building2, Hospital as HospitalIcon, Stethoscope, Users, ArrowRight, Shield, Sparkles, ChevronRight } from 'lucide-react';
+import { Building2, Hospital as HospitalIcon, Stethoscope, Users, ArrowRight, Shield, Sparkles, ChevronRight, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function RoleSelection() {
@@ -11,6 +11,14 @@ export function RoleSelection() {
   const isRTL = i18n.language === 'ar';
   const [logoClicks, setLogoClicks] = React.useState(0);
   const [showAdmin, setShowAdmin] = React.useState(false);
+
+  const toggleLanguage = () => {
+    const newLang = i18n.language === 'en' ? 'ar' : 'en';
+    i18n.changeLanguage(newLang);
+    document.documentElement.dir = newLang === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.lang = newLang;
+    localStorage.setItem('lomixa_lang', newLang);
+  };
 
   React.useEffect(() => {
     const timer = setTimeout(() => setLogoClicks(0), 3000);
@@ -26,7 +34,7 @@ export function RoleSelection() {
       icon: HospitalIcon,
       path: '/register/hospital',
       gradient: 'from-emerald-500 to-teal-600',
-      badge: 'Facility'
+      badge: t('roleSelection.hospital.badge')
     },
     {
       id: 'doctor',
@@ -35,7 +43,7 @@ export function RoleSelection() {
       icon: Stethoscope,
       path: '/register/doctor',
       gradient: 'from-sky-500 to-blue-600',
-      badge: 'Provider'
+      badge: t('roleSelection.doctor.badge')
     },
     {
       id: 'pharma',
@@ -44,7 +52,7 @@ export function RoleSelection() {
       icon: Building2,
       path: '/register/pharma',
       gradient: 'from-indigo-600 to-blue-700',
-      badge: 'Enterprise'
+      badge: t('roleSelection.pharma.badge')
     },
     {
       id: 'rep',
@@ -53,24 +61,42 @@ export function RoleSelection() {
       icon: Users,
       path: '/register/rep',
       gradient: 'from-orange-500 to-amber-600',
-      badge: 'Field Team'
+      badge: t('roleSelection.rep.badge')
     }
   ];
 
   if (showAdmin) {
     roles.push({
       id: 'admin',
-      title: 'LOMIXA Admin',
-      desc: 'System Overlord Registration - Root Access',
+      title: t('roleSelection.admin.title'),
+      desc: t('roleSelection.admin.desc'),
       icon: Shield,
       path: '/register/admin',
       gradient: 'from-purple-600 to-pink-700',
-      badge: 'System'
+      badge: t('roleSelection.admin.badge')
     });
   }
 
   return (
-    <div className="min-h-screen bg-[#050b14] text-white flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
+    <div 
+      className="min-h-screen bg-[#050b14] text-white flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans"
+      dir={isRTL ? 'rtl' : 'ltr'}
+    >
+      {/* Language Switcher */}
+      <div className="fixed top-8 right-8 z-50">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={toggleLanguage}
+          className="bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 px-4 py-2 rounded-2xl flex items-center gap-2 transition-colors group"
+        >
+          <Globe className="w-4 h-4 text-emerald-500 group-hover:rotate-12 transition-transform" />
+          <span className="text-sm font-black tracking-tighter uppercase italic">
+            {i18n.language === 'en' ? 'عربي' : 'EN'}
+          </span>
+        </motion.button>
+      </div>
+
       {/* Background Decor */}
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] -z-10 -translate-y-1/2 translate-x-1/2"></div>
       <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[120px] -z-10 translate-y-1/2 -translate-x-1/2"></div>
@@ -137,8 +163,8 @@ export function RoleSelection() {
                 </div>
 
                 <div className="flex items-center gap-2 text-emerald-500 font-black text-[10px] uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0">
-                  <span>Initialize</span>
-                  <ChevronRight className="w-4 h-4" />
+                  <span>{t('roleSelection.initialize')}</span>
+                  <ChevronRight className={cn("w-4 h-4", isRTL && "rotate-180")} />
                 </div>
               </div>
             </motion.button>

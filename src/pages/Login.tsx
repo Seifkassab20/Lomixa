@@ -172,7 +172,10 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#050b14] text-white font-sans flex flex-col relative overflow-x-hidden">
+    <div 
+      className="min-h-screen w-full bg-[#050b14] text-white font-sans flex flex-col relative overflow-x-hidden"
+      dir={isRTL ? 'rtl' : 'ltr'}
+    >
       {/* Background Decor */}
       <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] -z-10 animate-pulse-slow"></div>
       <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[150px] -z-10"></div>
