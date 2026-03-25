@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 export function DoctorDashboard() {
   const { userId, user } = useAuth();
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [visits, setVisits] = useState<ReturnType<typeof getVisits>>([]);
   const [doctorId, setDoctorId] = useState('');
   const [meetingRoom, setMeetingRoom] = useState<string | null>(null);
@@ -22,13 +22,13 @@ export function DoctorDashboard() {
     if (!myDoc && userId) {
       myDoc = {
         id: generateId(),
-        name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Dr. User',
-        specialty: user?.user_metadata?.specialty || 'General Practice',
+        name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || t('docUser'),
+        specialty: user?.user_metadata?.specialty || t('spec_general'),
         experienceYears: user?.user_metadata?.experienceYears || 0,
         phone: user?.user_metadata?.mobile || '',
         email: user?.email || '',
         hospitalId: 'default',
-        hospitalName: user?.user_metadata?.organization || 'Hospital',
+        hospitalName: user?.user_metadata?.organization || t('hospital'),
         availability: [],
         userId,
         isActive: true,
@@ -117,7 +117,7 @@ export function DoctorDashboard() {
         <div className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold dark:text-white">{t('todayVisits')}</h3>
-            <span className="text-xs text-gray-400 dark:text-slate-500">{new Date().toLocaleDateString('en-SA', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
+            <span className="text-xs text-gray-400 dark:text-slate-500">{new Date().toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-SA', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
           </div>
           {todayVisits.length === 0 ? (
             <div className="py-8 text-center text-sm text-gray-400 dark:text-slate-500">{t('noVisitsToday')}</div>

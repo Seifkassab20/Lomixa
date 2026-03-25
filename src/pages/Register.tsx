@@ -309,7 +309,7 @@ export function Register() {
           <div className="flex justify-between items-center bg-slate-900/40 backdrop-blur-sm p-4 rounded-3xl border border-white/5">
             <button onClick={() => navigate('/select-role')} className="text-slate-500 hover:text-white transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest px-4 font-sans uppercase">
                <ArrowRight className={cn("w-4 h-4", !isRTL && "rotate-180")} />
-               Back to Selection
+               {t('back_to_selection')}
             </button>
             <button onClick={toggleLanguage} className="px-6 py-2.5 rounded-2xl bg-slate-900 border border-slate-800 text-[10px] font-black uppercase tracking-[0.2em] hover:border-emerald-500 transition-all font-sans">
                {isRTL ? 'English' : 'عربي'}
@@ -357,9 +357,9 @@ export function Register() {
                    </div>
                    <div className="flex-1 w-full space-y-2">
                       <Label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] italic">
-                        {(selectedRole === 'pharma' || selectedRole === 'hospital') ? 'Organization Identity' : 'Professional Identity'}
+                        {(selectedRole === 'pharma' || selectedRole === 'hospital') ? t('orgIdentity') : t('professionalIdentity')}
                       </Label>
-                      <p className="text-xs text-slate-400 font-medium">Upload your official {(selectedRole === 'pharma' || selectedRole === 'hospital') ? 'logo' : 'profile photo'} for verification.</p>
+                      <p className="text-xs text-slate-400 font-medium">{(selectedRole === 'pharma' || selectedRole === 'hospital') ? t('uploadHintLogo') : t('uploadHintPhoto')}</p>
                    </div>
                 </div>
 
@@ -367,7 +367,7 @@ export function Register() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-10 border-t border-white/5">
                    {(selectedRole === 'pharma' || selectedRole === 'hospital') ? (
                      <div className="md:col-span-2 space-y-3">
-                        <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">Organization Name*</Label>
+                        <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">{t('orgName')}*</Label>
                         <Input name="organizationName" value={formData.organizationName} onChange={handleChange} required className="h-14 rounded-2xl bg-black/40 border-slate-800 font-bold focus:border-emerald-500" />
                      </div>
                    ) : (
@@ -376,28 +376,28 @@ export function Register() {
                           <div className="md:col-span-2 space-y-3">
                             <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">Title</Label>
                             <select name="title" value={formData.title} onChange={handleChange} className="w-full h-14 rounded-2xl bg-black/40 border border-slate-800 px-4 text-sm font-bold text-white outline-none focus:border-emerald-500">
-                               <option value="">Select Title</option>
-                               {DOCTOR_TITLES.map(t => <option key={t} value={t}>{t}</option>)}
+                               <option value="">{t('selectTitle')}</option>
+                               {DOCTOR_TITLES.map(tit => <option key={tit} value={tit}>{tit}</option>)}
                             </select>
                           </div>
                         )}
-                        <div className="space-y-3">
-                           <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">First Name*</Label>
+                                                 <div className="space-y-3">
+                           <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">{t('firstName')}*</Label>
                            <Input name="firstName" value={formData.firstName} onChange={handleChange} required className="h-14 rounded-2xl bg-black/40 border-slate-800 font-bold focus:border-emerald-500" />
                         </div>
                         <div className="space-y-3">
-                           <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">Middle Name</Label>
+                           <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">{t('middleName')}</Label>
                            <Input name="middleName" value={formData.middleName} onChange={handleChange} className="h-14 rounded-2xl bg-black/40 border-slate-800 font-bold focus:border-emerald-500" />
                         </div>
                         <div className="md:col-span-2 space-y-3">
-                           <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">Last Name*</Label>
+                           <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">{t('lastName')}*</Label>
                            <Input name="lastName" value={formData.lastName} onChange={handleChange} required className="h-14 rounded-2xl bg-black/40 border-slate-800 font-bold focus:border-emerald-500" />
                         </div>
                      </>
                    )}
 
                    <div className="space-y-3">
-                      <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">Corporate Email*</Label>
+                      <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">{t('email')}*</Label>
                       <div className="relative group/input">
                          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 group-focus-within/input:text-emerald-500" />
                          <Input type="email" name="email" value={formData.email} onChange={handleChange} required className="h-14 pl-12 rounded-2xl bg-black/40 border-slate-800 focus:border-emerald-500 font-bold" />
@@ -405,7 +405,7 @@ export function Register() {
                    </div>
                    
                    <div className="space-y-3">
-                      <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">Phone Number</Label>
+                      <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">{t('phoneNumber')}</Label>
                       <div className="flex gap-2">
                         <div className="relative w-36 group/code">
                            <select 
@@ -437,7 +437,7 @@ export function Register() {
                    </div>
 
                    <div className="md:col-span-2 space-y-3">
-                      <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">Security Key (Password)*</Label>
+                      <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">{t('securityKey')}*</Label>
                       <div className="relative group/input">
                          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 group-focus-within/input:text-emerald-500" />
                          <Input type={showPassword ? 'text' : 'password'} name="password" value={formData.password} onChange={handleChange} required className="h-14 pl-12 rounded-2xl bg-black/40 border-slate-800 focus:border-emerald-500 tracking-widest font-bold" />
@@ -453,14 +453,14 @@ export function Register() {
                    {selectedRole === 'doctor' && (
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div className="space-y-3">
-                           <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">Specialty*</Label>
+                           <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">{t('specialty')}*</Label>
                            <select name="specialty" value={formData.specialty} onChange={handleChange} required className="w-full h-14 rounded-2xl bg-black/40 border border-slate-800 px-4 text-sm font-bold text-white outline-none focus:border-emerald-500">
-                              <option value="">Select Specialty</option>
-                              {SPECIALTIES.map(s => <option key={s} value={s}>{s}</option>)}
+                              <option value="">{t('selectSpecialty')}</option>
+                              {SPECIALTIES.map(s => <option key={s} value={s}>{t(`spec_${s.toLowerCase().slice(0, 5)}`) || s}</option>)}
                            </select>
                         </div>
                         <div className="space-y-3">
-                           <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">Years of Experience</Label>
+                           <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">{t('yearsExperience')}</Label>
                            <Input type="number" name="yearsExperience" value={formData.yearsExperience} onChange={handleChange} className="h-14 rounded-2xl bg-black/40 border-slate-800 font-bold focus:border-emerald-500" />
                         </div>
                      </div>
@@ -470,28 +470,28 @@ export function Register() {
                      <div className="space-y-10">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                            <div className="space-y-3">
-                              <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">Role Title</Label>
+                              <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">{t('roleTitle')}</Label>
                               <select name="roleTitle" value={formData.roleTitle} onChange={handleChange} className="w-full h-14 rounded-2xl bg-black/40 border border-slate-800 px-4 text-sm font-bold text-white outline-none focus:border-emerald-500">
-                                 <option value="">Select Role</option>
+                                 <option value="">{t('selectRoleTitle')}</option>
                                  {REP_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                               </select>
                            </div>
                            <div className="space-y-3">
-                              <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">Pharma Company*</Label>
+                              <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">{t('pharmaCompany_select')}*</Label>
                               <select name="pharmaId" value={formData.pharmaId} onChange={handleChange} className="w-full h-14 rounded-2xl bg-black/40 border border-slate-800 px-4 text-sm font-bold text-white outline-none focus:border-emerald-500">
-                                 <option value="">Select Existing Company</option>
+                                 <option value="">{t('selectExistingCompany')}</option>
                                  {existingPharmaCompanies.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                 <option value="other">Other (Create New)</option>
+                                 <option value="other">{t('otherCreateNew')}</option>
                               </select>
                            </div>
                         </div>
 
                         {formData.pharmaId === 'other' && (
                           <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
-                             <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">New Company Name*</Label>
+                           <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">{t('newCompanyName')}</Label>
                              <div className="relative group/input">
                                 <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                                <Input name="newPharmaName" value={formData.newPharmaName} onChange={handleChange} required className="h-14 pl-12 rounded-2xl bg-brand/5 border-brand/20 font-bold placeholder:text-slate-600" placeholder="Organization name..." />
+                                <Input name="newPharmaName" value={formData.newPharmaName} onChange={handleChange} required className="h-14 pl-12 rounded-2xl bg-brand/5 border-brand/20 font-bold placeholder:text-slate-600" placeholder={t('org_placeholder')} />
                              </div>
                           </div>
                         )}
@@ -502,10 +502,10 @@ export function Register() {
                                  <div className="p-2 rounded-xl bg-orange-500/10 text-orange-500">
                                     <LayoutGrid className="w-4 h-4" />
                                  </div>
-                                 <h3 className="text-xs font-black uppercase tracking-widest italic">Product Portfolio</h3>
+                                 <h3 className="text-xs font-black uppercase tracking-widest italic">{t('product_portfolio')}</h3>
                               </div>
                               <Button type="button" onClick={addProduct} variant="outline" className="h-10 rounded-xl border-dashed border-slate-700 text-[10px] font-black uppercase gap-2 hover:border-orange-500/50">
-                                 <Plus className="w-3 h-3" /> Add Product
+                                 <Plus className="w-3 h-3" /> {t('add_product')}
                               </Button>
                            </div>
 
@@ -517,7 +517,7 @@ export function Register() {
                                    </button>
                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                       <div className="space-y-1">
-                                         <Label className="text-[8px] font-black uppercase text-slate-600 px-1 tracking-widest">Category</Label>
+                                         <Label className="text-[8px] font-black uppercase text-slate-600 px-1 tracking-widest">{t('product_cat')}</Label>
                                          <select 
                                            value={prod.category} 
                                            onChange={(e) => handleProductChange(idx, 'category', e.target.value)}
@@ -528,17 +528,17 @@ export function Register() {
                                          </select>
                                       </div>
                                       <div className="space-y-1">
-                                         <Label className="text-[8px] font-black uppercase text-slate-600 px-1 tracking-widest">Product Name*</Label>
+                                         <Label className="text-[8px] font-black uppercase text-slate-600 px-1 tracking-widest">{t('product_name')}*</Label>
                                          <Input 
                                            required 
                                            value={prod.name} 
                                            onChange={(e) => handleProductChange(idx, 'name', e.target.value)}
                                            className="h-11 rounded-xl bg-slate-900 border-slate-800 text-xs font-bold" 
-                                           placeholder="Medicine name..."
+                                           placeholder={t('medicineNamePlaceholder')}
                                          />
                                       </div>
                                       <div className="space-y-1">
-                                         <Label className="text-[8px] font-black uppercase text-slate-600 px-1 tracking-widest">Form</Label>
+                                         <Label className="text-[8px] font-black uppercase text-slate-600 px-1 tracking-widest">{t('product_form')}</Label>
                                          <Input 
                                            value={prod.form} 
                                            onChange={(e) => handleProductChange(idx, 'form', e.target.value)}
@@ -547,7 +547,7 @@ export function Register() {
                                          />
                                       </div>
                                       <div className="space-y-1">
-                                         <Label className="text-[8px] font-black uppercase text-slate-600 px-1 tracking-widest">Doses</Label>
+                                         <Label className="text-[8px] font-black uppercase text-slate-600 px-1 tracking-widest">{t('doses')}</Label>
                                          <Input 
                                            value={prod.doses} 
                                            onChange={(e) => handleProductChange(idx, 'doses', e.target.value)}
@@ -612,13 +612,13 @@ export function Register() {
                        )}
 
                        <div className="space-y-3">
-                          <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">Area</Label>
-                          <Input name="area" value={formData.area} onChange={handleChange} className="h-14 rounded-2xl bg-black/40 border-slate-800 font-bold focus:border-emerald-500" placeholder="District..." />
+                          <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">{t('area')}</Label>
+                          <Input name="area" value={formData.area} onChange={handleChange} className="h-14 rounded-2xl bg-black/40 border-slate-800 font-bold focus:border-emerald-500" placeholder={t('districtPlaceholder')} />
                        </div>
 
                        <div className="space-y-3">
-                          <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">Address Details</Label>
-                          <Input name="address" value={formData.address} onChange={handleChange} className="h-14 rounded-2xl bg-black/40 border-slate-800 font-bold focus:border-emerald-500" placeholder="Street, Building..." />
+                          <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">{t('address_label')}</Label>
+                          <Input name="address" value={formData.address} onChange={handleChange} className="h-14 rounded-2xl bg-black/40 border-slate-800 font-bold focus:border-emerald-500" placeholder={t('streetPlaceholder')} />
                        </div>
                     </div>
                 </div>
@@ -656,7 +656,7 @@ export function Register() {
              <Button type="submit" disabled={loading} className="w-full h-24 rounded-[3.5rem] bg-gradient-to-r from-emerald-600 to-teal-800 hover:from-emerald-500 hover:to-teal-600 text-white font-black text-2xl shadow-[0_30px_80px_-15px_rgba(16,185,129,0.5)] transition-all hover:scale-[1.02] active:scale-[0.98] border-t border-white/20 group/submit">
                 {loading ? <Activity className="w-9 h-9 animate-spin text-white" /> : (
                   <div className="flex items-center gap-6">
-                    <span className="tracking-[0.2em] italic uppercase">Initialize Registration</span>
+                    <span className="tracking-[0.2em] italic uppercase">{t('initializeRegistration')}</span>
                     <ChevronRight className={cn("w-8 h-8 group-hover/submit:translate-x-3 transition-transform", isRTL && "-scale-x-100")} />
                   </div>
                 )}

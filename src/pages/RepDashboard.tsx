@@ -25,11 +25,11 @@ export function RepDashboard() {
       const myCompany = companies.find(c => c.userId === userId) || companies[0];
       myRep = {
         id: generateId(),
-        name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Sales Rep',
+        name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || t('repUser'),
         email: user?.email || '',
         phone: user?.user_metadata?.mobile || '',
         pharmaId: myCompany?.id || 'default',
-        pharmaName: myCompany?.name || 'Pharma Company',
+        pharmaName: myCompany?.name || t('myPharma'),
         visitsThisMonth: 0,
         target: 25,
         userId,
@@ -169,7 +169,7 @@ export function RepDashboard() {
           </div>
 
           <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-xl p-5">
-            <div className="text-sm font-semibold text-emerald-800 dark:text-emerald-300 mb-1">{t('myCredits') || 'My Credits'}</div>
+            <div className="text-sm font-semibold text-emerald-800 dark:text-emerald-300 mb-1">{t('myCredits')}</div>
             <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">{credits}</div>
             <div className="text-xs text-emerald-600 dark:text-emerald-500 mt-1">{t('availableForBookings')}</div>
           </div>

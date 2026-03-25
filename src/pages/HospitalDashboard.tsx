@@ -23,8 +23,8 @@ export function HospitalDashboard() {
     if (!mine && userId) {
       mine = {
         id: generateId(),
-        name: user?.user_metadata?.organization || 'My Hospital',
-        location: user?.user_metadata?.location || 'Riyadh',
+        name: user?.user_metadata?.organization || t('myHospital'),
+        location: user?.user_metadata?.location || t('city_riyadh'),
         userId,
         isActive: true,
         isVerified: false,
@@ -54,9 +54,7 @@ export function HospitalDashboard() {
     }
   };
 
-  const months = isRTL
-    ? ['يناير','فبراير','مارس','أبريل','مايو','يونيو']
-    : ['Jan','Feb','Mar','Apr','May','Jun'];
+  const months = [1, 2, 3, 4, 5, 6].map(m => t(`month_${m}`));
 
   const monthlyData = months.map((name, i) => ({
     name,

@@ -31,7 +31,7 @@ export function PharmaDashboard() {
     if (!mine && userId) {
       mine = {
         id: generateId(),
-        name: user?.user_metadata?.organization || user?.email?.split('@')[1]?.split('.')[0] || 'My Pharma Company',
+        name: user?.user_metadata?.organization || user?.email?.split('@')[1]?.split('.')[0] || t('myPharma'),
         credits: 100,
         userId,
         isActive: true,
@@ -51,9 +51,7 @@ export function PharmaDashboard() {
   }, [loadData]);
 
   const monthlyData = (() => {
-    const months = isRTL
-      ? ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']
-      : ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => t(`month_${m}`));
     return months.map((name, i) => ({
       name,
       visits: visits.filter(v => new Date(v.date).getMonth() === i).length,

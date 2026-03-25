@@ -229,7 +229,7 @@ export function Login() {
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-xl font-black uppercase italic tracking-tighter flex items-center gap-3">
                     <Lock className="w-5 h-5 text-emerald-500" />
-                    Secure Access
+                    {t('secureAccessLabel')}
                   </h2>
                 </div>
 
@@ -244,7 +244,7 @@ export function Login() {
                       className="space-y-6"
                     >
                       <div className="space-y-4">
-                        <Label className="text-[10px] font-black tracking-widest uppercase text-slate-500 ml-1 italic">Identify Workspace</Label>
+                        <Label className="text-[10px] font-black tracking-widest uppercase text-slate-500 ml-1 italic">{t('identifyWorkspace')}</Label>
                         <div className="grid grid-cols-2 gap-3">
                           {roles.map((r) => {
                             const Icon = r.icon;
@@ -318,10 +318,10 @@ export function Login() {
                         disabled={loading}
                         className="w-full h-16 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-black uppercase tracking-[0.2em] text-sm shadow-xl shadow-emerald-900/40 transition-all hover:scale-[1.02] active:scale-[0.98]"
                       >
-                        {loading ? 'Authenticating...' : (
+                        {loading ? t('authenticating') : (
                           <div className="flex items-center gap-3">
                             {t('establishConnection')}
-                            <ChevronRight className="w-5 h-5" />
+                            <ChevronRight className={cn("w-5 h-5", isRTL && "rotate-180")} />
                           </div>
                         )}
                       </Button>
@@ -334,14 +334,14 @@ export function Login() {
                       exit={{ opacity: 0, x: 20 }}
                       className="space-y-6"
                     >
-                      <h3 className="text-lg font-black uppercase italic text-white tracking-tighter">Connection Recovery</h3>
+                      <h3 className="text-lg font-black uppercase italic text-white tracking-tighter">{t('connectionRecovery')}</h3>
                       <form onSubmit={handleForgotPassword} className="space-y-6">
                         <div className="space-y-2">
-                          <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Workspace Identity</Label>
-                          <Input value={email} onChange={(e) => setEmail(e.target.value)} className="h-14 rounded-2xl bg-black/40 border-slate-800 font-bold" placeholder="user@organization.com" />
+                          <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">{t('workspaceIdentity')}</Label>
+                          <Input value={email} onChange={(e) => setEmail(e.target.value)} className="h-14 rounded-2xl bg-black/40 border-slate-800 font-bold" placeholder={t('email_placeholder')} />
                         </div>
-                        <Button type="submit" className="w-full h-14 rounded-2xl bg-emerald-600 font-black uppercase tracking-widest">Request Reset</Button>
-                        <button type="button" onClick={() => setIsResetMode(false)} className="w-full text-xs font-bold text-slate-500 uppercase tracking-widest font-sans">Return to Entry</button>
+                        <Button type="submit" className="w-full h-14 rounded-2xl bg-emerald-600 font-black uppercase tracking-widest">{t('requestReset')}</Button>
+                        <button type="button" onClick={() => setIsResetMode(false)} className="w-full text-xs font-bold text-slate-500 uppercase tracking-widest font-sans">{t('returnToEntry')}</button>
                       </form>
                     </motion.div>
                   )}
@@ -377,37 +377,37 @@ export function Login() {
 
           {/* Quick Links Column */}
           <div className="space-y-8">
-            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Quick Links</h4>
+            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white">{t('quickLinks')}</h4>
             <ul className="space-y-4">
-              <li><Link to="/login" className="text-sm text-slate-400 hover:text-emerald-500 transition-colors font-medium">Login</Link></li>
-              <li><Link to="/select-role" className="text-sm text-slate-400 hover:text-emerald-500 transition-colors font-medium">Sign up</Link></li>
-              <li><Link to="/about" className="text-sm text-slate-400 hover:text-emerald-500 transition-colors font-medium">About Us</Link></li>
-              <li><Link to="/about" className="text-sm text-slate-400 hover:text-emerald-500 transition-colors font-medium">Terms and Conditions</Link></li>
+              <li><Link to="/login" className="text-sm text-slate-400 hover:text-emerald-500 transition-colors font-medium">{t('signIn')}</Link></li>
+              <li><Link to="/select-role" className="text-sm text-slate-400 hover:text-emerald-500 transition-colors font-medium">{t('initiateRegistration')}</Link></li>
+              <li><Link to="/about" className="text-sm text-slate-400 hover:text-emerald-500 transition-colors font-medium">{t('about')}</Link></li>
+              <li><Link to="/terms" className="text-sm text-slate-400 hover:text-emerald-500 transition-colors font-medium">{t('terms')}</Link></li>
             </ul>
           </div>
 
           {/* Contact Us Column */}
           <div className="space-y-8">
-            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Contact Us</h4>
+            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white">{t('contactUs')}</h4>
             <ul className="space-y-4 font-medium text-sm text-slate-400">
                <li className="flex flex-col gap-1">
-                  <span className="text-[10px] text-slate-600 uppercase tracking-widest">Email Support</span>
+                  <span className="text-[10px] text-slate-600 uppercase tracking-widest">{t('emailSupport')}</span>
                   <a href="mailto:Info@lomixa.net" className="text-white hover:text-emerald-500 transition-all font-semibold">Info@lomixa.net</a>
                </li>
                <li className="flex flex-col gap-1">
-                  <span className="text-[10px] text-slate-600 uppercase tracking-widest">Phone Direct</span>
+                  <span className="text-[10px] text-slate-600 uppercase tracking-widest">{t('phoneDirect')}</span>
                   <span className="text-white font-semibold">+20 115 059 0602</span>
                </li>
                <li className="flex flex-col gap-1">
-                  <span className="text-[10px] text-slate-600 uppercase tracking-widest">HQ Address</span>
-                  <span className="text-white/80 leading-relaxed">5 Tahrir Street, Giza, Egypt</span>
+                  <span className="text-[10px] text-slate-600 uppercase tracking-widest">{t('hqAddress')}</span>
+                  <span className="text-white/80 leading-relaxed">{t('hqAddressValue')}</span>
                </li>
             </ul>
           </div>
 
           {/* Social Presence Column */}
           <div className="space-y-8">
-            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Follow Us</h4>
+            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white">{t('followUs')}</h4>
             <div className="flex gap-4">
                {[
                  { icon: Facebook, href: "https://www.facebook.com/share/1CnvDsiXyq/?mibextid=wwXIfr" },
@@ -430,7 +430,7 @@ export function Login() {
 
         {/* Closing Legal Bar */}
         <div className="max-w-7xl mx-auto mt-16 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-600">
-          <p>© 2026 LOMIXA Healthcare Systems. All Rights Reserved.</p>
+          <p>© 2026 {t('appName')} Healthcare Systems. {t('allRightsReserved')}</p>
         </div>
       </footer>
     </div>
