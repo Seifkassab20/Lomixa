@@ -31,6 +31,7 @@ export function RepBookVisit() {
   const [credits, setCredits] = useState(0);
   const [repData, setRepData] = useState({ id: '', pharmaId: '', pharmaName: '', name: '' });
   const [visitNotes, setVisitNotes] = useState('');
+  const [bookedCount, setBookedCount] = useState(1);
 
   const VISIT_TYPES: { value: VisitType; icon: React.ElementType; labelKey: string }[] = [
     { value: 'In Person', icon: MapPin, labelKey: 'inPerson' },
@@ -74,53 +75,61 @@ export function RepBookVisit() {
       .slice(0, 2);
   }, [filtered, search, specialtyFilter]);
 
-  const handleBook = () => {
-    if (!selectedDoctor || !selectedSlot) return;
-    const slot = availableSlots.find(s => s.id === selectedSlot);
-    if (!slot || credits < 1) return;
+  const handleBook = (mode: 'single' | 'all') => {
+    if (!selectedDoctor) return;
+    
+    const slotsToBook = mode === 'single' 
+      ? availableSlots.filter(s => s.id === selectedSlot)
+      : availableSlots;
 
-    const visit: Visit = {
-      id: generateId(),
-      doctorId: selectedDoctor.id,
-      doctorName: selectedDoctor.name,
-      repId: repData.id,
-      repName: repData.name || user?.user_metadata?.full_name || 'Sales Rep',
-      repUserId: userId || undefined,
-      pharmaId: repData.pharmaId,
-      pharmaName: repData.pharmaName,
-      hospitalId: selectedDoctor.hospitalId,
-      hospitalName: selectedDoctor.hospitalName,
-      date: slot.date,
-      time: slot.time,
-      visitType: selectedType,
-      status: 'Pending',
-      durationMinutes: slot.duration,
-      notes: visitNotes.trim() || undefined,
-      createdAt: new Date().toISOString(),
-    };
+    if (slotsToBook.length === 0 || credits < slotsToBook.length) return;
 
-    saveVisit(visit);
+    setBookedCount(slotsToBook.length);
 
+    slotsToBook.forEach(slot => {
+      const visit: Visit = {
+        id: generateId(),
+        doctorId: selectedDoctor.id,
+        doctorName: selectedDoctor.name,
+        repId: repData.id,
+        repName: repData.name || user?.user_metadata?.full_name || 'Sales Rep',
+        repUserId: userId || undefined,
+        pharmaId: repData.pharmaId,
+        pharmaName: repData.pharmaName,
+        hospitalId: selectedDoctor.hospitalId,
+        hospitalName: selectedDoctor.hospitalName,
+        date: slot.date,
+        time: slot.time,
+        visitType: selectedType,
+        status: 'Pending',
+        durationMinutes: slot.duration,
+        notes: visitNotes.trim() || undefined,
+        createdAt: new Date().toISOString(),
+      };
+      saveVisit(visit);
+    });
+
+    const bookedIds = slotsToBook.map(s => s.id);
     const updatedAvail = selectedDoctor.availability.map(s =>
-      s.id === selectedSlot ? { ...s, isBooked: true } : s
+      bookedIds.includes(s.id) ? { ...s, isBooked: true } : s
     );
     saveDoctor({ ...selectedDoctor, availability: updatedAvail });
-    
-    // Fix: Persist slot reservation fully to the cloud, preventing double booking!
     saveDoctorAvailability(selectedDoctor.id, updatedAvail);
 
     const reps = getSalesReps();
     const myRep = reps.find(r => r.id === repData.id);
     if (myRep) {
-      saveSalesRep({ ...myRep, credits: Math.max((myRep.credits || 0) - 1, 0) });
-      setCredits(c => Math.max(c - 1, 0));
+      saveSalesRep({ ...myRep, credits: Math.max((myRep.credits || 0) - slotsToBook.length, 0) });
+      setCredits(c => Math.max(c - slotsToBook.length, 0));
     }
 
     if (userId) {
       pushNotification({
         userId,
-        title: 'Visit Booked!',
-        message: `Meeting with ${selectedDoctor.name} on ${new Date(slot.date).toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-SA', { month: 'short', day: 'numeric' })} at ${slot.time} (${selectedType}). Awaiting doctor confirmation.`,
+        title: 'Visit(s) Booked!',
+        message: mode === 'single' 
+          ? `Meeting with ${selectedDoctor.name} on ${new Date(slotsToBook[0].date).toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-SA', { month: 'short', day: 'numeric' })} at ${slotsToBook[0].time} (${selectedType}). Awaiting doctor confirmation.`
+          : `Bulk booking confirmed: ${slotsToBook.length} sessions scheduled with ${selectedDoctor.name}. Awaiting doctor confirmation.`,
         type: 'booking',
       });
     }
@@ -155,7 +164,7 @@ export function RepBookVisit() {
           <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <div>
             <div className="font-semibold text-emerald-700 dark:text-emerald-400">{t('visitBookedSuccess') || 'Visit Booked Successfully!'}</div>
-            <div className="text-sm text-emerald-600/80 dark:text-emerald-400/80">{t('creditUsed') || '1 credit used. Waiting for doctor confirmation.'}</div>
+            <div className="text-sm text-emerald-600/80 dark:text-emerald-400/80">{t('creditsUsed', { count: bookedCount }) || `${bookedCount} credit(s) used. Waiting for doctor confirmation.`}</div>
           </div>
         </div>
       )}
@@ -372,13 +381,28 @@ export function RepBookVisit() {
                 />
               </div>
 
-              <Button
-                onClick={handleBook}
-                disabled={!selectedSlot || credits < 1}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
-              >
-                {credits < 1 ? t('noCreditsAvailable') : selectedSlot ? t('confirmBooking') : t('selectASlot')}
-              </Button>
+              <div className="flex flex-col gap-2">
+                <Button
+                  onClick={() => handleBook('single')}
+                  disabled={!selectedSlot || credits < 1}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
+                >
+                  {credits < 1 ? t('noCreditsAvailable') : selectedSlot ? t('bookSelectedSlot') : t('selectASlot')}
+                </Button>
+
+                {availableSlots.length > 1 && (
+                  <Button
+                    onClick={() => handleBook('all')}
+                    disabled={credits < availableSlots.length}
+                    variant="outline"
+                    className="w-full border-emerald-600 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+                  >
+                    {credits < availableSlots.length 
+                      ? t('noCreditsAvailable') 
+                      : t('bookAllSlotsCount', { count: availableSlots.length })}
+                  </Button>
+                )}
+              </div>
 
               {credits < 1 && (
                 <p className="text-xs text-center text-amber-600 dark:text-amber-400">

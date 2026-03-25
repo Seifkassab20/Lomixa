@@ -77,20 +77,30 @@ const resources = {
         subtitle: 'Select your role to get started',
         pharma: {
           title: 'Pharmaceutical Company',
-          desc: 'Manage reps and visit bundles'
+          desc: 'Manage reps and visit bundles',
+          badge: 'Enterprise'
         },
         hospital: {
           title: 'Hospital / Clinic',
-          desc: 'Manage doctors and facility schedules'
+          desc: 'Manage doctors and facility schedules',
+          badge: 'Facility'
         },
         doctor: {
           title: 'Doctor',
-          desc: 'Independent or hospital-affiliated medical professional'
+          desc: 'Independent or hospital-affiliated medical professional',
+          badge: 'Provider'
         },
         rep: {
           title: 'Sales Representative',
-          desc: 'Manage your field work and scheduling'
-        }
+          desc: 'Manage your field work and scheduling',
+          badge: 'Field Team'
+        },
+        admin: {
+          title: 'LOMIXA Admin',
+          desc: 'System Overlord Registration - Root Access',
+          badge: 'System'
+        },
+        initialize: 'Initialize'
       },
 
       // ── Auth / Login ───────────────────────────────────────────
@@ -503,7 +513,10 @@ const resources = {
       findSchedule: 'Find and schedule meetings with doctors',
       creditsAvailable: '{{count}} credits available',
       visitBookedSuccess: 'Visit Booked Successfully!',
-      creditUsed: '1 credit used. Waiting for doctor confirmation.',
+      creditsUsed: '{{count}} credit(s) used. Waiting for doctor confirmation.',
+      bookSelectedSlot: 'Book Selected Slot',
+      bookAllSlots: 'Book All Available Slots',
+      bookAllSlotsCount: 'Book All {{count}} Slots',
       searchDoctorHospital: 'Search doctor or hospital...',
       visitType: 'Visit Type',
       availableSlots: 'Available Slots',
@@ -840,20 +853,30 @@ const resources = {
         subtitle: 'حدد دورك للبدء',
         pharma: {
           title: 'شركة صيدلانية',
-          desc: 'إدارة المناديب وباقات الزيارات'
+          desc: 'إدارة المناديب وباقات الزيارات',
+          badge: 'مؤسسة'
         },
         hospital: {
           title: 'مستشفى / عيادة',
-          desc: 'إدارة الأطباء وجداول المواعيد'
+          desc: 'إدارة الأطباء وجداول المواعيد',
+          badge: 'منشأة'
         },
         doctor: {
           title: 'طبيب',
-          desc: 'طبيب مستقل أو تابع لمستشفى'
+          desc: 'طبيب مستقل أو تابع لمستشفى',
+          badge: 'طبيب'
         },
         rep: {
           title: 'مندوب مبيعات',
-          desc: 'إدارة عملك الميداني والجدولة'
-        }
+          desc: 'إدارة عملك الميداني والجدولة',
+          badge: 'مندوب ميداني'
+        },
+        admin: {
+          title: 'مسؤول لوميكسا',
+          desc: 'مركز تحكم المطورين الآمن والمتقدم',
+          badge: 'نظام'
+        },
+        initialize: 'تهيئة'
       },
 
       // ── Auth / Login ───────────────────────────────────────────
@@ -1270,7 +1293,10 @@ const resources = {
       findSchedule: 'ابحث وجدول اجتماعات مع الأطباء',
       creditsAvailable: '{{count}} رصيد متاح',
       visitBookedSuccess: 'تم حجز الزيارة بنجاح!',
-      creditUsed: 'تم خصم رصيد واحد. في انتظار تأكيد الطبيب.',
+      creditsUsed: 'تم خصم {{count}} رصيد. في انتظار تأكيد الطبيب.',
+      bookSelectedSlot: 'حجز الموعد المحدد',
+      bookAllSlots: 'حجز كل المواعيد المتاحة',
+      bookAllSlotsCount: 'حجز كل الـ {{count}} مواعيد',
       searchDoctorHospital: 'ابحث عن طبيب أو مستشفى...',
       visitType: 'نوع الزيارة',
       availableSlots: 'المواعيد المتاحة',
