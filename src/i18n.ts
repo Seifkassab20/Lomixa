@@ -713,6 +713,11 @@ const resources = {
       minutesLabel: 'minutes',
       upcomingSlots: 'Upcoming Slots',
       noUpcomingSlots: 'No upcoming slots. Add your availability to start receiving visits.',
+      addOneSlot: 'Add Single Slot',
+      addAllSlots: 'Generate All Slots',
+      slotsRemainingInBlock: 'slots remaining in this block',
+      noSlotsCreatedError: 'No slots could be created in this time range.',
+      slotOverlapError: 'Cannot create: overlapping slots detected.',
 
       hospitalAnalytics: 'Hospital Analytics',
       doctorActivityStats: 'Doctor activity & visit statistics',
@@ -1543,6 +1548,11 @@ const resources = {
       minutesLabel: 'دقائق',
       upcomingSlots: 'المواعيد القادمة',
       noUpcomingSlots: 'لا توجد مواعيد قادمة. أضف مواعيدك لبدء استقبال الزيارات.',
+      addOneSlot: 'إضافة موعد واحد',
+      addAllSlots: 'توليد كل المواعيد',
+      slotsRemainingInBlock: 'مواعيد متبقية في هذه الفترة',
+      noSlotsCreatedError: 'لم يتم إنشاء أي مواعيد في هذا النطاق الزمني.',
+      slotOverlapError: 'تعذر الإنشاء: تم اكتشاف تداخل في المواعيد.',
 
       cardiology: 'أمراض القلب',
       neurology: 'طب الأعصاب',

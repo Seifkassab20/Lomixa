@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { JitsiMeeting } from '@/components/JitsiMeeting';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
+import { formatCurrency } from '@/lib/currency';
 
 export function DoctorDashboard() {
   const { userId, user } = useAuth();
@@ -15,6 +16,8 @@ export function DoctorDashboard() {
   const [visits, setVisits] = useState<ReturnType<typeof getVisits>>([]);
   const [doctorId, setDoctorId] = useState('');
   const [meetingRoom, setMeetingRoom] = useState<string | null>(null);
+  const [balance, setBalance] = useState(0);
+  const [country, setCountry] = useState('sa');
 
   useEffect(() => {
     const doctors = getDoctors();
@@ -38,6 +41,8 @@ export function DoctorDashboard() {
     }
     if (myDoc) {
       setDoctorId(myDoc.id);
+      setBalance(myDoc.balance || 0);
+      setCountry(myDoc.location?.country || 'sa');
       const myVisits = getVisits().filter(v => v.doctorId === myDoc!.id);
       setVisits(myVisits.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
     }
@@ -64,7 +69,7 @@ export function DoctorDashboard() {
           { label: t('visitsTodayLabel'), value: todayVisits.length, sub: `${confirmedToday.length} ${t('confirmed')}`, icon: Calendar, color: 'emerald' },
           { label: t('pendingRequests'), value: pendingVisits.length, sub: t('needYourAction'), icon: Clock, color: 'amber' },
           { label: t('totalVisitsLabel'), value: visits.length, sub: `${visits.filter(v => v.status === 'Completed').length} ${t('completedVisitsStat')}`, icon: CheckCircle2, color: 'blue' },
-          { label: t('earnings'), value: `﷼${visits.filter(v => v.status === 'Completed').reduce((sum, v) => sum + (v.price || 150), 0).toLocaleString()}`, sub: t('estFromVisits'), icon: DollarSign, color: 'purple' },
+          { label: t('earnings'), value: formatCurrency(balance, country), sub: t('estFromVisits'), icon: DollarSign, color: 'purple' },
         ].map(({ label, value, sub, icon: Icon, color }) => (
           <div key={label} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
             <div className="flex items-center justify-between mb-3">

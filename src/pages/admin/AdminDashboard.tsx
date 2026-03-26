@@ -5,9 +5,11 @@ import {
   getDoctors, getSalesReps, getBundleRequests, saveBundleRequest, pushNotification,
   BundleRequest, generateId, saveTransaction, saveHospital,
   deleteHospital, deletePharma, deleteSalesRep, getPharmaBundles, savePharmaBundle, deletePharmaBundle, Bundle,
-  syncCloudData, getTransactions
+  syncCloudData, getTransactions, getAdminBalance
 } from '@/lib/store';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '@/lib/auth';
+import { getProfile } from '@/lib/store';
 import { 
   Building2, Users, CreditCard, ShieldCheck, ShieldAlert, 
   Search, Filter, Edit2, TrendingUp, DollarSign, Package,
@@ -30,6 +32,9 @@ export function AdminDashboard() {
   const [search, setSearch] = useState('');
   const [requests, setRequests] = useState<BundleRequest[]>([]);
   const [activeTab, setActiveTab] = useState<'verification' | 'bundles' | 'pharma'>('verification');
+  const [platformBalance, setPlatformBalance] = useState(0);
+  const { userId } = useAuth();
+  const [adminCountry, setAdminCountry] = useState('sa');
   
   // Custom Bundle State
   const [editingPharma, setEditingPharma] = useState<PharmaCompany | null>(null);
@@ -46,10 +51,17 @@ export function AdminDashboard() {
     if (editingPharma) {
       setCustomBundles(getPharmaBundles(editingPharma.id));
     }
+    setPlatformBalance(getAdminBalance());
     syncCloudData(); // Trigger cloud refresh whenever Admin refreshes
   };
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { 
+    if (userId) {
+      const profile = getProfile(userId);
+      setAdminCountry(profile.country || 'sa');
+    }
+    refresh(); 
+  }, [userId]);
 
   const handleVerifyUser = (type: 'hospital' | 'pharma', id: string) => {
     if (type === 'hospital') {
@@ -218,6 +230,15 @@ export function AdminDashboard() {
               </h1>
               <p className="text-sm text-gray-500 dark:text-slate-400 mt-1 uppercase tracking-widest font-bold opacity-60">{t('systemOverlord')}</p>
            </div>
+        </div>
+        <div className="flex items-center gap-3 bg-brand/10 border border-brand/20 rounded-2xl px-6 py-3">
+            <div className="flex flex-col items-end text-brand">
+              <span className="text-[8px] font-black uppercase tracking-widest opacity-60">Platform Commission</span>
+               <span className="text-xl font-black italic tracking-tighter">{formatCurrency(platformBalance, adminCountry)}</span>
+            </div>
+            <div className="h-10 w-10 bg-brand rounded-xl flex items-center justify-center text-white shadow-lg shadow-brand/20">
+              <DollarSign className="w-5 h-5" />
+            </div>
         </div>
       </div>
 

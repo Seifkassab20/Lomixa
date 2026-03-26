@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { getVisits, saveVisit, getDoctors, Visit, VisitStatus, pushNotification } from '@/lib/store';
+import { 
+  getVisits, saveVisit, getDoctors, Visit, VisitStatus, pushNotification,
+  processVisitPayment, getSalesReps, saveSalesRep, saveDoctorAvailability, getDoctorAvailability
+} from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -45,17 +48,48 @@ export function DoctorBookings() {
   }, [userId]);
 
   const handleAction = (visit: Visit, action: 'Confirmed' | 'Cancelled') => {
+    const isConfirming = action === 'Confirmed';
+    const isRejectingPending = action === 'Cancelled' && visit.status === 'Pending';
+    
+    // 1. Process Financials if applicable
+    if (isConfirming && visit.status === 'Pending') {
+      // Confirming a pending visit: Trigger the payment split
+      if (visit.price) {
+        processVisitPayment(visit.price, visit.doctorId);
+      }
+    } else if (isRejectingPending) {
+      // Rejecting a pending visit: Refund the REP
+      const reps = getSalesReps();
+      const repObj = reps.find(r => r.id === visit.repId);
+      if (repObj && visit.price) {
+        saveSalesRep({ ...repObj, balance: (repObj.balance || 0) + visit.price });
+      }
+
+      // AND Free the slot!
+      const avail = getDoctorAvailability(visit.doctorId);
+      const updatedAvail = avail.map(s => {
+        // Match by date and time to find the slot
+        if (s.date === visit.date && s.time === visit.time) {
+          return { ...s, isBooked: false };
+        }
+        return s;
+      });
+      saveDoctorAvailability(visit.doctorId, updatedAvail);
+    }
+
     const updated = { ...visit, status: action };
     saveVisit(updated);
     setVisits(prev => prev.map(v => v.id === visit.id ? updated : v));
 
-    // Notify the REP (not ourselves)
+    // Notify the REP
     if (visit.repUserId) {
       pushNotification({
         userId: visit.repUserId,
-        title: `Visit ${action}`,
-        message: `Dr. ${visit.doctorName} has ${action.toLowerCase()} your visit request on ${new Date(visit.date).toLocaleDateString('en-SA', { month: 'short', day: 'numeric' })} at ${visit.time}.`,
-        type: action === 'Confirmed' ? 'confirmation' : 'cancellation',
+        title: isConfirming ? `Visit Confirmed!` : `Visit Rejected`,
+        message: isConfirming 
+          ? `Dr. ${visit.doctorName} has accepted your visit on ${new Date(visit.date).toLocaleDateString('en-SA', { month: 'short', day: 'numeric' })}. The funds have been released.`
+          : `Dr. ${visit.doctorName} was unable to accept your visit on ${new Date(visit.date).toLocaleDateString('en-SA', { month: 'short', day: 'numeric' })}. The budget has been refunded to your account.`,
+        type: isConfirming ? 'confirmation' : 'cancellation',
       });
     }
     // Also notify ourselves

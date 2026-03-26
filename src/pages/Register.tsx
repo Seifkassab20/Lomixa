@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '@/components/ui/Toast';
 import { saveDoctor, saveHospital, savePharmaCompany, saveSalesRep, getPharmaCompanies, generateId, pushNotification } from '@/lib/store';
+import { sendEmail, EmailTemplates } from '@/lib/email';
 import { motion, AnimatePresence } from 'motion/react';
 import { ARABIC_COUNTRY_CODES, COUNTRIES, CITY_MAP } from '@/lib/constants';
 
@@ -253,6 +254,12 @@ export function Register() {
       }
 
       toast('Registration successful. Awaiting verification.', 'success');
+      
+      // Send Welcome Email (Real-time)
+      const fullName = selectedRole === 'doctor' || selectedRole === 'rep' ? `${formData.firstName} ${formData.lastName}` : formData.organizationName;
+      const welcome = EmailTemplates.welcome(fullName);
+      sendEmail({ to: formData.email, ...welcome }).catch(console.error);
+
       navigate('/login');
     } catch (err: any) {
       toast(err.message, 'error');

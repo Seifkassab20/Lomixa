@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import {
   getDoctors, saveVisit, saveDoctor, getSalesReps, getPharmaCompanies, savePharmaCompany,
-  generateId, Visit, VisitType, pushNotification, Doctor, saveSalesRep, saveDoctorAvailability
+  generateId, Visit, VisitType, pushNotification, Doctor, saveSalesRep, saveDoctorAvailability, processVisitPayment,
+  getAdminBalance, saveAdminBalance
 } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
+import { useTranslation } from 'react-i18next';
+import { formatCurrency } from '@/lib/currency';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { JitsiMeeting } from '@/components/JitsiMeeting';
 import { Search, Video, Phone, MapPin, MessageSquare, Calendar, Clock, CheckCircle2, CreditCard, X, FileText, Sparkles, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useTranslation } from 'react-i18next';
-import { formatCurrency } from '@/lib/currency';
+import { sendEmail, EmailTemplates } from '@/lib/email';
 
 const SPECIALTIES = [
   'All', 'Cardiology', 'Neurology', 'Pediatrics', 'Oncology',
@@ -30,10 +32,10 @@ export function RepBookVisit() {
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [meetingRoom, setMeetingRoom] = useState<string | null>(null);
   const [balance, setBalance] = useState(0);
+  const [country, setCountry] = useState('sa');
 
   const reps = getSalesReps();
   const currentRep = reps.find(r => r.userId === userId);
-  const country = currentRep?.location?.country || 'sa';
   const [repData, setRepData] = useState({ id: '', pharmaId: '', pharmaName: '', name: '' });
   const [visitNotes, setVisitNotes] = useState('');
   const [bookedCount, setBookedCount] = useState(1);
@@ -50,8 +52,9 @@ export function RepBookVisit() {
     const reps = getSalesReps();
     const myRep = reps.find(r => r.userId === userId);
     if (myRep) {
-      setRepData({ id: myRep.id, pharmaId: myRep.pharmaId, pharmaName: myRep.pharmaName, name: myRep.name });
+      setRepData(myRep);
       setBalance(myRep.balance || 0);
+      setCountry(myRep.location?.country || 'sa');
     }
   };
 
@@ -121,13 +124,22 @@ export function RepBookVisit() {
     const updatedAvail = selectedDoctor.availability.map(s =>
       bookedIds.includes(s.id) ? { ...s, isBooked: true } : s
     );
-    saveDoctor({ ...selectedDoctor, availability: updatedAvail });
+
+    // Update Doctor Availability only (NO BALANCE UPDATE YET)
+    const allDocs = getDoctors();
+    const currentDoc = allDocs.find(d => d.id === selectedDoctor.id) || selectedDoctor;
+    
+    const updatedDoctor: Doctor = {
+      ...currentDoc,
+      availability: updatedAvail
+    };
+    saveDoctor(updatedDoctor);
     saveDoctorAvailability(selectedDoctor.id, updatedAvail);
 
+    // Update Rep Budget (Hold money)
     const reps = getSalesReps();
     const myRep = reps.find(r => r.id === repData.id);
     if (myRep) {
-      const totalPrice = slotsToBook.reduce((sum, s) => sum + (s.price || 150), 0);
       saveSalesRep({ ...myRep, balance: Math.max((myRep.balance || 0) - totalPrice, 0) });
       setBalance(b => Math.max(b - totalPrice, 0));
     }
@@ -141,6 +153,19 @@ export function RepBookVisit() {
           : `Bulk booking confirmed: ${slotsToBook.length} sessions scheduled with ${selectedDoctor.name}. Awaiting doctor confirmation.`,
         type: 'booking',
       });
+
+      // Send Real-time Email to Doctor
+      if (selectedDoctor.email) {
+        const slot = slotsToBook[0];
+        const emailContent = EmailTemplates.bookingRequest(
+          selectedDoctor.name,
+          repData.name || user?.user_metadata?.full_name || 'Representative',
+          slot.date,
+          slot.time,
+          selectedType
+        );
+        sendEmail({ to: selectedDoctor.email, ...emailContent }).catch(console.error);
+      }
     }
 
     setBookingSuccess(true);
@@ -164,7 +189,7 @@ export function RepBookVisit() {
         </div>
         <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-xl px-4 py-2">
           <CreditCard className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-          <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">{balance} {t('sarCurrency')}</span>
+          <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">{formatCurrency(balance, country)}</span>
         </div>
       </div>
 
@@ -415,9 +440,9 @@ export function RepBookVisit() {
               </div>
 
               {balance < 100 && (
-                <p className="text-xs text-center text-amber-600 dark:text-amber-400">
-                  {t('outOfPersonalCreditsMsg')}
-                </p>
+                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                  {formatCurrency(balance, country)} {t('available')}
+                </span>
               )}
               {balance > 0 && balance <= 500 && (
                 <p className="text-xs text-center text-orange-600 dark:text-orange-400">

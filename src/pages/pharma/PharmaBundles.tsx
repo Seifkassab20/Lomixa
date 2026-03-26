@@ -9,6 +9,7 @@ import { CreditCard, Zap, Shield, Star, CheckCircle2, Clock, X, Lock, AlertCircl
 import { useTranslation } from 'react-i18next';
 import { useToast } from '@/components/ui/Toast';
 import { formatCurrency, convertCurrency, getCurrencyInfo } from '@/lib/currency';
+import { sendEmail, EmailTemplates } from '@/lib/email';
 
 const BUNDLE_ICONS = [Zap, Star, Shield];
 const BUNDLE_COLORS = [
@@ -87,6 +88,15 @@ export function PharmaBundles() {
       });
 
       toast('Bundle purchase request submitted. Awaiting Admin approval.', 'success');
+      
+      // Send Real-time Email to Admin
+      const adminEmail = 'admin@lomixa.sa'; // Standard network admin mailbox
+      const bundleEmail = EmailTemplates.bundleRequest(
+        mine.name,
+        bundle.name,
+        formatCurrency(localPrice, country)
+      );
+      sendEmail({ to: adminEmail, ...bundleEmail }).catch(console.error);
       
       // Cleanup
       setShowPayment(null);

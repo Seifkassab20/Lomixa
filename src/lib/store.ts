@@ -17,6 +17,7 @@ export interface Doctor {
   email: string;
   isVerified: boolean;
   isActive: boolean;
+  balance?: number;
   userId?: string;
   role?: string;
   availability: AvailabilitySlot[];
@@ -63,7 +64,7 @@ export interface SalesRep {
 export interface Hospital {
   id: string;
   name: string;
-  location: string;
+  location: any;
   userId?: string;
   isActive: boolean;
   isVerified: boolean;
@@ -281,6 +282,7 @@ function mapDoctorToDB(d: Doctor) {
     email: d.email,
     is_active: d.isActive,
     is_verified: d.isVerified,
+    balance: d.balance || 0,
     location: d.location ? JSON.stringify(d.location) : null,
     avatar: d.avatar,
     title: d.title
@@ -303,6 +305,7 @@ function mapDoctorFromDB(db: any): Doctor {
     email: db.email,
     isActive: db.is_active ?? true,
     isVerified: db.is_verified ?? false,
+    balance: db.balance || 0,
     role: db.role,
     avatar: db.avatar,
     location: location,
@@ -445,7 +448,7 @@ export async function syncCloudData() {
   if (!isSupabaseConfigured) return;
 
   try {
-    const [hospitals, doctors, reps, pharma, visits, notifications, bundleReqs, transactions] = await Promise.all([
+    const [hospitals, doctors, reps, pharma, visits, notifications, bundleReqs, transactions, finance] = await Promise.all([
       supabase.from('hospitals').select('*'),
       supabase.from('doctors').select('*'),
       supabase.from('sales_reps').select('*'),
@@ -454,6 +457,7 @@ export async function syncCloudData() {
       supabase.from('notifications').select('*'),
       supabase.from('bundle_requests').select('*'),
       supabase.from('transactions').select('*'),
+      supabase.from('platform_finance').select('*').limit(1),
     ]);
 
     // Only skip merging local-to-cloud push if mutation was VERY recent (within 2s)
@@ -486,6 +490,7 @@ export async function syncCloudData() {
     if (notifications.data) save('notifications', mergeData(load('notifications', []), notifications.data.map(mapNotifFromDB).slice(0, 100)));
     if (bundleReqs.data) save('bundle_requests', mergeData(getBundleRequests(), bundleReqs.data.map(mapBundleRequestFromDB)));
     if (transactions.data) save('transactions', mergeData(getTransactions(), transactions.data.map(mapTransactionFromDB)));
+    if (finance.data && finance.data[0]) save('admin_balance', finance.data[0].admin_balance);
 
     const slots = await supabase.from('availability_slots').select('*');
     if (slots.data && Date.now() - getLastMutationTime() > 10000) {
@@ -687,6 +692,37 @@ function mapTransactionFromDB(db: any): Transaction {
     id: db.id, pharmaId: db.pharma_id, bundleName: db.bundle_name,
     fundsAdded: db.funds_added, amountSAR: db.amount_sar, date: db.date
   };
+}
+
+export function getAdminBalance(): number { return load<number>('admin_balance', 0); }
+export function saveAdminBalance(balance: number) {
+  save('admin_balance', balance);
+  notifyMutation();
+  if (isSupabaseConfigured) {
+    supabase.from('platform_finance').upsert({
+      id: '00000000-0000-0000-0000-000000000000',
+      admin_balance: balance,
+      updated_at: new Date().toISOString()
+    }).then(({error}) => error && console.error("Admin Balance Push Failed:", error));
+  }
+}
+
+export function processVisitPayment(amount: number, doctorId: string) {
+  // 1. Calculate split (20% to admin, 80% to doctor)
+  const adminShare = Math.floor(amount * 0.2);
+  const doctorShare = amount - adminShare; // Better than Math.floor(amount * 0.8) to avoid losing pennies
+
+  // 2. Update Admin Balance
+  const currentAdminBalance = getAdminBalance();
+  saveAdminBalance(currentAdminBalance + adminShare);
+
+  // 3. Update Doctor Balance
+  const doctors = getDoctors();
+  const docIdx = doctors.findIndex(d => d.id === doctorId);
+  if (docIdx >= 0) {
+    doctors[docIdx].balance = (doctors[docIdx].balance || 0) + doctorShare;
+    saveDoctor(doctors[docIdx]);
+  }
 }
 
 export function getBundles(): Bundle[] { return BUNDLES; }
