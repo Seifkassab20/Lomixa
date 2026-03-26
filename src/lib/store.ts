@@ -280,8 +280,10 @@ function mapDoctorToDB(d: Doctor) {
     phone: d.phone,
     email: d.email,
     is_active: d.isActive,
-    is_verified: d.isVerified
-    // stripped title, role, avatar, location because they lack SQL columns in Supabase
+    is_verified: d.isVerified,
+    location: d.location ? JSON.stringify(d.location) : null,
+    avatar: d.avatar,
+    title: d.title
   };
 }
 
@@ -313,11 +315,13 @@ function mapHospitalToDB(h: Hospital) {
     id: h.id, 
     user_id: h.userId, 
     name: h.name, 
-    location: h.location, 
+    location: h.location ? (typeof h.location === 'string' ? h.location : JSON.stringify(h.location)) : null, 
     is_active: h.isActive, 
     is_verified: h.isVerified,
-    type: h.type
-    // stripped phone, email, role, avatar, documents because they lack SQL columns in Supabase
+    type: h.type,
+    phone: h.phone,
+    email: h.email,
+    avatar: h.avatar
   };
 }
 
@@ -328,7 +332,7 @@ function mapHospitalFromDB(db: any): Hospital {
     id: db.id, 
     userId: db.user_id, 
     name: db.name, 
-    location: db.location, 
+    location: db.location ? (typeof db.location === 'string' && (db.location.startsWith('{') || db.location.startsWith('[')) ? JSON.parse(db.location) : db.location) : null, 
     isActive: db.is_active ?? true, 
     isVerified: db.is_verified ?? false,
     phone: db.phone,
@@ -342,10 +346,16 @@ function mapHospitalFromDB(db: any): Hospital {
 
 function mapPharmaToDB(p: PharmaCompany) {
   const data: any = { 
-    id: p.id, user_id: p.userId, name: p.name, balance: p.balance, 
-    is_active: p.isActive, is_verified: p.isVerified,
-    location: p.location ? JSON.stringify(p.location) : null
-    // stripped phone, email, role, avatar, documents because they lack SQL columns in Supabase
+    id: p.id, 
+    user_id: p.userId, 
+    name: p.name, 
+    balance: p.balance, 
+    is_active: p.isActive, 
+    is_verified: p.isVerified,
+    location: p.location ? JSON.stringify(p.location) : null,
+    avatar: p.avatar,
+    phone: p.phone,
+    email: p.email
   };
   if (p.customBundles) data.custom_bundles = JSON.stringify(p.customBundles);
   return data;
@@ -381,8 +391,12 @@ function mapRepToDB(r: SalesRep) {
     visits_this_month: r.visitsThisMonth, 
     balance: r.balance || 0,
     is_active: r.isActive, 
-    is_verified: r.isVerified
-    // stripped first_name, last_name, role_title, role, avatar, location, products because they lack SQL columns in Supabase
+    is_verified: r.isVerified,
+    location: r.location ? JSON.stringify(r.location) : null,
+    avatar: r.avatar,
+    first_name: r.firstName,
+    last_name: r.lastName,
+    role_title: r.roleTitle
   };
 }
 
