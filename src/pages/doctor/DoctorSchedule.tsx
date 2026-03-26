@@ -4,15 +4,15 @@ import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2, Calendar, Clock, Video, Phone, MapPin, MessageSquare } from 'lucide-react';
+import { Plus, Trash2, Calendar, Clock, Video, Phone, MapPin, MessageSquare, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 
 const APPOINTMENT_TYPES = [
-  { value: 'In Person', label: 'In-Person', icon: MapPin },
-  { value: 'Video', label: 'Video', icon: Video },
-  { value: 'Call', label: 'Voice', icon: Phone },
-  { value: 'Text', label: 'Text', icon: MessageSquare },
+  { value: 'In Person', label: 'In-Person', icon: MapPin, defaultPrice: 300 },
+  { value: 'Video', label: 'Video', icon: Video, defaultPrice: 200 },
+  { value: 'Call', label: 'Voice', icon: Phone, defaultPrice: 150 },
+  { value: 'Text', label: 'Text', icon: MessageSquare, defaultPrice: 100 },
 ];
 
 export function DoctorSchedule() {
@@ -27,6 +27,7 @@ export function DoctorSchedule() {
     endTime: '17:00',
     duration: 15,
     appointmentType: 'In Person' as AvailabilitySlot['appointmentType'],
+    price: 300,
   });
 
   useEffect(() => {
@@ -73,6 +74,7 @@ export function DoctorSchedule() {
       appointmentType: form.appointmentType,
       duration: form.duration,
       isBooked: false,
+      price: form.price,
     };
     
     // Auto increment start time for sequential rapid adding
@@ -170,6 +172,20 @@ export function DoctorSchedule() {
                   />
                 </div>
               </div>
+
+              {/* PRICE */}
+              <div>
+                <Label className="text-slate-300 mb-2 block font-medium">{t('slotPrice') || 'Slot Price (SAR)'}</Label>
+                <div className="relative">
+                  <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <Input 
+                    type="number" 
+                    value={form.price} 
+                    onChange={e => setForm(f => ({ ...f, price: Number(e.target.value) }))} 
+                    className="w-full bg-[#1c2636] border-slate-800 border focus:border-emerald-500 text-white pl-12 h-14 rounded-xl"
+                  />
+                </div>
+              </div>
               
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold">
@@ -208,7 +224,7 @@ export function DoctorSchedule() {
                     <button
                       key={value}
                       type="button"
-                      onClick={() => setForm(f => ({ ...f, appointmentType: value as AvailabilitySlot['appointmentType'] }))}
+                      onClick={() => setForm(f => ({ ...f, appointmentType: value as AvailabilitySlot['appointmentType'], price: APPOINTMENT_TYPES.find(t => t.value === value)?.defaultPrice || f.price }))}
                       className={cn(
                         "flex items-center gap-3 px-5 py-3.5 rounded-xl border text-sm font-semibold transition-all",
                         form.appointmentType === value
@@ -272,6 +288,7 @@ export function DoctorSchedule() {
                           <span className="flex items-center gap-1"><Calendar className="h-3 w-3 text-slate-500" />{new Date(slot.date).toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-SA', { month: 'short', day: 'numeric' })}</span>
                           <span className="flex items-center gap-1"><Clock className="h-3 w-3 text-slate-500" />{slot.time}</span>
                           <span className="opacity-70 px-1.5 py-0.5 bg-slate-800 rounded text-[10px]">{slot.duration} {t('minutesLabel') || 'min'}</span>
+                          <span className="text-emerald-400 font-bold ml-1">{slot.price || 0} {t('sarCurrency') || 'SAR'}</span>
                         </div>
                       </div>
                     </div>

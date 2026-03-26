@@ -52,6 +52,7 @@ create table if not exists public.availability_slots (
     appointment_type text not null,
     duration integer default 30,
     is_booked boolean default false,
+    price integer,
     created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -91,6 +92,7 @@ create table if not exists public.visits (
     duration_minutes integer default 30,
     notes text,
     outcome_notes text,
+    price integer,
     cancelled_by_rep boolean default false,
     created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );

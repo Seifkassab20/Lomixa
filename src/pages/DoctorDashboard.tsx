@@ -64,7 +64,7 @@ export function DoctorDashboard() {
           { label: t('visitsTodayLabel'), value: todayVisits.length, sub: `${confirmedToday.length} ${t('confirmed')}`, icon: Calendar, color: 'emerald' },
           { label: t('pendingRequests'), value: pendingVisits.length, sub: t('needYourAction'), icon: Clock, color: 'amber' },
           { label: t('totalVisitsLabel'), value: visits.length, sub: `${visits.filter(v => v.status === 'Completed').length} ${t('completedVisitsStat')}`, icon: CheckCircle2, color: 'blue' },
-          { label: t('earnings'), value: `﷼${(visits.filter(v => v.status === 'Completed').length * 150).toLocaleString()}`, sub: t('estFromVisits'), icon: DollarSign, color: 'purple' },
+          { label: t('earnings'), value: `﷼${visits.filter(v => v.status === 'Completed').reduce((sum, v) => sum + (v.price || 150), 0).toLocaleString()}`, sub: t('estFromVisits'), icon: DollarSign, color: 'purple' },
         ].map(({ label, value, sub, icon: Icon, color }) => (
           <div key={label} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
             <div className="flex items-center justify-between mb-3">

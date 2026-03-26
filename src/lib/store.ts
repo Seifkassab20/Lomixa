@@ -31,6 +31,7 @@ export interface AvailabilitySlot {
   appointmentType: 'In Person' | 'Video' | 'Call' | 'Text';
   duration: number;
   isBooked: boolean;
+  price?: number;
 }
 
 export interface SalesRep {
@@ -112,6 +113,7 @@ export interface Visit {
   visitType: VisitType;
   status: VisitStatus;
   durationMinutes: number;
+  price?: number;
   notes?: string;           
   outcomeNotes?: string;    
   cancelledByRep?: boolean; 
@@ -225,6 +227,7 @@ function mapVisitToDB(v: Visit) {
     visit_type: v.visitType,
     status: v.status,
     duration_minutes: v.durationMinutes,
+    price: v.price,
     notes: v.notes,
     outcome_notes: v.outcomeNotes,
     cancelled_by_rep: v.cancelledByRep,
@@ -248,6 +251,7 @@ function mapVisitFromDB(db: any): Visit {
     visitType: db.visit_type as VisitType,
     status: db.status as VisitStatus,
     durationMinutes: db.duration_minutes,
+    price: db.price,
     notes: db.notes,
     outcomeNotes: db.outcome_notes,
     cancelledByRep: db.cancelled_by_rep,
@@ -447,7 +451,7 @@ export async function syncCloudData() {
       const slotsByDoc = slots.data.reduce((acc: any, row: any) => {
         if (!acc[row.doctor_id]) acc[row.doctor_id] = [];
         acc[row.doctor_id].push({
-          id: row.id, date: row.date, time: row.time, appointment_type: row.appointment_type, duration: row.duration, is_booked: row.is_booked
+          id: row.id, date: row.date, time: row.time, appointmentType: row.appointment_type, duration: row.duration, is_booked: row.is_booked, price: row.price
         });
         return acc;
       }, {});
@@ -643,7 +647,7 @@ export function saveDoctorAvailability(doctorId: string, slots: AvailabilitySlot
         supabase.from('availability_slots').insert(
           slots.map(s => ({
             id: s.id, doctor_id: doctorId, date: s.date, time: s.time, 
-            appointment_type: s.appointmentType, duration: s.duration, is_booked: s.isBooked
+            appointment_type: s.appointmentType, duration: s.duration, is_booked: s.isBooked, price: s.price
           }))
         ).then();
       }

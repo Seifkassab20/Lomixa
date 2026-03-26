@@ -103,6 +103,7 @@ export function RepBookVisit() {
         visitType: selectedType,
         status: 'Pending',
         durationMinutes: slot.duration,
+        price: slot.price,
         notes: visitNotes.trim() || undefined,
         createdAt: new Date().toISOString(),
       };
@@ -119,6 +120,7 @@ export function RepBookVisit() {
     const reps = getSalesReps();
     const myRep = reps.find(r => r.id === repData.id);
     if (myRep) {
+      // For now, continue to deduct 1 credit per slot, but in a real-world scenario, this might depend on the price.
       saveSalesRep({ ...myRep, credits: Math.max((myRep.credits || 0) - slotsToBook.length, 0) });
       setCredits(c => Math.max(c - slotsToBook.length, 0));
     }
@@ -361,6 +363,7 @@ export function RepBookVisit() {
                           <Clock className="h-3.5 w-3.5 text-gray-400" />
                           <span>{slot.time}</span>
                           <span className="text-gray-400">{slot.duration}m</span>
+                          <span className="text-emerald-400 font-bold ml-1">{slot.price || 150} {t('sarCurrency') || 'SAR'}</span>
                         </div>
                       </button>
                     ))}
