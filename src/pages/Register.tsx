@@ -318,8 +318,9 @@ export function Register() {
                <ArrowRight className={cn("w-4 h-4", !isRTL && "rotate-180")} />
                {t('back_to_selection')}
             </button>
-            <button onClick={toggleLanguage} className="px-6 py-2.5 rounded-2xl bg-slate-900 border border-slate-800 text-[10px] font-black uppercase tracking-[0.2em] hover:border-emerald-500 transition-all font-sans">
-               {isRTL ? 'English' : 'عربي'}
+            <button onClick={toggleLanguage} className="px-6 py-2.5 rounded-2xl bg-slate-900 border border-slate-800 text-[10px] font-black uppercase tracking-[0.2em] hover:border-emerald-500 transition-all font-sans flex items-center gap-2">
+               <Globe className="w-4 h-4 text-emerald-500" />
+               {isRTL ? t('switchToEnglish') : t('switchToArabic')}
             </button>
           </div>
 

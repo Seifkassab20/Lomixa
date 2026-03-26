@@ -69,18 +69,18 @@ export function AdminDashboard() {
       if (h) {
         saveHospital({ ...h, isVerified: true });
         console.log(`[SIMULATED MAIL] To Hospital | ID: ${h.id} | Subject: Infrastructure Verified`);
-        if (h.userId) pushNotification({ userId: h.userId, title: 'Hospital Verified', message: 'Your hospital/clinic has been verified on the LOMIXA regional grid.', type: 'info' });
+        if (h.userId) pushNotification({ userId: h.userId, title: t('hospitalVerifiedTitle'), message: t('hospitalVerifiedMsg'), type: 'info' });
       }
     } else if (type === 'pharma') {
       const p = pharma.find(ph => ph.id === id);
       if (p) {
         savePharmaCompany({ ...p, isVerified: true });
         console.log(`[SIMULATED MAIL] To Pharma | ID: ${p.id} | Subject: Organization Verified`);
-        if (p.userId) pushNotification({ userId: p.userId, title: 'Company Verified', message: 'Your pharmaceutical organization has been verified by the LOMIXA Admin.', type: 'info' });
+        if (p.userId) pushNotification({ userId: p.userId, title: t('companyVerifiedTitle'), message: t('companyVerifiedMsg'), type: 'info' });
       }
     }
     refresh();
-    toast('Access permission granted and identity verified.', 'success');
+    toast(t('accessGrantedToast'), 'success');
   };
 
   const initiateReject = (type: 'hospital' | 'pharma', id: string) => {
@@ -233,7 +233,7 @@ export function AdminDashboard() {
         </div>
         <div className="flex items-center gap-3 bg-brand/10 border border-brand/20 rounded-2xl px-6 py-3">
             <div className="flex flex-col items-end text-brand">
-              <span className="text-[8px] font-black uppercase tracking-widest opacity-60">Platform Commission</span>
+              <span className="text-[8px] font-black uppercase tracking-widest opacity-60">{t('platformCommission')}</span>
                <span className="text-xl font-black italic tracking-tighter">{formatCurrency(platformBalance, adminCountry)}</span>
             </div>
             <div className="h-10 w-10 bg-brand rounded-xl flex items-center justify-center text-white shadow-lg shadow-brand/20">
@@ -492,7 +492,7 @@ export function AdminDashboard() {
                         </div>
                         <div>
                           <h4 className="font-black text-gray-900 dark:text-white uppercase tracking-tighter italic">{req.pharmaName}</h4>
-                          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{req.bundleName} Bundle Request</p>
+                          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{req.bundleName} {t('bundleRequestDetail')}</p>
                         </div>
                      </div>
                      <div className="text-right">
@@ -500,7 +500,7 @@ export function AdminDashboard() {
                           {formatCurrency(req.price, pharma.find(p => p.id === req.pharmaId)?.location?.country || 'sa')}
                         </div>
                         <div className="text-[10px] text-slate-500 font-bold">
-                          {formatCurrency(req.balance, pharma.find(p => p.id === req.pharmaId)?.location?.country || 'sa')} Balance
+                          {formatCurrency(req.balance, pharma.find(p => p.id === req.pharmaId)?.location?.country || 'sa')} {t('balanceLabel') || 'Balance'}
                         </div>
                      </div>
                   </div>
@@ -588,7 +588,7 @@ export function AdminDashboard() {
               <Input 
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Search conglomerates..."
+                placeholder={t('searchConglomerates')}
                 className="pl-9 w-64 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 border-none text-xs font-bold"
               />
             </div>

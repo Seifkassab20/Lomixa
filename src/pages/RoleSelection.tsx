@@ -92,7 +92,7 @@ export function RoleSelection() {
         >
           <Globe className="w-4 h-4 text-emerald-500 group-hover:rotate-12 transition-transform" />
           <span className="text-sm font-black tracking-tighter uppercase italic">
-            {i18n.language === 'en' ? 'عربي' : 'EN'}
+            {i18n.language === 'en' ? t('switchToArabic') : t('switchToEnglish')}
           </span>
         </motion.button>
       </div>

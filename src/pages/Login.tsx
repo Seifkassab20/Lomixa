@@ -193,9 +193,10 @@ export function Login() {
         <div className="flex items-center gap-6">
           <button 
             onClick={toggleLanguage}
-            className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-bold uppercase tracking-widest hover:bg-white/10 transition-all font-sans"
+            className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-bold uppercase tracking-widest hover:bg-white/10 transition-all font-sans flex items-center gap-2"
           >
-            {i18n.language === 'en' ? 'عربي' : 'English'}
+            <Globe className="w-3.5 h-3.5" />
+            {i18n.language === 'en' ? t('switchToArabic') : t('switchToEnglish')}
           </button>
         </div>
       </header>
