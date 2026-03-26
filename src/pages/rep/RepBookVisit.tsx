@@ -11,6 +11,7 @@ import { JitsiMeeting } from '@/components/JitsiMeeting';
 import { Search, Video, Phone, MapPin, MessageSquare, Calendar, Clock, CheckCircle2, CreditCard, X, FileText, Sparkles, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
+import { formatCurrency } from '@/lib/currency';
 
 const SPECIALTIES = [
   'All', 'Cardiology', 'Neurology', 'Pediatrics', 'Oncology',
@@ -28,7 +29,11 @@ export function RepBookVisit() {
   const [selectedType, setSelectedType] = useState<VisitType>('In Person');
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [meetingRoom, setMeetingRoom] = useState<string | null>(null);
-  const [credits, setCredits] = useState(0);
+  const [balance, setBalance] = useState(0);
+
+  const reps = getSalesReps();
+  const currentRep = reps.find(r => r.userId === userId);
+  const country = currentRep?.location?.country || 'sa';
   const [repData, setRepData] = useState({ id: '', pharmaId: '', pharmaName: '', name: '' });
   const [visitNotes, setVisitNotes] = useState('');
   const [bookedCount, setBookedCount] = useState(1);
@@ -46,7 +51,7 @@ export function RepBookVisit() {
     const myRep = reps.find(r => r.userId === userId);
     if (myRep) {
       setRepData({ id: myRep.id, pharmaId: myRep.pharmaId, pharmaName: myRep.pharmaName, name: myRep.name });
-      setCredits(myRep.credits || 0);
+      setBalance(myRep.balance || 0);
     }
   };
 
@@ -60,7 +65,7 @@ export function RepBookVisit() {
     return matchSearch && matchSpecialty;
   });
 
-  const availableSlots = selectedDoctor?.availability.filter(s => !s.isBooked) || [];
+  const availableSlots = selectedDoctor?.availability.filter(s => !s.isBooked && s.appointmentType === selectedType) || [];
 
   // Lomixa Smart Matchmaker (AI Recommendation Engine)
   const aiRecommendations = React.useMemo(() => {
@@ -82,7 +87,9 @@ export function RepBookVisit() {
       ? availableSlots.filter(s => s.id === selectedSlot)
       : availableSlots;
 
-    if (slotsToBook.length === 0 || credits < slotsToBook.length) return;
+    const totalPrice = slotsToBook.reduce((sum, s) => sum + (s.price || 150), 0);
+
+    if (slotsToBook.length === 0 || balance < totalPrice) return;
 
     setBookedCount(slotsToBook.length);
 
@@ -120,9 +127,9 @@ export function RepBookVisit() {
     const reps = getSalesReps();
     const myRep = reps.find(r => r.id === repData.id);
     if (myRep) {
-      // For now, continue to deduct 1 credit per slot, but in a real-world scenario, this might depend on the price.
-      saveSalesRep({ ...myRep, credits: Math.max((myRep.credits || 0) - slotsToBook.length, 0) });
-      setCredits(c => Math.max(c - slotsToBook.length, 0));
+      const totalPrice = slotsToBook.reduce((sum, s) => sum + (s.price || 150), 0);
+      saveSalesRep({ ...myRep, balance: Math.max((myRep.balance || 0) - totalPrice, 0) });
+      setBalance(b => Math.max(b - totalPrice, 0));
     }
 
     if (userId) {
@@ -157,7 +164,7 @@ export function RepBookVisit() {
         </div>
         <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-xl px-4 py-2">
           <CreditCard className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-          <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">{credits} {t('creditsAvailableLabel') || 'credits available'}</span>
+          <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">{balance} {t('sarCurrency')}</span>
         </div>
       </div>
 
@@ -166,7 +173,7 @@ export function RepBookVisit() {
           <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <div>
             <div className="font-semibold text-emerald-700 dark:text-emerald-400">{t('visitBookedSuccess') || 'Visit Booked Successfully!'}</div>
-            <div className="text-sm text-emerald-600/80 dark:text-emerald-400/80">{t('creditsUsed', { count: bookedCount }) || `${bookedCount} credit(s) used. Waiting for doctor confirmation.`}</div>
+            <div className="text-sm text-emerald-600/80 dark:text-emerald-400/80">{t('balanceDeductedMsg') || 'The visit price has been deducted from your balance. Awaiting doctor confirmation.'}</div>
           </div>
         </div>
       )}
@@ -363,7 +370,7 @@ export function RepBookVisit() {
                           <Clock className="h-3.5 w-3.5 text-gray-400" />
                           <span>{slot.time}</span>
                           <span className="text-gray-400">{slot.duration}m</span>
-                          <span className="text-emerald-400 font-bold ml-1">{slot.price || 150} {t('sarCurrency') || 'SAR'}</span>
+                          <span className="text-emerald-400 font-bold ml-1">{formatCurrency(slot.price || 150, country)}</span>
                         </div>
                       </button>
                     ))}
@@ -387,34 +394,34 @@ export function RepBookVisit() {
               <div className="flex flex-col gap-2">
                 <Button
                   onClick={() => handleBook('single')}
-                  disabled={!selectedSlot || credits < 1}
+                  disabled={!selectedSlot || balance < (availableSlots.find(s => s.id === selectedSlot)?.price || 150)}
                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
                 >
-                  {credits < 1 ? t('noCreditsAvailable') : selectedSlot ? t('bookSelectedSlot') : t('selectASlot')}
+                  {!selectedSlot ? t('selectASlot') : balance < (availableSlots.find(s => s.id === selectedSlot)?.price || 150) ? t('noBalanceAvailable') || 'Insufficient Balance' : t('bookSelectedSlot')}
                 </Button>
 
                 {availableSlots.length > 1 && (
                   <Button
-                    onClick={() => handleBook('all')}
-                    disabled={credits < availableSlots.length}
                     variant="outline"
-                    className="w-full border-emerald-600 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+                    onClick={() => handleBook('all')}
+                    disabled={balance < availableSlots.reduce((sum, s) => sum + (s.price || 150), 0)}
+                    className="w-full border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/5 h-12 rounded-xl text-xs font-bold gap-2"
                   >
-                    {credits < availableSlots.length 
-                      ? t('noCreditsAvailable') 
-                      : t('bookAllSlotsCount', { count: availableSlots.length })}
+                    <Zap className="h-3.5 w-3.5 fill-current" />
+                    {t('bookAllSlotsCount', { count: availableSlots.length })}
+                    <span className="opacity-60 ml-1">({formatCurrency(availableSlots.reduce((sum, s) => sum + (s.price || 150), 0), country)})</span>
                   </Button>
                 )}
               </div>
 
-              {credits < 1 && (
+              {balance < 100 && (
                 <p className="text-xs text-center text-amber-600 dark:text-amber-400">
-                  {t('outOfPersonalCreditsMsg') || 'You are out of visit credits. Contact your manager to allocate more credits to your account.'}
+                  {t('outOfPersonalCreditsMsg')}
                 </p>
               )}
-              {credits > 0 && credits <= 5 && (
+              {balance > 0 && balance <= 500 && (
                 <p className="text-xs text-center text-orange-600 dark:text-orange-400">
-                  {t('lowCreditsWarning', { count: credits }).replace('{{count}}', credits.toString()) || `⚠️ Low credits: only ${credits} remaining. Consider buying a bundle.`}
+                  {t('lowCreditsWarning', { amount: formatCurrency(balance, country) })}
                 </p>
               )}
             </div>

@@ -8,6 +8,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { formatCurrency } from '@/lib/currency';
 
 const STATUS_COLORS: Record<string, string> = {
   Pending: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 border-amber-200 dark:border-amber-500/30',
@@ -23,26 +24,34 @@ export function PharmaDashboard() {
   const isRTL = i18n.language === 'ar';
   const [visits, setVisits] = useState<ReturnType<typeof getVisits>>([]);
   const [reps, setReps] = useState<ReturnType<typeof getSalesReps>>([]);
-  const [credits, setCredits] = useState(0);
+  const [balance, setBalance] = useState(0);
 
   const loadData = useCallback(() => {
     const companies = getPharmaCompanies();
-    let mine = companies.find(c => c.userId === userId);
+    // Safety check: find all matching profiles and pick the one with the highest balance 
+    // This resolves potential sync-race duplicates
+    const matches = companies.filter(c => c.userId === userId || c.id === userId);
+    let mine = matches.length > 0 ? matches.sort((a, b) => (b.balance || 0) - (a.balance || 0))[0] : null;
+
     if (!mine && userId) {
       mine = {
-        id: generateId(),
+        id: userId,
         name: user?.user_metadata?.organization || user?.email?.split('@')[1]?.split('.')[0] || t('myPharma'),
-        credits: 100,
-        userId,
+        balance: 50, // Starting balance from registration
+        userId: userId,
         isActive: true,
         isVerified: false,
       };
       savePharmaCompany(mine);
     }
-    setCredits(mine?.credits ?? 0);
-    setReps(getSalesReps().filter(r => r.pharmaId === mine?.id));
-    setVisits(getVisits().filter(v => v.pharmaId === mine?.id));
-  }, [userId]);
+    setBalance(mine?.balance ?? 0);
+    setReps(getSalesReps().filter(r => r.pharmaId === mine?.id || r.pharmaId === mine?.userId));
+    setVisits(getVisits().filter(v => v.pharmaId === mine?.id || v.pharmaId === mine?.userId));
+  }, [userId, t, user?.user_metadata?.organization, user?.email]);
+
+  const companies = getPharmaCompanies();
+  const mine = companies.find(c => c.userId === userId) || companies.find(c => c.id === userId);
+  const country = mine?.location?.country || 'sa';
 
   useEffect(() => {
     loadData();
@@ -70,21 +79,21 @@ export function PharmaDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Low Credits Warning */}
-      {credits <= 10 && credits >= 0 && (
+      {/* Low Balance Warning */}
+      {balance <= 500 && balance >= 0 && (
         <div className={cn(
           'rounded-xl p-4 flex items-start gap-3 border',
-          credits === 0
+          balance === 0
             ? 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-400'
             : 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30 text-amber-700 dark:text-amber-400'
         )}>
           <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold text-sm">
-              {credits === 0 ? t('outOfCredits') : t('lowCredits', { count: credits })}
+              {balance === 0 ? t('outOfCredits') : t('lowCredits', { amount: formatCurrency(balance, country) })}
             </div>
             <div className="text-xs mt-0.5 opacity-80">
-              {credits === 0 ? t('outOfCreditsDesc') : t('lowCreditsDesc')}
+              {balance === 0 ? t('outOfCreditsDesc') : t('lowCreditsDesc')}
             </div>
             <button onClick={() => navigate('/bundles')} className="mt-2 text-xs underline font-medium">
               {t('buyBundle_link')}
@@ -99,7 +108,7 @@ export function PharmaDashboard() {
           { label: t('totalReps'), value: reps.length, sub: `${reps.filter(r => r.visitsThisMonth > 0).length} ${t('active')}`, icon: Users, color: 'emerald' },
           { label: t('totalVisits'), value: visits.length, sub: `${visits.filter(v => v.status === 'Pending').length} ${t('pendingCount')}`, icon: CalendarIcon, color: 'blue' },
           { label: t('conversionRate'), value: visits.length > 0 ? `${Math.round((visits.filter(v => v.status === 'Completed').length / visits.length) * 100)}%` : '0%', sub: t('completedVisitsStat'), icon: TrendingUp, color: 'amber' },
-          { label: t('availableCredits'), value: credits.toLocaleString(), sub: '', icon: CreditCard, color: 'purple' },
+          { label: t('availableCredits'), value: formatCurrency(balance, country), sub: '', icon: CreditCard, color: 'purple' },
         ].map(({ label, value, sub, icon: Icon, color }) => (
           <div key={label} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
             <div className="flex items-center justify-between mb-3">

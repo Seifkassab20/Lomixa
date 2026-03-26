@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { getProfile, saveProfile } from '@/lib/store';
+import { 
+  getProfile, saveProfile, getPharmaCompanies, savePharmaCompany, 
+  getSalesReps, saveSalesRep, getDoctors, saveDoctor, getHospitals, saveHospital 
+} from '@/lib/store';
+import { convertCurrency, CountryCode } from '@/lib/currency';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,7 +46,15 @@ export function SettingsPage() {
   useEffect(() => {
     if (userId) {
       const profile = getProfile(userId);
-      const rawPhone = profile.phone || user?.user_metadata?.mobile || '';
+      const companies = getPharmaCompanies();
+      const pharmaEntity = companies.find(c => c.userId === userId || c.id === userId);
+      const repEntity = getSalesReps().find(r => r.userId === userId || r.id === userId);
+      const doctorEntity = getDoctors().find(d => d.userId === userId || d.id === userId);
+      const hospitalEntity = getHospitals().find(h => h.userId === userId || h.id === userId);
+
+      const entity = pharmaEntity || repEntity || doctorEntity || hospitalEntity;
+      
+      const rawPhone = entity?.phone || profile.phone || user?.user_metadata?.mobile || '';
       
       // Try to extract country code from existing phone
       let extractedCode = '+966';
@@ -57,15 +69,15 @@ export function SettingsPage() {
       }
 
       setForm({
-        fullName: profile.fullName || user?.user_metadata?.full_name || '',
+        fullName: entity?.name || profile.fullName || user?.user_metadata?.full_name || '',
         phoneCode: extractedCode,
         phone: extractedNumber,
-        organization: profile.organization || user?.user_metadata?.organization || '',
-        country: profile.country || user?.user_metadata?.country || 'sa',
-        city: profile.city || user?.user_metadata?.city || '',
+        organization: pharmaEntity?.name || profile.organization || user?.user_metadata?.organization || '',
+        country: (entity?.location?.country as string) || profile.country || user?.user_metadata?.country || 'sa',
+        city: (entity?.location?.city as string) || profile.city || user?.user_metadata?.city || '',
         bio: profile.bio || '',
         email: user?.email || '',
-        avatar: profile.avatar || user?.user_metadata?.avatar_url || '',
+        avatar: (entity?.avatar as string) || profile.avatar || user?.user_metadata?.avatar_url || '',
         newPassword: '',
       });
     }
@@ -74,15 +86,92 @@ export function SettingsPage() {
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId) return;
-    
+
     const finalData = {
       ...form,
       phone: `${form.phoneCode}${form.phone}`
     };
     
+    // Update generic profile
     saveProfile(userId, finalData);
+
+    // Update specific account entity (the actual business record)
+    if (role === 'pharma') {
+      const all = getPharmaCompanies();
+      const pc = all.find(c => c.userId === userId || c.id === userId);
+      if (pc) {
+        const oldCountry = pc.location?.country || 'sa';
+        const newCountry = form.country;
+        let newBalance = pc.balance;
+        
+        // Convert balance if country changes to preserve value
+        if (oldCountry !== newCountry) {
+          newBalance = convertCurrency(pc.balance, oldCountry as CountryCode, newCountry as CountryCode);
+        }
+
+        savePharmaCompany({
+          ...pc,
+          name: form.organization || pc.name,
+          phone: finalData.phone,
+          balance: newBalance,
+          avatar: form.avatar,
+          location: {
+            ...(pc.location || {}),
+            country: form.country,
+            city: form.city
+          }
+        });
+      }
+    } else if (role === 'rep') {
+      const all = getSalesReps();
+      const r = all.find(s => s.userId === userId || s.id === userId);
+      if (r) {
+        saveSalesRep({
+          ...r,
+          name: form.fullName,
+          phone: finalData.phone,
+          avatar: form.avatar,
+          location: {
+            ...(r.location || {}),
+            country: form.country
+          }
+        });
+      }
+    } else if (role === 'doctor') {
+      const all = getDoctors();
+      const d = all.find(doc => doc.userId === userId || doc.id === userId);
+      if (d) {
+        saveDoctor({
+          ...d,
+          name: form.fullName,
+          phone: finalData.phone,
+          avatar: form.avatar,
+          location: {
+            ...(d.location || {}),
+            country: form.country
+          }
+        });
+      }
+    } else if (role === 'hospital') {
+      const all = getHospitals();
+      const h = all.find(hosp => hosp.userId === userId || hosp.id === userId);
+      if (h) {
+        saveHospital({
+          ...h,
+          name: form.fullName,
+          phone: finalData.phone,
+          avatar: form.avatar,
+          location: {
+            ...(h.location || {}),
+            country: form.country
+          }
+        });
+      }
+    }
+    
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
+    toast(t('profileUpdated') || 'Changes Saved', 'success');
   };
 
   const handleVerifyEmail = async () => {

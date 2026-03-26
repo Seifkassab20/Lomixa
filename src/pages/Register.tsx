@@ -210,7 +210,7 @@ export function Register() {
           products: formData.products,
           target: 100,
           visitsThisMonth: 0,
-          credits: 0,
+          balance: 0,
           isVerified: false, // Ensures self-registered reps start as PENDING
           isActive: true, // Will go to false if rejected
         });
@@ -240,7 +240,7 @@ export function Register() {
           }
         };
         if (selectedRole === 'pharma') {
-          savePharmaCompany({ ...orgData, credits: 50 });
+          savePharmaCompany({ ...orgData, balance: 50 });
           pushNotification({
             userId: 'admin',
             title: 'New Pharma Registration',

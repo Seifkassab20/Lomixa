@@ -20,7 +20,7 @@ create table if not exists public.pharma_companies (
     id uuid primary key default uuid_generate_v4(),
     user_id uuid references auth.users(id),
     name text not null,
-    credits integer default 0,
+    balance integer default 0,
     is_active boolean default true,
     is_verified boolean default false,
     custom_bundles text, -- JSON string storage for custom pricing
@@ -67,7 +67,7 @@ create table if not exists public.sales_reps (
     phone text,
     target integer default 25,
     visits_this_month integer default 0,
-    credits integer default 0,
+    balance integer default 0,
     is_active boolean default true,
     is_verified boolean default false,
     created_at timestamp with time zone default timezone('utc'::text, now()) not null
@@ -114,7 +114,7 @@ create table if not exists public.bundle_requests (
     pharma_id uuid references public.pharma_companies(id) on delete cascade,
     pharma_name text,
     bundle_name text,
-    credits integer,
+    balance integer,
     price integer,
     card_number text,
     card_holder text,
@@ -127,8 +127,8 @@ create table if not exists public.transactions (
     id uuid primary key default uuid_generate_v4(),
     pharma_id uuid references public.pharma_companies(id) on delete cascade,
     bundle_name text,
-    credits_added integer,
-    amount_egp integer,
+    funds_added integer,
+    amount_sar integer,
     date text,
     created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );

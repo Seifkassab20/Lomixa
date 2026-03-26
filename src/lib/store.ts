@@ -49,10 +49,14 @@ export interface SalesRep {
   isVerified: boolean;
   visitsThisMonth: number;
   target: number;
-  credits: number;
+  balance: number;
   role?: string;
   avatar?: string;
-  location?: any;
+  location?: {
+    country: string;
+    city?: string;
+    areas?: string[];
+  };
   products?: any[];
 }
 
@@ -78,7 +82,7 @@ export interface Hospital {
 export interface PharmaCompany {
   id: string;
   name: string;
-  credits: number;
+  balance: number;
   userId?: string;
   isActive: boolean;
   isVerified: boolean;
@@ -86,6 +90,11 @@ export interface PharmaCompany {
   email?: string;
   role?: string;
   avatar?: string;
+  location?: {
+    country: string;
+    city?: string;
+    address?: string;
+  };
   documents?: {
     commercial: boolean;
     address: boolean;
@@ -123,7 +132,7 @@ export interface Visit {
 export interface Bundle {
   id: string;
   name: string;
-  credits: number;
+  balance: number;
   price: number;
   features: string[];
 }
@@ -134,7 +143,7 @@ export interface BundleRequest {
   pharmaName: string;
   bundleId: string;
   bundleName: string;
-  credits: number;
+  balance: number;
   price: number;
   cardNumber: string; // Partial for demo
   cardHolder: string;
@@ -156,8 +165,8 @@ export interface Transaction {
   id: string;
   pharmaId: string;
   bundleName: string;
-  creditsAdded: number;
-  amountEGP: number;
+  fundsAdded: number;
+  amountSAR: number;
   date: string;
 }
 
@@ -165,23 +174,23 @@ const BUNDLES: Bundle[] = [
   {
     id: 'starter',
     name: 'Starter',
-    credits: 50,
-    price: 1500,
-    features: ['50 Visit Credits', 'Basic Analytics', 'Email Support', '1 Sales Rep'],
+    balance: 500, // $500 Credit Value
+    price: 400,   // $400 USD
+    features: ['500 Unit Value', 'Basic Analytics', 'Email Support', '1 Sales Rep'],
   },
   {
     id: 'professional',
     name: 'Professional',
-    credits: 200,
-    price: 4500,
-    features: ['200 Visit Credits', 'Advanced Analytics', 'Priority Support', '5 Sales Reps', 'Video Call Integration'],
+    balance: 2000,
+    price: 1200,
+    features: ['2000 Unit Value', 'Advanced Analytics', 'Priority Support', '5 Sales Reps', 'Video Call Integration'],
   },
   {
     id: 'enterprise',
     name: 'Enterprise',
-    credits: 1000,
-    price: 15000,
-    features: ['1000 Visit Credits', 'Full Analytics Suite', 'Dedicated Account Manager', 'Unlimited Reps', 'Custom Integrations', 'Arabic/English Support'],
+    balance: 10000,
+    price: 4000,
+    features: ['10000 Unit Value', 'Full Analytics Suite', 'Dedicated Account Manager', 'Unlimited Reps', 'Custom Integrations', 'Arabic/English Support'],
   },
 ];
 
@@ -333,8 +342,9 @@ function mapHospitalFromDB(db: any): Hospital {
 
 function mapPharmaToDB(p: PharmaCompany) {
   const data: any = { 
-    id: p.id, user_id: p.userId, name: p.name, credits: p.credits, 
-    is_active: p.isActive, is_verified: p.isVerified
+    id: p.id, user_id: p.userId, name: p.name, balance: p.balance, 
+    is_active: p.isActive, is_verified: p.isVerified,
+    location: p.location ? JSON.stringify(p.location) : null
     // stripped phone, email, role, avatar, documents because they lack SQL columns in Supabase
   };
   if (p.customBundles) data.custom_bundles = JSON.stringify(p.customBundles);
@@ -348,11 +358,12 @@ function mapPharmaFromDB(db: any): PharmaCompany {
   try { if (db.documents) docs = JSON.parse(db.documents); } catch(e) {}
 
   return { 
-    id: db.id, userId: db.user_id, name: db.name, credits: db.credits, 
+    id: db.id, userId: db.user_id, name: db.name, balance: db.balance, 
     isActive: db.is_active ?? true, isVerified: db.is_verified ?? false,
     phone: db.phone, email: db.email, role: db.role,
     customBundles: bundles,
     avatar: db.avatar,
+    location: db.location ? (typeof db.location === 'string' ? JSON.parse(db.location) : db.location) : null,
     documents: docs
   };
 }
@@ -368,7 +379,7 @@ function mapRepToDB(r: SalesRep) {
     phone: r.phone, 
     target: r.target, 
     visits_this_month: r.visitsThisMonth, 
-    credits: r.credits || 0,
+    balance: r.balance || 0,
     is_active: r.isActive, 
     is_verified: r.isVerified
     // stripped first_name, last_name, role_title, role, avatar, location, products because they lack SQL columns in Supabase
@@ -387,7 +398,7 @@ function mapRepFromDB(db: any): SalesRep {
     lastName: db.last_name,
     roleTitle: db.role_title,
     email: db.email, phone: db.phone, target: db.target, 
-    visitsThisMonth: db.visits_this_month, credits: db.credits || 0,
+    visitsThisMonth: db.visits_this_month, balance: db.balance || 0,
     isActive: db.is_active ?? true,
     isVerified: db.is_verified ?? true,
     role: db.role,
@@ -405,23 +416,35 @@ function mapNotifFromDB(db: any): Notification {
   return { id: db.id, userId: db.user_id, title: db.title, message: db.message, type: db.type, read: db.read, createdAt: db.created_at };
 }
 
+function mapBundleRequestFromDB(db: any): BundleRequest {
+  return {
+    id: db.id, pharmaId: db.pharma_id, pharmaName: db.pharma_name,
+    bundleId: db.bundle_id, bundleName: db.bundle_name, balance: db.balance,
+    price: db.price, cardNumber: db.card_number, cardHolder: db.card_holder,
+    status: db.status, date: db.created_at
+  };
+}
+
 
 // BACKGROUND SYNC POLLER
 export async function syncCloudData() {
   if (!isSupabaseConfigured) return;
-  if (Date.now() - getLastMutationTime() < 10000) return;
 
   try {
-    const [hospitals, doctors, reps, pharma, visits, notifications] = await Promise.all([
+    const [hospitals, doctors, reps, pharma, visits, notifications, bundleReqs, transactions] = await Promise.all([
       supabase.from('hospitals').select('*'),
       supabase.from('doctors').select('*'),
       supabase.from('sales_reps').select('*'),
       supabase.from('pharma_companies').select('*'),
       supabase.from('visits').select('*'),
       supabase.from('notifications').select('*'),
+      supabase.from('bundle_requests').select('*'),
+      supabase.from('transactions').select('*'),
     ]);
 
-    if (Date.now() - getLastMutationTime() < 10000) return;
+    // Only skip merging local-to-cloud push if mutation was VERY recent (within 2s)
+    // This allows background cloud-to-local sync to be more aggressive
+    if (Date.now() - getLastMutationTime() < 2000) return;
 
     const mergeData = (local: any[], cloud: any[], fallbackKeys: string[] = []) => {
       const map = new Map(local.map(i => [i.id, i]));
@@ -429,7 +452,9 @@ export async function syncCloudData() {
         const existing = map.get(i.id);
         if (existing) {
           fallbackKeys.forEach(k => {
-            if (i[k] === 0 || i[k] === null || i[k] === undefined) {
+            // Only use local fallback if cloud is truly missing/null, 
+            // but NOT if cloud is 0 (as 0 might be a legitimate update)
+            if (i[k] === null || i[k] === undefined) {
               i[k] = existing[k] !== undefined ? existing[k] : i[k];
             }
           });
@@ -441,10 +466,12 @@ export async function syncCloudData() {
 
     if (hospitals.data) save('hospitals', mergeData(getHospitals(), hospitals.data.map(mapHospitalFromDB)));
     if (doctors.data) save('doctors', mergeData(getDoctors(), doctors.data.map(mapDoctorFromDB)));
-    if (reps.data) save('sales_reps', mergeData(getSalesReps(), reps.data.map(mapRepFromDB), ['credits', 'target', 'visitsThisMonth']));
-    if (pharma.data) save('pharma_companies', mergeData(getPharmaCompanies(), pharma.data.map(mapPharmaFromDB)));
+    if (reps.data) save('sales_reps', mergeData(getSalesReps(), reps.data.map(mapRepFromDB), ['balance', 'target', 'visitsThisMonth']));
+    if (pharma.data) save('pharma_companies', mergeData(getPharmaCompanies(), pharma.data.map(mapPharmaFromDB), ['balance']));
     if (visits.data) save('visits', mergeData(getVisits(), visits.data.map(mapVisitFromDB)));
     if (notifications.data) save('notifications', mergeData(load('notifications', []), notifications.data.map(mapNotifFromDB).slice(0, 100)));
+    if (bundleReqs.data) save('bundle_requests', mergeData(getBundleRequests(), bundleReqs.data.map(mapBundleRequestFromDB)));
+    if (transactions.data) save('transactions', mergeData(getTransactions(), transactions.data.map(mapTransactionFromDB)));
 
     const slots = await supabase.from('availability_slots').select('*');
     if (slots.data && Date.now() - getLastMutationTime() > 10000) {
@@ -529,7 +556,7 @@ export function deleteSalesRep(id: string) {
   }
 }
 
-export function allocateCreditsToRep(repId: string, amount: number): boolean {
+export function allocateFundsToRep(repId: string, amount: number): boolean {
   if (amount <= 0) return false;
   const reps = getSalesReps();
   const repIdx = reps.findIndex(r => r.id === repId);
@@ -539,17 +566,25 @@ export function allocateCreditsToRep(repId: string, amount: number): boolean {
   const companies = getPharmaCompanies();
   const companyIdx = companies.findIndex(c => c.id === pharmaId);
   if (companyIdx < 0) return false;
-  if (companies[companyIdx].credits < amount) return false;
+  if (companies[companyIdx].balance < amount) return false;
   
   // Deduct from company and persist
-  companies[companyIdx].credits -= amount;
+  companies[companyIdx].balance -= amount;
   savePharmaCompany(companies[companyIdx]);
   
   // Add to rep and persist using robust upsert mechanism
-  reps[repIdx].credits = (reps[repIdx].credits || 0) + amount;
+  reps[repIdx].balance = (reps[repIdx].balance || 0) + amount;
   saveSalesRep(reps[repIdx]);
   
   return true;
+}
+
+export function topupRepBalance(repId: string, amount: number) {
+  const reps = getSalesReps();
+  const idx = reps.findIndex(r => r.id === repId);
+  if (idx < 0) return;
+  reps[idx].balance = (reps[idx].balance || 0) + amount;
+  saveSalesRep(reps[idx]);
 }
 
 export function getPharmaCompanies(): PharmaCompany[] { return load<PharmaCompany[]>('pharma_companies', []); }
@@ -625,6 +660,19 @@ export function saveTransaction(t: Transaction) {
   list.unshift(t);
   save('transactions', list);
   notifyMutation();
+  if (isSupabaseConfigured) {
+    supabase.from('transactions').upsert({
+      id: t.id, pharma_id: t.pharmaId, bundle_name: t.bundleName,
+      funds_added: t.fundsAdded, amount_sar: t.amountSAR, date: t.date
+    }).then(({error}) => error && console.error("Transaction Cloud Push Failed:", error));
+  }
+}
+
+function mapTransactionFromDB(db: any): Transaction {
+  return {
+    id: db.id, pharmaId: db.pharma_id, bundleName: db.bundle_name,
+    fundsAdded: db.funds_added, amountSAR: db.amount_sar, date: db.date
+  };
 }
 
 export function getBundles(): Bundle[] { return BUNDLES; }
@@ -697,6 +745,14 @@ export function saveBundleRequest(req: BundleRequest) {
   const updated = idx >= 0 ? reqs.map((r, i) => i === idx ? req : r) : [...reqs, req];
   save('bundle_requests', updated);
   notifyMutation();
+  if (isSupabaseConfigured) {
+    supabase.from('bundle_requests').upsert({
+      id: req.id, pharma_id: req.pharmaId, pharma_name: req.pharmaName,
+      bundle_id: req.bundleId, bundle_name: req.bundleName, balance: req.balance, 
+      price: req.price, card_number: req.cardNumber, card_holder: req.cardHolder, 
+      status: req.status
+    }).then(({error}) => error && console.error("Bundle Request Cloud Push Failed:", error));
+  }
 }
 
 export async function isUserAuthorized(uid?: string, role?: string): Promise<boolean> {
@@ -875,10 +931,29 @@ export async function ensureUserEntityExists(user: any) {
           pharmaName: m.pharma_name || 'Pharma',
           target: existingRep?.target ?? (isNaN(parseInt(m.target)) ? 25 : parseInt(m.target)),
           visitsThisMonth: existingRep?.visitsThisMonth || 0,
-          credits: existingRep?.credits || 0,
+          balance: existingRep?.balance || 0,
           isVerified: existingRep?.isVerified ?? true,
           isActive: existingRep?.isActive ?? true,
           role: 'rep'
+        });
+      } else if (role === 'pharma' && m) {
+        savePharmaCompany({
+          id: user.id,
+          userId: user.id,
+          name: m.organization || user.email?.split('@')[1]?.split('.')[0] || 'Pharma',
+          balance: 5000,
+          isActive: true,
+          isVerified: false
+        });
+      } else if (role === 'hospital' && m) {
+        saveHospital({
+          id: user.id,
+          userId: user.id,
+          name: m.organization || 'Clinic/Hospital',
+          location: 'Regional Center',
+          type: 'clinic',
+          isActive: true,
+          isVerified: false
         });
       }
       return;

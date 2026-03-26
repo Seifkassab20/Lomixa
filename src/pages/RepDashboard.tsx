@@ -1,19 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { getVisits, getSalesReps, getPharmaCompanies, saveSalesRep, generateId } from '@/lib/store';
-import { Calendar, CreditCard, Clock, Target, Video, Phone, MapPin } from 'lucide-react';
+import { Calendar, CreditCard, Clock, Target, Video, Phone, MapPin, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { JitsiMeeting } from '@/components/JitsiMeeting';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
+import { useToast } from '@/components/ui/Toast';
+import { formatCurrency } from '@/lib/currency';
 
 export function RepDashboard() {
   const { userId, user } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [visits, setVisits] = useState<ReturnType<typeof getVisits>>([]);
-  const [credits, setCredits] = useState(0);
+  const [balance, setBalance] = useState(0);
+  const [country, setCountry] = useState('sa');
+  const [showTopup, setShowTopup] = useState(false);
+  const [topupAmount, setTopupAmount] = useState(500);
   const [meetingRoom, setMeetingRoom] = useState<string | null>(null);
   const [repInfo, setRepInfo] = useState({ name: '', pharmaId: '', pharmaName: '', target: 25 });
 
@@ -24,7 +32,7 @@ export function RepDashboard() {
       const companies = getPharmaCompanies();
       const myCompany = companies.find(c => c.userId === userId) || companies[0];
       myRep = {
-        id: generateId(),
+        id: userId,
         name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || t('repUser'),
         email: user?.email || '',
         phone: user?.user_metadata?.mobile || '',
@@ -32,8 +40,8 @@ export function RepDashboard() {
         pharmaName: myCompany?.name || t('myPharma'),
         visitsThisMonth: 0,
         target: 25,
-        userId,
-        credits: 0,
+        userId: userId,
+        balance: 0,
         isActive: true,
         isVerified: true,
       };
@@ -43,9 +51,10 @@ export function RepDashboard() {
       setRepInfo({ name: myRep.name, pharmaId: myRep.pharmaId, pharmaName: myRep.pharmaName, target: myRep.target });
       const myVisits = getVisits().filter(v => v.repId === myRep!.id);
       setVisits(myVisits.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
-      setCredits(myRep!.credits || 0);
+      setBalance(myRep!.balance || 0);
+      setCountry(myRep!.location?.country || 'sa');
     }
-  }, [userId]);
+  }, [userId, t, user?.email, user?.user_metadata?.full_name, user?.user_metadata?.mobile]);
 
   const TYPE_ICONS = { 'In Person': MapPin, Video, Call: Phone, Text: Clock };
   const thisMonth = new Date().getMonth();
@@ -72,7 +81,7 @@ export function RepDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: t('visitsThisMonth'), value: monthVisits, sub: `${t('target')}: ${repInfo.target}`, icon: Calendar, color: 'emerald' },
-          { label: t('myCredits') || 'My Credits', value: credits.toLocaleString(), sub: t('availableForBookings'), icon: CreditCard, color: 'blue' },
+          { label: t('myCredits') || 'My Balance', value: formatCurrency(balance, country), sub: t('availableForBookings'), icon: CreditCard, color: 'blue' },
           { label: t('pendingApprovals'), value: pendingVisits.length, sub: t('awaitingResponse'), icon: Clock, color: 'amber' },
           { label: t('confirmedVisits'), value: confirmedVisits.length, sub: t('readyToAttend'), icon: Target, color: 'purple' },
         ].map(({ label, value, sub, icon: Icon, color }) => (
@@ -169,10 +178,57 @@ export function RepDashboard() {
           </div>
 
           <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-xl p-5">
-            <div className="text-sm font-semibold text-emerald-800 dark:text-emerald-300 mb-1">{t('myCredits')}</div>
-            <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">{credits}</div>
-            <div className="text-xs text-emerald-600 dark:text-emerald-500 mt-1">{t('availableForBookings')}</div>
+            <div className="flex items-center justify-between mb-2">
+               <div className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">{t('myCredits') || 'My Balance'}</div>
+               <Button size="sm" variant="ghost" onClick={() => setShowTopup(true)} className="h-6 text-[10px] uppercase font-black tracking-widest text-emerald-600 hover:text-emerald-700 bg-emerald-500/10 h-7 rounded-lg">
+                  {t('topUp') || 'Add Funds'}
+               </Button>
+            </div>
+             <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">{formatCurrency(balance, country)}</div>
+             <div className="text-xs text-emerald-600 dark:text-emerald-500 mt-1">{t('availableForBookings')}</div>
           </div>
+
+          {showTopup && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+               <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 w-full max-w-md border dark:border-slate-800 shadow-3xl animate-in zoom-in-95">
+                  <div className="flex items-center justify-between mb-8">
+                     <h2 className="text-2xl font-black italic uppercase tracking-tighter dark:text-white">{t('topUpBalance') || 'Top Up My Balance'}</h2>
+                     <button onClick={() => setShowTopup(false)} className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-white transition-colors">
+                        <X className="h-5 w-5" />
+                     </button>
+                  </div>
+                  <div className="space-y-6">
+                     <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-4">
+                          Amount ({formatCurrency(0, country).split('0')[1].trim() || formatCurrency(0, country).split('٠')[1]?.trim() || 'Amount'})
+                        </Label>
+                        <Input type="number" value={topupAmount} onChange={e => setTopupAmount(parseInt(e.target.value) || 0)} className="h-14 rounded-2xl bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-xl font-black italic px-6 focus:border-emerald-500" />
+                     </div>
+                     <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800/50 space-y-4">
+                        <div className="bg-slate-100 dark:bg-slate-900 h-10 rounded-xl px-4 flex items-center gap-3">
+                           <CreditCard className="w-4 h-4 text-slate-400" />
+                           <span className="text-xs font-mono tracking-tighter text-slate-400">•••• •••• •••• 1234</span>
+                        </div>
+                     </div>
+                     <Button 
+                       onClick={() => {
+                         const currentRep = getSalesReps().find(r => r.userId === userId);
+                         if (currentRep) {
+                           const updatedRep = { ...currentRep, balance: (currentRep.balance || 0) + topupAmount };
+                           saveSalesRep(updatedRep);
+                           setBalance(updatedRep.balance);
+                           setShowTopup(false);
+                           toast({ title: t('topupSuccess') || 'Balance updated successfully!', variant: 'success' });
+                         }
+                       }}
+                       className="w-full h-16 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-widest italic"
+                     >
+                        Confirm Payment
+                     </Button>
+                  </div>
+               </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -4,7 +4,8 @@ import {
   getPharmaCompanies, savePharmaCompany, PharmaCompany, getHospitals, Hospital, 
   getDoctors, getSalesReps, getBundleRequests, saveBundleRequest, pushNotification,
   BundleRequest, generateId, saveTransaction, saveHospital,
-  deleteHospital, deletePharma, deleteSalesRep, getPharmaBundles, savePharmaBundle, deletePharmaBundle, Bundle
+  deleteHospital, deletePharma, deleteSalesRep, getPharmaBundles, savePharmaBundle, deletePharmaBundle, Bundle,
+  syncCloudData, getTransactions
 } from '@/lib/store';
 import { useTranslation } from 'react-i18next';
 import { 
@@ -13,6 +14,7 @@ import {
   ArrowUpRight, Activity, Hospital as HospitalIcon, Stethoscope,
   Clock, Check, X, AlertCircle, Plus, Trash2, Save, RotateCcw
 } from 'lucide-react';
+import { formatCurrency } from '@/lib/currency';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,6 +46,7 @@ export function AdminDashboard() {
     if (editingPharma) {
       setCustomBundles(getPharmaBundles(editingPharma.id));
     }
+    syncCloudData(); // Trigger cloud refresh whenever Admin refreshes
   };
 
   useEffect(() => { refresh(); }, []);
@@ -99,9 +102,9 @@ export function AdminDashboard() {
     const newBundle: Bundle = {
       id: generateId(),
       name: 'New Bundle',
-      credits: 100,
+      balance: 1000,
       price: 2500,
-      features: ['Visit Credits'],
+      features: ['Visit Funds'],
     };
     setCustomBundles([...customBundles, newBundle]);
   };
@@ -133,14 +136,27 @@ export function AdminDashboard() {
   };
 
   const handleApproveRequest = (req: BundleRequest) => {
-    const pc = getPharmaCompanies().find(p => p.id === req.pharmaId);
+    // Try to find the company by ID or UserID for mapping robustness
+    const allPharmas = getPharmaCompanies();
+    let pc = allPharmas.find(p => p.id === req.pharmaId || p.userId === req.pharmaId);
+    
     if (!pc) {
-      toast('Reference Pharma not found. Cannot approve.', 'error');
-      return;
+      // If still not found, search by name as last resort then self-heal
+      pc = allPharmas.find(p => p.name === req.pharmaName);
+      if (!pc) {
+        pc = {
+          id: req.pharmaId,
+          userId: req.pharmaId,
+          name: req.pharmaName,
+          balance: 0,
+          isActive: true,
+          isVerified: true
+        };
+      }
     }
 
-    // 1. Add credits to pharma (preserving ALL other fields)
-    const updatedPharma = { ...pc, credits: (pc.credits || 0) + req.credits };
+    // 1. Add funds to pharma
+    const updatedPharma = { ...pc!, balance: (pc!.balance || 0) + req.balance };
     savePharmaCompany(updatedPharma);
 
     // 2. Update request status
@@ -152,8 +168,8 @@ export function AdminDashboard() {
       id: generateId(),
       pharmaId: pc.id,
       bundleName: req.bundleName,
-      creditsAdded: req.credits,
-      amountEGP: req.price,
+      fundsAdded: req.balance,
+      amountSAR: req.price,
       date: new Date().toISOString(),
     });
 
@@ -162,13 +178,14 @@ export function AdminDashboard() {
       pushNotification({
         userId: pc.userId,
         title: 'Bundle Approved',
-        message: `Your request for ${req.bundleName} bundle has been approved. ${req.credits} credits added.`,
+        message: `Your request for ${req.bundleName} bundle has been approved. ${req.balance} SAR added to your balance.`,
         type: 'info',
       });
       console.log(`[SIMULATED EMAIL] To: ${pc.name} - Bundle Approved: ${req.bundleName}`);
     }
 
     refresh();
+    syncCloudData(); // Trigger immediate cloud cycle
     toast('Bundle request approved and funded.', 'success');
   };
 
@@ -361,14 +378,14 @@ export function AdminDashboard() {
                                 />
                              </div>
                              <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase text-slate-500 px-1">{t('creditsIncluded')}</Label>
-                                <Input 
-                                  type="number"
-                                  value={b.credits} 
-                                  onChange={e => handleUpdateBundleField(bIdx, 'credits', parseInt(e.target.value))}
-                                  className="h-12 bg-black/40 border-slate-800 rounded-xl"
-                                />
-                             </div>
+                                 <Label className="text-[10px] font-black uppercase text-slate-500 px-1">{t('balanceIncluded') || 'Balance Included (SAR)'}</Label>
+                                 <Input 
+                                   type="number"
+                                   value={b.balance} 
+                                   onChange={e => handleUpdateBundleField(bIdx, 'balance', parseInt(e.target.value))}
+                                   className="h-12 bg-black/40 border-slate-800 rounded-xl"
+                                 />
+                              </div>
                              <div className="space-y-2">
                                 <Label className="text-[10px] font-black uppercase text-slate-500 px-1">{t('priceSAR')}</Label>
                                 <Input 
@@ -458,8 +475,12 @@ export function AdminDashboard() {
                         </div>
                      </div>
                      <div className="text-right">
-                        <div className="text-xl font-black text-brand tracking-tighter">{req.price.toLocaleString()} SAR</div>
-                        <div className="text-[10px] text-slate-500 font-bold">{req.credits} Credits</div>
+                        <div className="text-xl font-black text-brand tracking-tighter">
+                          {formatCurrency(req.price, pharma.find(p => p.id === req.pharmaId)?.location?.country || 'sa')}
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-bold">
+                          {formatCurrency(req.balance, pharma.find(p => p.id === req.pharmaId)?.location?.country || 'sa')} Balance
+                        </div>
                      </div>
                   </div>
                   
@@ -581,10 +602,10 @@ export function AdminDashboard() {
                         )}
                       </div>
                       <div className="flex items-center gap-4 mt-2">
-                         <div className="flex flex-col">
-                           <span className="text-[8px] uppercase font-black text-slate-500 tracking-widest">{t('networkLiquidity')}</span>
-                           <span className="text-sm font-bold text-brand">{pc.credits || 0} SAR</span>
-                         </div>
+                          <div className="flex flex-col">
+                            <span className="text-[8px] uppercase font-black text-slate-500 tracking-widest">{t('networkLiquidity') || 'Network Liquidity'}</span>
+                            <span className="text-sm font-bold text-brand">{formatCurrency(pc.balance || 0, pc.location?.country || 'sa')}</span>
+                          </div>
                          <div className="w-[1px] h-6 bg-slate-200 dark:bg-slate-800" />
                          <div className="flex flex-col">
                            <span className="text-[8px] uppercase font-black text-slate-500 tracking-widest">{t('fieldPersonnel')}</span>
