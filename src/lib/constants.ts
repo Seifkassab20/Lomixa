@@ -42,3 +42,9 @@ export const CITY_MAP: Record<string, string[]> = {
   iq: ['Baghdad', 'Erbil', 'Basra', 'Mosul', 'Sulaymaniyah', 'Najaf'],
   ly: ['Tripoli', 'Benghazi', 'Misrata', 'Bayda'],
 };
+
+export const SPECIALTIES = [
+  'Cardiology', 'Neurology', 'Pediatrics', 'Oncology',
+  'Orthopedics', 'Dermatology', 'Psychiatry', 'General Practice',
+  'Endocrinology', 'Gastroenterology', 'Pulmonology', 'Rheumatology',
+];

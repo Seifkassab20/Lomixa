@@ -58,7 +58,7 @@ export function RepDashboard() {
 
   const TYPE_ICONS = { 'In Person': MapPin, Video, Call: Phone, Text: Clock };
   const thisMonth = new Date().getMonth();
-  const monthVisits = visits.filter(v => new Date(v.date).getMonth() === thisMonth).length;
+  const monthVisits = visits.filter(v => new Date(v.date).getMonth() === thisMonth && v.status === 'Completed').length;
   const pendingVisits = visits.filter(v => v.status === 'Pending');
   const confirmedVisits = visits.filter(v => v.status === 'Confirmed');
   const recentVisits = visits.slice(0, 5);

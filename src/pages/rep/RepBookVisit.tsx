@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   getDoctors, saveVisit, saveDoctor, getSalesReps, getPharmaCompanies, savePharmaCompany,
-  generateId, Visit, VisitType, pushNotification, Doctor, saveSalesRep, saveDoctorAvailability, processVisitPayment,
+  generateId, Visit, VisitType, pushNotification, Doctor, SalesRep, saveSalesRep, saveDoctorAvailability, processVisitPayment,
   getAdminBalance, saveAdminBalance
 } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
@@ -11,14 +11,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { JitsiMeeting } from '@/components/JitsiMeeting';
-import { Search, Video, Phone, MapPin, MessageSquare, Calendar, Clock, CheckCircle2, CreditCard, X, FileText, Sparkles, Zap } from 'lucide-react';
+import { Search, Video, Phone, MapPin, MessageSquare, Calendar, Clock, CheckCircle2, CreditCard, X, FileText, Sparkles, Zap, ChevronDown, Stethoscope } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { sendEmail, EmailTemplates } from '@/lib/email';
 
-const SPECIALTIES = [
-  'All', 'Cardiology', 'Neurology', 'Pediatrics', 'Oncology',
-  'Orthopedics', 'Dermatology', 'Psychiatry', 'General Practice',
-];
+import { SPECIALTIES } from '@/lib/constants';
 
 export function RepBookVisit() {
   const { userId, user } = useAuth();
@@ -36,7 +33,7 @@ export function RepBookVisit() {
 
   const reps = getSalesReps();
   const currentRep = reps.find(r => r.userId === userId);
-  const [repData, setRepData] = useState({ id: '', pharmaId: '', pharmaName: '', name: '' });
+  const [repData, setRepData] = useState<SalesRep | null>(null);
   const [visitNotes, setVisitNotes] = useState('');
   const [bookedCount, setBookedCount] = useState(1);
 
@@ -58,14 +55,63 @@ export function RepBookVisit() {
     }
   };
 
+  const searchableOptions = React.useMemo(() => {
+    // Current operating parameters for Rep
+    const repCountry = repData?.location?.country || 'sa';
+    const repCities = repData?.location?.cities || [];
+
+    // Filter doctors to match Rep's territory first
+    const territoryDoctors = doctors.filter(d => {
+       const matchCountry = d.location?.country === repCountry;
+       const matchCity = !repCities.length || (d.location?.city && repCities.includes(d.location.city));
+       return matchCountry && matchCity;
+    });
+
+    const hospitals = Array.from(new Set(territoryDoctors.map(d => d.hospitalName))).sort();
+    const doctorNames = Array.from(new Set(territoryDoctors.map(d => d.name))).sort();
+    
+    return { hospitals, doctorNames };
+  }, [doctors, repData]);
+
   useEffect(() => {
     refreshData();
   }, [userId]);
 
   const filtered = doctors.filter(d => {
+    // Location matchmaker (Strict filters)
+    const repCountry = repData?.location?.country || 'sa';
+    const repCities = repData?.location?.cities || [];
+    
+    // Country must match
+    const matchCountry = d.location?.country === repCountry;
+    
+    // City must be in the rep's operating cities
+    const matchCity = !repCities.length || (d.location?.city && repCities.includes(d.location.city));
+    
+    if (!matchCountry || !matchCity) return false;
+
     const matchSearch = !search || d.name.toLowerCase().includes(search.toLowerCase()) || d.hospitalName.toLowerCase().includes(search.toLowerCase());
     const matchSpecialty = specialtyFilter === 'All' || d.specialty === specialtyFilter;
     return matchSearch && matchSpecialty;
+  }).sort((a, b) => {
+    // Prioritize target specialties (Recommendation system enhancement)
+    const targetSpecs = repData?.targetSpecialties || [];
+    if (targetSpecs.length > 0) {
+      const aMatchesSpec = targetSpecs.includes(a.specialty);
+      const bMatchesSpec = targetSpecs.includes(b.specialty);
+      if (aMatchesSpec && !bMatchesSpec) return -1;
+      if (!aMatchesSpec && bMatchesSpec) return 1;
+    }
+
+    // Prioritize area matches (Nearest)
+    const repArea = repData?.location?.area || '';
+    if (repArea) {
+      const aMatchesArea = a.location?.area === repArea;
+      const bMatchesArea = b.location?.area === repArea;
+      if (aMatchesArea && !bMatchesArea) return -1;
+      if (!aMatchesArea && bMatchesArea) return 1;
+    }
+    return 0;
   });
 
   const availableSlots = selectedDoctor?.availability.filter(s => !s.isBooked && s.appointmentType === selectedType) || [];
@@ -73,15 +119,36 @@ export function RepBookVisit() {
   // Lomixa Smart Matchmaker (AI Recommendation Engine)
   const aiRecommendations = React.useMemo(() => {
     if (search !== '' || specialtyFilter !== 'All') return [];
+    
+    const repArea = repData?.location?.area || '';
+    const targetSpecs = repData?.targetSpecialties || [];
+
     return [...filtered]
       .filter(d => d.availability.some(s => !s.isBooked))
       .sort((a, b) => {
+        // Priority 1: Target Specialty Match
+        if (targetSpecs.length > 0) {
+           const aMatchesSpec = targetSpecs.includes(a.specialty);
+           const bMatchesSpec = targetSpecs.includes(b.specialty);
+           if (aMatchesSpec && !bMatchesSpec) return -1;
+           if (!aMatchesSpec && bMatchesSpec) return 1;
+        }
+
+        // Priority 2: Match Rep's Area (Nearest)
+        if (repArea) {
+           const aMatchesArea = a.location?.area === repArea;
+           const bMatchesArea = b.location?.area === repArea;
+           if (aMatchesArea && !bMatchesArea) return -1;
+           if (!aMatchesArea && bMatchesArea) return 1;
+        }
+
+        // Priority 3: Availability Density
         const aSlots = a.availability.filter(s => !s.isBooked).length;
         const bSlots = b.availability.filter(s => !s.isBooked).length;
         return bSlots - aSlots; // Recommend doctors with the most open availability
       })
       .slice(0, 2);
-  }, [filtered, search, specialtyFilter]);
+  }, [filtered, search, specialtyFilter, repData?.location?.area, repData?.targetSpecialties]);
 
   const handleBook = (mode: 'single' | 'all') => {
     if (!selectedDoctor) return;
@@ -101,11 +168,11 @@ export function RepBookVisit() {
         id: generateId(),
         doctorId: selectedDoctor.id,
         doctorName: selectedDoctor.name,
-        repId: repData.id,
-        repName: repData.name || user?.user_metadata?.full_name || 'Sales Rep',
+        repId: repData?.id || '',
+        repName: repData?.name || user?.user_metadata?.full_name || 'Sales Rep',
         repUserId: userId || undefined,
-        pharmaId: repData.pharmaId,
-        pharmaName: repData.pharmaName,
+        pharmaId: repData?.pharmaId || '',
+        pharmaName: repData?.pharmaName || '',
         hospitalId: selectedDoctor.hospitalId,
         hospitalName: selectedDoctor.hospitalName,
         date: slot.date,
@@ -203,31 +270,44 @@ export function RepBookVisit() {
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
+      <div className="flex flex-col sm:flex-row gap-4 items-center mb-8 bg-white dark:bg-slate-900 p-4 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 transition-all">
+        <div className="relative flex-1 group w-full">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
+          <select
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder={t('searchDoctorHospital') || "Search doctor or hospital..."}
-            className="pl-9 dark:bg-slate-800 dark:border-slate-600 dark:text-white dark:placeholder-slate-400"
-          />
+            className="w-full h-14 pl-12 pr-12 rounded-2xl bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm font-bold appearance-none transition-all cursor-pointer dark:text-white"
+          >
+            <option value="">{t('allDoctorsHospitals') || "All Doctors & Hospitals"}</option>
+            {searchableOptions.hospitals.length > 0 && (
+              <optgroup label={t('hospitals') || 'Hospitals'}>
+                {searchableOptions.hospitals.map(h => <option key={h} value={h}>{h}</option>)}
+              </optgroup>
+            )}
+            {searchableOptions.doctorNames.length > 0 && (
+              <optgroup label={t('doctors') || 'Doctors'}>
+                {searchableOptions.doctorNames.map(name => <option key={name} value={name}>{name}</option>)}
+              </optgroup>
+            )}
+          </select>
+          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
         </div>
-        <div className="flex gap-1.5 flex-wrap">
-          {SPECIALTIES.map(sp => (
-            <button
-              key={sp}
-              onClick={() => setSpecialtyFilter(sp)}
-              className={cn(
-                'px-3 py-1.5 text-xs rounded-lg font-medium transition-colors whitespace-nowrap',
-                specialtyFilter === sp
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-700'
-              )}
-            >
-              {t(sp.toLowerCase().replace(' ', '')) || sp}
-            </button>
-          ))}
+
+        <div className="relative w-full sm:w-auto min-w-[200px] group">
+          <Stethoscope className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
+          <select
+            value={specialtyFilter}
+            onChange={e => setSpecialtyFilter(e.target.value)}
+            className="w-full h-14 pl-12 pr-12 rounded-2xl bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm font-bold appearance-none transition-all cursor-pointer dark:text-white"
+          >
+            <option value="All">{t('allSpecialties') || "All Specialties"}</option>
+            {SPECIALTIES.map(sp => (
+              <option key={sp} value={sp}>
+                {(t(sp.toLowerCase().replace(' ', '')) || sp).replace('spec_', '')}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
         </div>
       </div>
 

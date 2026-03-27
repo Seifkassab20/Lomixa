@@ -13,7 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { createClient } from '@supabase/supabase-js';
 import { motion, AnimatePresence } from 'motion/react';
-import { ARABIC_COUNTRY_CODES } from '@/lib/constants';
+import { ARABIC_COUNTRY_CODES, SPECIALTIES } from '@/lib/constants';
 
 // Helper client that doesn't persist session so signing up a user doesn't log out the admin
 const createTempClient = () => {
@@ -23,12 +23,6 @@ const createTempClient = () => {
 };
 
 const DOCTOR_TITLES = ['dr', 'prof', 'assoc', 'asst', 'consultant', 'specialist'];
-
-const SPECIALTIES = [
-  'Cardiology', 'Neurology', 'Pediatrics', 'Oncology',
-  'Orthopedics', 'Dermatology', 'Psychiatry', 'General Practice',
-  'Endocrinology', 'Gastroenterology', 'Pulmonology', 'Rheumatology',
-];
 
 export function ManageDoctors() {
   const { userId } = useAuth();
@@ -101,6 +95,7 @@ export function ManageDoctors() {
       email: form.email,
       hospitalId: myHospital?.id || 'default',
       hospitalName: myHospital?.name || 'Hospital',
+      location: editingDoc?.location || myHospital?.location || null,
       availability: editingDoc?.availability || [],
       isActive: editingDoc?.isActive ?? true,
       isVerified: true, // Pre-verified by hospital

@@ -16,10 +16,9 @@ import { useToast } from '@/components/ui/Toast';
 import { saveDoctor, saveHospital, savePharmaCompany, saveSalesRep, getPharmaCompanies, generateId, pushNotification } from '@/lib/store';
 import { sendEmail, EmailTemplates } from '@/lib/email';
 import { motion, AnimatePresence } from 'motion/react';
-import { ARABIC_COUNTRY_CODES, COUNTRIES, CITY_MAP } from '@/lib/constants';
+import { ARABIC_COUNTRY_CODES, COUNTRIES, CITY_MAP, SPECIALTIES } from '@/lib/constants';
 
 const DOCTOR_TITLES = ['Dr.', 'Prof.', 'Assoc. Prof.', 'Asst. Prof.', 'Consultant', 'Specialist'];
-const SPECIALTIES = ['Cardiology', 'Dermatology', 'Endocrinology', 'Gastroenterology', 'Neurology', 'Oncology', 'Orthopedics', 'Pediatrics', 'Psychiatry', 'Pulmonology', 'General Practice'];
 const REP_ROLES = ['Medical Representative', 'Sales Supervisor', 'District Manager', 'Marketing Manager', 'Product Manager', 'Sales Manager', 'Sales Director', 'Marketing Director', 'Business Dev Manager', 'Business Dev Director'];
 const PHARMA_CATEGORIES = [
   'Analgesics', 'Antipyretics', 'Antibiotics', 'Antivirals', 'Antifungals', 'Antineoplastics', 'Cardiovascular', 
@@ -78,6 +77,7 @@ export function Register() {
     pharmaId: '',
     newPharmaName: '',
     products: [{ id: generateId(), category: '', name: '', form: '', description: '', indications: '', doses: '' }],
+    targetSpecialties: [] as string[],
     // Document Uploads
     commCertificate: null as File | null,
     natAddress: null as File | null,
@@ -107,6 +107,15 @@ export function Register() {
         ? prev.cities.filter(c => c !== city) 
         : [...prev.cities, city];
       return { ...prev, cities };
+    });
+  };
+
+  const toggleSpecialty = (specialty: string) => {
+    setFormData(prev => {
+      const targetSpecialties = prev.targetSpecialties.includes(specialty)
+        ? prev.targetSpecialties.filter(s => s !== specialty)
+        : [...prev.targetSpecialties, specialty];
+      return { ...prev, targetSpecialties };
     });
   };
 
@@ -214,6 +223,7 @@ export function Register() {
           balance: 0,
           isVerified: false, // Ensures self-registered reps start as PENDING
           isActive: true, // Will go to false if rejected
+          targetSpecialties: formData.targetSpecialties,
         });
 
         if (formData.pharmaId && formData.pharmaId !== 'other') {
@@ -249,7 +259,7 @@ export function Register() {
             type: 'info'
           });
         } else {
-          saveHospital({ ...orgData, location: formData.address || '' });
+          saveHospital(orgData as any);
         }
       }
 
@@ -503,6 +513,28 @@ export function Register() {
                              </div>
                           </div>
                         )}
+
+                        <div className="space-y-4 pt-6 border-t border-white/5">
+                           <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">{t('targetSpecialties')}* ({t('selectMultiple')})</Label>
+                           <div className="flex flex-wrap gap-2">
+                              {SPECIALTIES.map(spec => {
+                                const isSelected = formData.targetSpecialties.includes(spec);
+                                return (
+                                  <button
+                                    key={spec}
+                                    type="button"
+                                    onClick={() => toggleSpecialty(spec)}
+                                    className={cn(
+                                      "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all",
+                                      isSelected ? "bg-orange-500 border-orange-500 text-white" : "bg-black/40 border-slate-800 text-slate-500 hover:border-slate-700"
+                                    )}
+                                  >
+                                    {t(`spec_${spec.toLowerCase().slice(0, 5)}`) || spec}
+                                  </button>
+                                );
+                              })}
+                           </div>
+                        </div>
 
                         <div className="space-y-6 pt-6 border-t border-white/5">
                            <div className="flex items-center justify-between">

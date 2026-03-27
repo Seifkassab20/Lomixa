@@ -111,10 +111,20 @@ export function DoctorBookings() {
     if (outcomeModal.repUserId) {
       pushNotification({
         userId: outcomeModal.repUserId,
-        title: 'Visit Completed',
+        title: t('visitCompleted') || 'Visit Completed',
         message: `Dr. ${outcomeModal.doctorName} has marked your visit on ${new Date(outcomeModal.date).toLocaleDateString('en-SA', { month: 'short', day: 'numeric' })} as completed.`,
         type: 'info',
       });
+
+      // Update the sales rep's visit counter since it's now officially completed
+      const reps = getSalesReps();
+      const rep = reps.find(r => r.id === outcomeModal.repId);
+      if (rep) {
+        saveSalesRep({
+          ...rep,
+          visitsThisMonth: (rep.visitsThisMonth || 0) + 1
+        });
+      }
     }
     setOutcomeModal(null);
     setOutcomeNotes('');

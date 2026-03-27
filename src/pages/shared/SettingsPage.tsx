@@ -39,7 +39,7 @@ import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useTheme } from "@/components/ThemeProvider";
 import { cn } from "@/lib/utils";
 import { Palette, Sparkles, Layout } from "lucide-react";
-import { ARABIC_COUNTRY_CODES, COUNTRIES, CITY_MAP } from "@/lib/constants";
+import { ARABIC_COUNTRY_CODES, COUNTRIES, CITY_MAP, SPECIALTIES } from "@/lib/constants";
 
 export function SettingsPage() {
   const { userId, user, role } = useAuth();
@@ -57,6 +57,7 @@ export function SettingsPage() {
     email: "",
     avatar: "",
     newPassword: "",
+    specialty: "",
   });
   const [testApiKey, setTestApiKey] = useState("");
   const [saved, setSaved] = useState(false);
@@ -134,6 +135,7 @@ export function SettingsPage() {
           user?.user_metadata?.avatar_url ||
           "",
         newPassword: "",
+        specialty: doctorEntity?.specialty || "",
       });
     }
   }, [userId, user]);
@@ -235,6 +237,7 @@ export function SettingsPage() {
             ...(d.location || {}),
             country: form.country,
           },
+          specialty: form.specialty || d.specialty,
         });
       }
     } else if (role === "hospital") {
@@ -570,6 +573,31 @@ export function SettingsPage() {
                       }
                       className="pl-12 h-12 rounded-xl bg-app-card dark:border-slate-800"
                     />
+                  </div>
+                </div>
+              )}
+
+              {role === "doctor" && (
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">
+                    {t("specialty")}
+                  </Label>
+                  <div className="relative group">
+                    <select
+                      value={form.specialty}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, specialty: e.target.value }))
+                      }
+                      className="w-full h-12 pl-4 pr-10 rounded-xl bg-app-card border border-slate-200 dark:border-slate-800 text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none appearance-none font-bold"
+                    >
+                      <option value="">{t("selectSpecialty") || "Select Specialty"}</option>
+                      {SPECIALTIES.map((s) => (
+                        <option key={s} value={s}>
+                          {t(s.toLowerCase().replace(" ", "")) || s}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
                   </div>
                 </div>
               )}

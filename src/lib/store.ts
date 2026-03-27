@@ -59,6 +59,7 @@ export interface SalesRep {
     areas?: string[];
   };
   products?: any[];
+  targetSpecialties?: string[];
 }
 
 export interface Hospital {
@@ -399,7 +400,8 @@ function mapRepToDB(r: SalesRep) {
     avatar: r.avatar,
     first_name: r.firstName,
     last_name: r.lastName,
-    role_title: r.roleTitle
+    role_title: r.roleTitle,
+    target_specialties: r.targetSpecialties ? JSON.stringify(r.targetSpecialties) : null
   };
 }
 
@@ -421,7 +423,8 @@ function mapRepFromDB(db: any): SalesRep {
     role: db.role,
     avatar: db.avatar,
     location: location,
-    products: products
+    products: products,
+    targetSpecialties: db.target_specialties ? JSON.parse(db.target_specialties) : []
   };
 }
 

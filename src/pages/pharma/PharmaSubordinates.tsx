@@ -45,7 +45,7 @@ export function PharmaSubordinates() {
     const counts: Record<string, number> = {};
     filtered.forEach(rep => {
       counts[rep.id] = allVisits.filter(
-        v => v.repId === rep.id && new Date(v.date).getMonth() === thisMonth
+        v => v.repId === rep.id && new Date(v.date).getMonth() === thisMonth && v.status === 'Completed'
       ).length;
     });
     setRepVisitCounts(counts);
