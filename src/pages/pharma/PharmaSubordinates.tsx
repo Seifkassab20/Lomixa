@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getSalesReps, saveSalesRep, deleteSalesRep, generateId, SalesRep, getPharmaCompanies, getVisits, allocateFundsToRep } from '@/lib/store';
+import { getSalesReps, saveSalesRep, deleteSalesRep, generateId, SalesRep, getPharmaCompanies, getVisits, allocateFundsToRep, checkUserExistence } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,6 +62,11 @@ export function PharmaSubordinates() {
     if (!myCompany) return;
 
     const fullPhone = `${form.phoneCode}${form.phone}`;
+    const emailExists = await checkUserExistence('email', form.email);
+    if (emailExists && (!editingRep || form.email !== editingRep.email)) {
+      toast(t('emailAlreadyExists'), 'error');
+      return;
+    }
 
     let finalUserId = editingRep?.userId || editingRep?.id || generateId();
     let finalId = editingRep?.id || finalUserId;

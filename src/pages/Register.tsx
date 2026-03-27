@@ -13,7 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '@/components/ui/Toast';
-import { saveDoctor, saveHospital, savePharmaCompany, saveSalesRep, getPharmaCompanies, generateId, pushNotification } from '@/lib/store';
+import { saveDoctor, saveHospital, savePharmaCompany, saveSalesRep, getPharmaCompanies, generateId, pushNotification, checkUserExistence } from '@/lib/store';
 import { sendEmail, EmailTemplates } from '@/lib/email';
 import { motion, AnimatePresence } from 'motion/react';
 import { ARABIC_COUNTRY_CODES, COUNTRIES, CITY_MAP, SPECIALTIES } from '@/lib/constants';
@@ -155,6 +155,11 @@ export function Register() {
     try {
       if (!selectedRole) throw new Error('Role selection missing.');
       if (!formData.password) throw new Error('A security key is strictly required.');
+      
+      const emailExists = await checkUserExistence('email', formData.email);
+      if (emailExists) {
+        throw new Error(t('emailAlreadyExists'));
+      }
       
       let finalUserId = generateId();
 

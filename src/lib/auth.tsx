@@ -45,15 +45,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        // Enforce role consistency if a target role is set (from Login/Register)
         const targetRole = localStorage.getItem('lomixa_target_role');
         const userRole = session.user.user_metadata?.role as Role;
-        
-        if (targetRole && userRole && targetRole !== userRole) {
-          localStorage.removeItem('lomixa_target_role');
-          await supabase.auth.signOut();
-          return;
-        }
         
         // Match found or no target set - proceed
         if (targetRole === userRole) {

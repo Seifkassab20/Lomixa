@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  getDoctors, saveDoctor, deleteDoctor, generateId, Doctor, getHospitals
+  getDoctors, saveDoctor, deleteDoctor, generateId, Doctor, getHospitals, checkUserExistence
 } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -50,7 +50,12 @@ export function ManageDoctors() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const fullPhone = `${form.phoneCode}${form.phone}`;
-    
+    const emailExists = await checkUserExistence('email', form.email);
+    if (emailExists && (!editingDoc || form.email !== editingDoc.email)) {
+      alert(t('emailAlreadyExists'));
+      return;
+    }
+
     let finalUserId = editingDoc?.userId || editingDoc?.id || generateId();
     let finalId = editingDoc?.id || finalUserId;
 

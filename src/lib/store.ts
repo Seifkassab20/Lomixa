@@ -757,7 +757,10 @@ export function saveDoctorAvailability(doctorId: string, slots: AvailabilitySlot
 }
 
 export async function checkUserExistence(type: 'email' | 'phone', value: string): Promise<boolean> {
-  if (!isSupabaseConfigured) return true;
+  if (!isSupabaseConfigured) {
+    const tables: any[] = [getDoctors(), getSalesReps(), getHospitals(), getPharmaCompanies()];
+    return tables.some(table => table.some((item: any) => item[type] === value));
+  }
   const tables = ['doctors', 'sales_reps', 'hospitals', 'pharma_companies'];
   try {
     const results = await Promise.all(tables.map(table => supabase.from(table).select('id').eq(type, value).limit(1)));

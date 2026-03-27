@@ -50,14 +50,23 @@ export function Login() {
 
   React.useEffect(() => {
     const checkRedirect = async () => {
+      // Don't redirect if we're in the middle of a check or if role mismatch is imminent
+      const targetRole = localStorage.getItem('lomixa_target_role');
+      const actualRole = user?.user_metadata?.role;
+      
       if (user && !loading) {
+        if (targetRole && actualRole && targetRole !== actualRole) {
+          // Stay here, handleLogin will show the error and signOut
+          return;
+        }
+        
         const { getAuthorizationDetails } = await import('@/lib/store');
         const { authorized } = await getAuthorizationDetails(user.id, user.user_metadata?.role);
         if (authorized) {
-           navigate('/dashboard', { replace: true });
+          navigate('/dashboard', { replace: true });
         } else {
-           const { supabase } = await import('@/lib/supabase');
-           await supabase.auth.signOut();
+          const { supabase } = await import('@/lib/supabase');
+          await supabase.auth.signOut();
         }
       }
     };
@@ -106,7 +115,7 @@ export function Login() {
       
       if (actualRole && actualRole !== selectedRole) {
         await supabase.auth.signOut();
-        throw new Error(`Invalid role. This account is registered as a ${actualRole}.`);
+        throw new Error(t('wrongRole'));
       }
 
       if (freshUser && actualRole && actualRole !== 'admin') {

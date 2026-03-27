@@ -142,6 +142,8 @@ const resources = {
       satisfactionRate: 'Satisfaction Rate',
       pleaseSelectRole: 'Please select a role to continue.',
       failedToLogin: 'Failed to login',
+      wrongRole: 'This user is not registered with the selected role.',
+      emailAlreadyExists: 'This email is already registered with another role.',
       // --- Location ---
       country: 'Country',
       city: 'City',
@@ -982,6 +984,8 @@ const resources = {
       satisfactionRate: 'معدل الرضا',
       pleaseSelectRole: 'الرجاء اختيار دورك للمتابعة.',
       failedToLogin: 'فشل تسجيل الدخول',
+      wrongRole: 'هذا المستخدم غير مسجل بالدور المختار.',
+      emailAlreadyExists: 'هذا البريد الإلكتروني مسجل بالفعل بدور آخر.',
       // --- Location ---
       country: 'الدولة',
       city: 'المدينة',
