@@ -4,15 +4,16 @@ import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2, Calendar, Clock, Video, Phone, MapPin, MessageSquare } from 'lucide-react';
+import { Plus, Trash2, Calendar, Clock, Video, Phone, MapPin, MessageSquare, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
+import { formatCurrency } from '@/lib/currency';
 
 const APPOINTMENT_TYPES = [
-  { value: 'In Person', label: 'In-Person', icon: MapPin },
-  { value: 'Video', label: 'Video', icon: Video },
-  { value: 'Call', label: 'Voice', icon: Phone },
-  { value: 'Text', label: 'Text', icon: MessageSquare },
+  { value: 'In Person', label: 'In-Person', icon: MapPin, defaultPrice: 300 },
+  { value: 'Video', label: 'Video', icon: Video, defaultPrice: 200 },
+  { value: 'Call', label: 'Voice', icon: Phone, defaultPrice: 150 },
+  { value: 'Text', label: 'Text', icon: MessageSquare, defaultPrice: 100 },
 ];
 
 export function DoctorSchedule() {
@@ -20,6 +21,7 @@ export function DoctorSchedule() {
   const { t, i18n } = useTranslation();
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
   const [doctorId, setDoctorId] = useState<string>('');
+  const [country, setCountry] = useState('sa');
   
   const [form, setForm] = useState({
     date: '',
@@ -27,6 +29,7 @@ export function DoctorSchedule() {
     endTime: '17:00',
     duration: 15,
     appointmentType: 'In Person' as AvailabilitySlot['appointmentType'],
+    price: 300,
   });
 
   useEffect(() => {
@@ -34,6 +37,7 @@ export function DoctorSchedule() {
     const myDoc = doctors.find(d => d.userId === userId);
     if (myDoc) {
       setDoctorId(myDoc.id);
+      setCountry(myDoc.location?.country || 'sa');
       setSlots(getDoctorAvailability(myDoc.id));
     }
   }, [userId]);
@@ -41,50 +45,110 @@ export function DoctorSchedule() {
   const startAsDate = new Date(`1970-01-01T${form.startTime}:00`);
   const endAsDate = new Date(`1970-01-01T${form.endTime}:00`);
   const diffInMinutes = (endAsDate.getTime() - startAsDate.getTime()) / 60000;
-  const numberOfSlots = diffInMinutes > 0 ? Math.floor(diffInMinutes / form.duration) : 0;
+  const theoreticalSlots = diffInMinutes > 0 ? Math.floor(diffInMinutes / form.duration) : 0;
 
-  const handleAdd = () => {
+  const timeToMins = (timeStr: string) => {
+    const [h, m] = timeStr.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  const calculateActualRemaining = () => {
+    if (!form.date || theoreticalSlots <= 0) return 0;
+    let count = 0;
+    let currentMins = timeToMins(form.startTime);
+    const limitMins = timeToMins(form.endTime);
+    while (currentMins + form.duration <= limitMins) {
+      const overlaps = slots.some(s => {
+        if (s.date !== form.date) return false;
+        const exStartMins = timeToMins(s.time);
+        const exEndMins = exStartMins + s.duration;
+        return Math.max(currentMins, exStartMins) < Math.min(currentMins + form.duration, exEndMins);
+      });
+      if (!overlaps) count++;
+      currentMins += form.duration;
+    }
+    return count;
+  };
+
+  const numberOfSlots = calculateActualRemaining();
+
+  const handleAdd = (mode: 'single' | 'all') => {
     if (numberOfSlots <= 0 || !form.date) return;
     
-    const timeToMins = (timeStr: string) => {
-      const [h, m] = timeStr.split(':').map(Number);
-      return h * 60 + m;
-    };
-    
-    const newStartMins = timeToMins(form.startTime);
-    const newEndMins = newStartMins + form.duration;
-    
-    const overlaps = slots.some(s => {
-      if (s.date !== form.date) return false;
-      const exStartMins = timeToMins(s.time);
-      const exEndMins = exStartMins + s.duration;
-      return Math.max(newStartMins, exStartMins) < Math.min(newEndMins, exEndMins);
-    });
+    if (mode === 'single') {
+      const newStartMins = timeToMins(form.startTime);
+      const newEndMins = newStartMins + form.duration;
+      
+      const overlaps = slots.some(s => {
+        if (s.date !== form.date) return false;
+        const exStartMins = timeToMins(s.time);
+        const exEndMins = exStartMins + s.duration;
+        return Math.max(newStartMins, exStartMins) < Math.min(newEndMins, exEndMins);
+      });
 
-    if (overlaps) {
-      alert(t('slotOverlapError') || 'Cannot create slot: It overlaps with an existing slot.');
-      return;
+      if (overlaps) {
+        alert(t('slotOverlapError') || 'Cannot create slot: It overlaps with an existing slot.');
+        return;
+      }
+
+      const newSlot: AvailabilitySlot = {
+        id: generateId(),
+        date: form.date,
+        time: form.startTime,
+        appointmentType: form.appointmentType,
+        duration: form.duration,
+        isBooked: false,
+        price: form.price,
+      };
+      
+      const currentAsDate = new Date(`1970-01-01T${form.startTime}:00`);
+      const nextAsDate = new Date(currentAsDate.getTime() + form.duration * 60000);
+      const nextTimeString = nextAsDate.toTimeString().substring(0, 5);
+      
+      const updated = [...slots, newSlot].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+      saveDoctorAvailability(doctorId, updated);
+      setSlots(updated);
+      setForm(prev => ({ ...prev, startTime: nextTimeString }));
+    } else {
+      // Bulk Add
+      const newSlots: AvailabilitySlot[] = [];
+      let currentMins = timeToMins(form.startTime);
+      const limitMins = timeToMins(form.endTime);
+
+      while (currentMins + form.duration <= limitMins) {
+        const timeStr = `${Math.floor(currentMins / 60).toString().padStart(2, '0')}:${(currentMins % 60).toString().padStart(2, '0')}`;
+        
+        // Check for overlaps for each slot in bulk
+        const overlaps = slots.some(s => {
+          if (s.date !== form.date) return false;
+          const exStartMins = timeToMins(s.time);
+          const exEndMins = exStartMins + s.duration;
+          return Math.max(currentMins, exStartMins) < Math.min(currentMins + form.duration, exEndMins);
+        });
+
+        if (!overlaps) {
+          newSlots.push({
+            id: generateId(),
+            date: form.date,
+            time: timeStr,
+            appointmentType: form.appointmentType,
+            duration: form.duration,
+            isBooked: false,
+            price: form.price,
+          });
+        }
+        currentMins += form.duration;
+      }
+
+      if (newSlots.length === 0) {
+        alert(t('noSlotsCreatedError') || 'No slots could be created (either too small time range or all overlap).');
+        return;
+      }
+
+      const updated = [...slots, ...newSlots].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+      saveDoctorAvailability(doctorId, updated);
+      setSlots(updated);
     }
-
-    const newSlot: AvailabilitySlot = {
-      id: generateId(),
-      date: form.date,
-      time: form.startTime,
-      appointmentType: form.appointmentType,
-      duration: form.duration,
-      isBooked: false,
-    };
-    
-    // Auto increment start time for sequential rapid adding
-    const currentAsDate = new Date(`1970-01-01T${form.startTime}:00`);
-    const nextAsDate = new Date(currentAsDate.getTime() + form.duration * 60000);
-    const nextTimeString = nextAsDate.toTimeString().substring(0, 5);
-    
-    const updated = [...slots, newSlot].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-
-    saveDoctorAvailability(doctorId, updated);
-    setSlots(updated);
-    setForm(prev => ({ ...prev, startTime: nextTimeString }));
   };
 
   const handleDelete = (id: string) => {
@@ -170,11 +234,28 @@ export function DoctorSchedule() {
                   />
                 </div>
               </div>
+
+              {/* PRICE */}
+              <div>
+                <Label className="text-slate-300 mb-2 block font-medium">{t('slotPrice') || 'Slot Price (SAR)'}</Label>
+                <div className="relative">
+                  <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <Input 
+                    type="number" 
+                    value={form.price} 
+                    onChange={e => setForm(f => ({ ...f, price: Number(e.target.value) }))} 
+                    className="w-full bg-[#1c2636] border-slate-800 border focus:border-emerald-500 text-white pl-12 h-14 rounded-xl"
+                  />
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none uppercase">
+                    {formatCurrency(0, country).replace(/[0-9.]/g, '').trim()}
+                  </div>
+                </div>
+              </div>
               
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold">
                   <Clock className="w-3.5 h-3.5" />
-                  <span>{numberOfSlots} slots remaining in this block ({form.duration} min each)</span>
+                  <span>{numberOfSlots} {t('slotsRemainingInBlock') || 'slots remaining in this block'} ({form.duration} min each)</span>
                 </div>
               </div>
 
@@ -208,7 +289,7 @@ export function DoctorSchedule() {
                     <button
                       key={value}
                       type="button"
-                      onClick={() => setForm(f => ({ ...f, appointmentType: value as AvailabilitySlot['appointmentType'] }))}
+                      onClick={() => setForm(f => ({ ...f, appointmentType: value as AvailabilitySlot['appointmentType'], price: APPOINTMENT_TYPES.find(t => t.value === value)?.defaultPrice || f.price }))}
                       className={cn(
                         "flex items-center gap-3 px-5 py-3.5 rounded-xl border text-sm font-semibold transition-all",
                         form.appointmentType === value
@@ -223,15 +304,25 @@ export function DoctorSchedule() {
                 </div>
               </div>
               
-              {/* SUBMIT */}
-              <Button 
-                type="button" 
-                onClick={handleAdd}
-                disabled={numberOfSlots <= 0 || !form.date}
-                className="w-full h-14 bg-[#39b596] hover:bg-emerald-500 text-white font-bold rounded-xl text-base mt-2 transition-all disabled:opacity-50"
-              >
-                Add Slot
-              </Button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                <Button 
+                  type="button" 
+                  onClick={() => handleAdd('single')}
+                  disabled={numberOfSlots <= 0 || !form.date}
+                  className="h-14 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-base border border-slate-700 transition-all disabled:opacity-50"
+                >
+                  {t('addOneSlot') || 'Add One Slot'}
+                </Button>
+                <Button 
+                  type="button" 
+                  onClick={() => handleAdd('all')}
+                  disabled={numberOfSlots <= 0 || !form.date}
+                  className="h-14 bg-[#39b596] hover:bg-emerald-500 text-white font-bold rounded-xl text-base transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-5 h-5" />
+                  {t('addAllSlots') || `Add All ${numberOfSlots} Slots`}
+                </Button>
+              </div>
 
             </div>
           </div>
@@ -272,6 +363,7 @@ export function DoctorSchedule() {
                           <span className="flex items-center gap-1"><Calendar className="h-3 w-3 text-slate-500" />{new Date(slot.date).toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-SA', { month: 'short', day: 'numeric' })}</span>
                           <span className="flex items-center gap-1"><Clock className="h-3 w-3 text-slate-500" />{slot.time}</span>
                           <span className="opacity-70 px-1.5 py-0.5 bg-slate-800 rounded text-[10px]">{slot.duration} {t('minutesLabel') || 'min'}</span>
+                          <span className="text-emerald-400 font-bold ml-1">{formatCurrency(slot.price || 0, country)}</span>
                         </div>
                       </div>
                     </div>

@@ -92,7 +92,7 @@ export function RoleSelection() {
         >
           <Globe className="w-4 h-4 text-emerald-500 group-hover:rotate-12 transition-transform" />
           <span className="text-sm font-black tracking-tighter uppercase italic">
-            {i18n.language === 'en' ? 'عربي' : 'EN'}
+            {i18n.language === 'en' ? t('switchToArabic') : t('switchToEnglish')}
           </span>
         </motion.button>
       </div>
@@ -117,7 +117,7 @@ export function RoleSelection() {
           
           <div className="space-y-4">
             <h1 className="text-4xl lg:text-6xl font-black text-white italic tracking-tighter uppercase leading-none">
-              Join <span className="text-emerald-500">LOMIXA</span>
+              {t('joinUs')} <span className="text-emerald-500">LOMIXA</span>
             </h1>
             <p className="text-slate-400 font-bold max-w-md mx-auto text-sm uppercase tracking-widest opacity-60">
               {t('roleSelection.subtitle')}

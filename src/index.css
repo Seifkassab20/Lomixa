@@ -5,7 +5,7 @@
   --color-brand-foreground: var(--brand-fg);
   --color-brand-muted: var(--brand-muted);
   --color-brand-dark: var(--brand-dark);
-  
+
   --color-app-bg: var(--app-bg);
   --color-app-bg-sidebar: var(--app-bg-sidebar);
   --color-app-card: var(--app-card);
@@ -17,7 +17,9 @@
 
 /* ── Base Styles ── */
 @layer base {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     transition-property: background-color, border-color, color, fill, stroke;
     transition-duration: 200ms;
     transition-timing-function: ease;
@@ -29,13 +31,13 @@
     --brand-fg: #ffffff;
     --brand-muted: rgba(16, 185, 129, 0.1);
     --brand-dark: #059669;
-    
+
     --app-bg: #f8fafc;
     --app-bg-sidebar: #ffffff;
     --app-card: #ffffff;
     --app-border: #e2e8f0;
   }
-  
+
   .dark {
     --app-bg: #050b14;
     --app-bg-sidebar: #0a111c;
@@ -44,18 +46,18 @@
   }
 
   /* Sapphire Grid (Tech/Royal) */
-  [data-theme='sapphire'] {
+  [data-theme="sapphire"] {
     --brand-clr: #4f46e5;
     --brand-muted: rgba(79, 70, 229, 0.1);
     --brand-dark: #4338ca;
-    
+
     --app-bg: #f1f5f9; /* Slate-100 */
     --app-bg-sidebar: #f8fafc;
     --app-card: #ffffff;
     --app-border: #cbd5e1;
   }
 
-  [data-theme='sapphire'].dark {
+  [data-theme="sapphire"].dark {
     --app-bg: #0f172a; /* Slate-900 */
     --app-bg-sidebar: #1e293b;
     --app-card: #1e293b;
@@ -63,26 +65,31 @@
   }
 
   /* Desert Oasis (Warm Premium) */
-  [data-theme='oasis'] {
+  [data-theme="oasis"] {
     --brand-clr: #0d9488;
     --brand-muted: rgba(13, 148, 136, 0.1);
     --brand-dark: #0f766e;
-    
+
     --app-bg: #fafaf9; /* Stone-50 */
     --app-bg-sidebar: #fffbeb; /* Amber-50 */
     --app-card: #ffffff;
     --app-border: #e7e5e4;
   }
 
-  [data-theme='oasis'].dark {
+  [data-theme="oasis"].dark {
     --app-bg: #1c1917; /* Stone-900 */
     --app-bg-sidebar: #292524;
     --app-card: #292524;
     --app-border: #44403c;
   }
 
-  .scrollbar-hide::-webkit-scrollbar { display: none; }
-  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 
   .dark {
     color-scheme: dark;

@@ -35,6 +35,7 @@ import { ToastProvider } from './components/ui/Toast';
 import { AboutUs } from './pages/AboutUs';
 import { TermsAndConditions } from './pages/TermsAndConditions';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
+import { initializeRates } from './lib/currency';
 
 function OnboardingWrapper() {
   const navigate = useNavigate();
@@ -75,6 +76,10 @@ function InitialCheck() {
 }
 
 export default function App() {
+  React.useEffect(() => {
+    initializeRates();
+  }, []);
+
   return (
     <ThemeProvider defaultTheme="dark" storageKey="lomixa-theme">
       <ToastProvider>
@@ -118,6 +123,8 @@ export default function App() {
                 
                 {/* Admin */}
                 <Route path="admin-control" element={<AdminDashboard />} />
+                <Route path="admin-control/:tab" element={<AdminDashboard />} />
+
               </Route>
 
               <Route path="*" element={<Navigate to="/" replace />} />

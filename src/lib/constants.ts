@@ -1,20 +1,14 @@
 export const ARABIC_COUNTRY_CODES = [
-  { code: '+966', country: 'KSA', flag: '🇸🇦' },
-  { code: '+971', country: 'UAE', flag: '🇦🇪' },
-  { code: '+20', country: 'EGY', flag: '🇪🇬' },
-  { code: '+965', country: 'KWT', flag: '🇰🇼' },
-  { code: '+974', country: 'QAT', flag: '🇶🇦' },
-  { code: '+968', country: 'OMN', flag: '🇴🇲' },
-  { code: '+973', country: 'BHR', flag: '🇧🇭' },
-  { code: '+962', country: 'JOR', flag: '🇯🇴' },
-  { code: '+964', country: 'IRQ', flag: '🇮🇶' },
-  { code: '+218', country: 'LBY', flag: '🇱🇾' },
-  { code: '+961', country: 'LBN', flag: '🇱🇧' },
-  { code: '+963', country: 'SYR', flag: '🇸🇾' },
-  { code: '+212', country: 'MAR', flag: '🇲🇦' },
-  { code: '+213', country: 'DZA', flag: '🇩🇿' },
-  { code: '+216', country: 'TUN', flag: '🇹🇳' },
-  { code: '+249', country: 'SDN', flag: '🇸🇩' },
+  { code: '+966', countryId: 'sa', country: 'KSA', flag: '🇸🇦' },
+  { code: '+971', countryId: 'uae', country: 'UAE', flag: '🇦🇪' },
+  { code: '+20', countryId: 'egypt', country: 'EGY', flag: '🇪🇬' },
+  { code: '+965', countryId: 'kw', country: 'KWT', flag: '🇰🇼' },
+  { code: '+974', countryId: 'qa', country: 'QAT', flag: '🇶🇦' },
+  { code: '+968', countryId: 'om', country: 'OMN', flag: '🇴🇲' },
+  { code: '+973', countryId: 'bh', country: 'BHR', flag: '🇧🇭' },
+  { code: '+962', countryId: 'jo', country: 'JOR', flag: '🇯🇴' },
+  { code: '+964', countryId: 'iq', country: 'IRQ', flag: '🇮🇶' },
+  { code: '+218', countryId: 'ly', country: 'LBY', flag: '🇱🇾' },
 ];
 
 export const COUNTRIES = [
@@ -42,3 +36,9 @@ export const CITY_MAP: Record<string, string[]> = {
   iq: ['Baghdad', 'Erbil', 'Basra', 'Mosul', 'Sulaymaniyah', 'Najaf'],
   ly: ['Tripoli', 'Benghazi', 'Misrata', 'Bayda'],
 };
+
+export const SPECIALTIES = [
+  'Cardiology', 'Neurology', 'Pediatrics', 'Oncology',
+  'Orthopedics', 'Dermatology', 'Psychiatry', 'General Practice',
+  'Endocrinology', 'Gastroenterology', 'Pulmonology', 'Rheumatology',
+];

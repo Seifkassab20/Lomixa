@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label';
 import { CreditCard, Zap, Shield, Star, CheckCircle2, Clock, X, Lock, AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '@/components/ui/Toast';
+import { formatCurrency, convertCurrency, getCurrencyInfo } from '@/lib/currency';
+import { sendEmail, EmailTemplates } from '@/lib/email';
 
 const BUNDLE_ICONS = [Zap, Star, Shield];
 const BUNDLE_COLORS = [
@@ -21,7 +23,7 @@ export function PharmaBundles() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [loading, setLoading] = useState<string | null>(null);
-  const [credits, setCredits] = useState(0);
+  const [balance, setBalance] = useState(0);
   const [showPayment, setShowPayment] = useState<string | null>(null);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [bundles, setBundles] = useState<Bundle[]>([]);
@@ -34,15 +36,21 @@ export function PharmaBundles() {
 
   const refresh = () => {
     const companies = getPharmaCompanies();
-    let mine = companies.find(c => c.userId === userId);
+    const matches = companies.filter(c => c.userId === userId || c.id === userId);
+    let mine = matches.length > 0 ? matches.sort((a, b) => (b.balance || 0) - (a.balance || 0))[0] : null;
     
     if (mine) {
-      setCredits(mine.credits || 0);
+      setBalance(mine.balance || 0);
       setBundles(getPharmaBundles(mine.id));
-      const reqs = getBundleRequests().filter(r => r.pharmaId === mine.id);
+      const reqs = getBundleRequests().filter(r => r.pharmaId === mine.id || r.pharmaId === mine.userId);
       setPendingRequests(reqs);
     }
   };
+
+  const companies = getPharmaCompanies();
+  const mine = companies.find(c => c.userId === userId) || companies.find(c => c.id === userId);
+  const country = mine?.location?.country || 'sa';
+  const currency = getCurrencyInfo(country);
 
   useEffect(() => { refresh(); }, [userId]);
 
@@ -60,6 +68,10 @@ export function PharmaBundles() {
     const mine = companies.find(c => c.userId === userId);
 
     if (bundle && mine) {
+      // Convert USD units to local currency values for the actual request
+      const localBalance = Math.round(bundle.balance * currency.usdRate);
+      const localPrice = Math.round(bundle.price * currency.usdRate);
+
       // Create request for Admin to review
       saveBundleRequest({
         id: generateId(),
@@ -67,8 +79,8 @@ export function PharmaBundles() {
         pharmaName: mine.name,
         bundleId: bundle.id,
         bundleName: bundle.name,
-        credits: bundle.credits,
-        price: bundle.price,
+        balance: localBalance,
+        price: localPrice,
         cardNumber: `**** **** **** ${cardNo.slice(-4)}`,
         cardHolder: holder,
         status: 'pending',
@@ -76,6 +88,15 @@ export function PharmaBundles() {
       });
 
       toast('Bundle purchase request submitted. Awaiting Admin approval.', 'success');
+      
+      // Send Real-time Email to Admin
+      const adminEmail = 'admin@lomixa.sa'; // Standard network admin mailbox
+      const bundleEmail = EmailTemplates.bundleRequest(
+        mine.name,
+        bundle.name,
+        formatCurrency(localPrice, country)
+      );
+      sendEmail({ to: adminEmail, ...bundleEmail }).catch(console.error);
       
       // Cleanup
       setShowPayment(null);
@@ -104,7 +125,7 @@ export function PharmaBundles() {
           </div>
           <div className="flex flex-col">
             <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Network Liquidity</span>
-            <span className="text-xl font-black text-emerald-500">{credits.toLocaleString()} EGP</span>
+            <span className="text-xl font-black text-emerald-400">{formatCurrency(balance, country)}</span>
           </div>
         </div>
       </div>
@@ -116,7 +137,7 @@ export function PharmaBundles() {
             <div className="flex items-center gap-3">
                <Clock className="w-5 h-5 text-amber-500" />
                <div className="text-sm font-bold text-amber-500 uppercase tracking-tighter">
-                 Acquisition Protocol Pending ({pendingRequests.find(r => r.status === 'pending')?.price} EGP)
+                 Acquisition Protocol Pending ({formatCurrency(pendingRequests.find(r => r.status === 'pending')?.price || 0, country)})
                </div>
             </div>
             <Badge className="bg-amber-500/20 text-amber-500 border-amber-500/30">Admin Review Required</Badge>
@@ -159,12 +180,12 @@ export function PharmaBundles() {
                 </div>
                 <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter">{bundle.name}</h3>
                 <div className="flex items-baseline gap-2 mt-2">
-                  <span className="text-5xl font-black text-white tracking-tighter">{bundle.price.toLocaleString()} EGP</span>
+                  <span className="text-5xl font-black text-white tracking-tighter">{formatCurrency(Math.round(bundle.price * currency.usdRate), country)}</span>
                   <span className="text-white/50 text-xs font-bold uppercase tracking-widest">Market Value</span>
                 </div>
                 <div className="text-emerald-400 text-sm font-black uppercase tracking-widest mt-3 flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4" />
-                  {bundle.credits} {t('visitCreditsLabel') || 'Network Credits'}
+                  {formatCurrency(Math.round(bundle.balance * currency.usdRate), country)} Balance
                 </div>
               </div>
 
@@ -213,10 +234,12 @@ export function PharmaBundles() {
                     <span>Order Summary</span>
                     <span>LOMIXA Marketplace</span>
                  </div>
-                 <div className="flex justify-between items-end">
+                  <div className="flex justify-between items-end">
                     <div className="text-white font-black italic">{bundles.find(b => b.id === showPayment)?.name} Plan</div>
-                    <div className="text-2xl font-black text-emerald-500 tracking-tighter">{bundles.find(b => b.id === showPayment)?.price.toLocaleString()} EGP</div>
-                 </div>
+                    <div className="text-2xl font-black text-emerald-500 tracking-tighter">
+                      {formatCurrency(Math.round((bundles.find(b => b.id === showPayment)?.price || 0) * currency.usdRate), country)}
+                    </div>
+                  </div>
               </div>
 
               <div className="space-y-4">
@@ -279,7 +302,7 @@ export function PharmaBundles() {
               </Button>
               <div className="text-center">
                 <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest leading-relaxed">
-                  Your purchase will be processed and validated by the LOMIXA administration desk within 24 hours. Credits will be allocated upon manual validation.
+                  Your purchase will be processed and validated by the LOMIXA administration desk within 24 hours. Funds will be allocated upon manual validation.
                 </p>
               </div>
             </form>

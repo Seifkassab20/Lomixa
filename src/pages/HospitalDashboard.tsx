@@ -1,11 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { getVisits, getDoctors, getHospitals, saveHospital, saveDoctor, generateId, Hospital } from '@/lib/store';
-import { Stethoscope, Calendar, Activity, Users, ArrowRight } from 'lucide-react';
+import { Stethoscope, Calendar, Activity, Users, ArrowRight, DollarSign } from 'lucide-react';
+import { formatCurrency } from '@/lib/currency';
+
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
+
+
 
 export function HospitalDashboard() {
   const { userId, user } = useAuth();
@@ -17,35 +21,29 @@ export function HospitalDashboard() {
   const [doctors, setDoctors] = useState<ReturnType<typeof getDoctors>>([]);
   const [visits, setVisits] = useState<ReturnType<typeof getVisits>>([]);
 
-  useEffect(() => {
+  const loadData = React.useCallback(() => {
     const hospitals = getHospitals();
-    let mine = hospitals.find(h => h.userId === userId);
-    if (!mine && userId) {
-      mine = {
-        id: generateId(),
-        name: user?.user_metadata?.organization || 'My Hospital',
-        location: user?.user_metadata?.location || 'Riyadh',
-        userId,
-        isActive: true,
-        isVerified: false,
-        type: 'hospital',
-        role: 'hospital'
-      };
-      saveHospital(mine);
-    }
+    const mine = hospitals.find(h => h.userId === userId);
     setMyFacility(mine || null);
     
-    const refresh = () => {
-      const allDocs = getDoctors();
-      const facilityDocs = allDocs.filter(d => d.hospitalId === mine?.id);
-      setDoctors(facilityDocs);
-      
-      const allVisits = getVisits();
-      const facilityVisits = allVisits.filter(v => v.hospitalId === mine?.id);
-      setVisits(facilityVisits);
-    };
-    refresh();
-  }, [userId, user?.user_metadata?.organization, user?.user_metadata?.location]);
+    const allDocs = getDoctors();
+    const facilityDocs = allDocs.filter(d => d.hospitalId === mine?.id);
+    setDoctors(facilityDocs);
+    
+    const allVisits = getVisits();
+    const facilityVisits = allVisits.filter(v => v.hospitalId === mine?.id);
+    setVisits(facilityVisits);
+  }, [userId]);
+
+  useEffect(() => {
+    loadData();
+    const interval = setInterval(loadData, 10000);
+    return () => clearInterval(interval);
+  }, [loadData]);
+
+  const earningsValue = formatCurrency(myFacility?.balance || 0, myFacility?.location?.country || 'sa');
+
+
 
   const handleToggleDoctor = (doc: any) => {
     saveDoctor({ ...doc, isActive: !doc.isActive });
@@ -54,9 +52,7 @@ export function HospitalDashboard() {
     }
   };
 
-  const months = isRTL
-    ? ['يناير','فبراير','مارس','أبريل','مايو','يونيو']
-    : ['Jan','Feb','Mar','Apr','May','Jun'];
+  const months = [1, 2, 3, 4, 5, 6].map(m => t(`month_${m}`));
 
   const monthlyData = months.map((name, i) => ({
     name,
@@ -70,8 +66,9 @@ export function HospitalDashboard() {
           { label: t('totalDoctors'), value: doctors.length, sub: myFacility?.type === 'clinic' ? t('clinic') : t('inYourFacility'), icon: Stethoscope, color: 'emerald' },
           { label: t('visitsThisWeek'), value: visits.filter(v => { const d = new Date(v.date); const now = new Date(); const diff = (now.getTime() - d.getTime()) / 86400000; return diff <= 7; }).length, sub: `${visits.filter(v => v.status === 'Pending').length} ${t('pendingCount')}`, icon: Calendar, color: 'blue' },
           { label: t('completedVisits'), value: visits.filter(v => v.status === 'Completed').length, sub: t('completedVisitsAll'), icon: Activity, color: 'amber' },
-          { label: t('pharmaEngagement'), value: [...new Set(visits.map(v => v.pharmaId))].length, sub: t('activeCompanies'), icon: Users, color: 'purple' },
+          { label: t('earnings'), value: earningsValue, sub: t('estFromVisits'), icon: DollarSign, color: 'purple' },
         ].map(({ label, value, sub, icon: Icon, color }) => (
+
           <div key={label} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-medium text-gray-500 dark:text-slate-400">{label}</span>
@@ -95,7 +92,10 @@ export function HospitalDashboard() {
         ))}
       </div>
 
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+
         <div className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="space-y-1">

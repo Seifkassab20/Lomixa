@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  getDoctors, saveDoctor, deleteDoctor, generateId, Doctor, getHospitals
+  getDoctors, saveDoctor, deleteDoctor, generateId, Doctor, getHospitals, checkUserExistence
 } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { createClient } from '@supabase/supabase-js';
 import { motion, AnimatePresence } from 'motion/react';
-import { ARABIC_COUNTRY_CODES } from '@/lib/constants';
+import { ARABIC_COUNTRY_CODES, SPECIALTIES } from '@/lib/constants';
 
 // Helper client that doesn't persist session so signing up a user doesn't log out the admin
 const createTempClient = () => {
@@ -23,12 +23,6 @@ const createTempClient = () => {
 };
 
 const DOCTOR_TITLES = ['dr', 'prof', 'assoc', 'asst', 'consultant', 'specialist'];
-
-const SPECIALTIES = [
-  'Cardiology', 'Neurology', 'Pediatrics', 'Oncology',
-  'Orthopedics', 'Dermatology', 'Psychiatry', 'General Practice',
-  'Endocrinology', 'Gastroenterology', 'Pulmonology', 'Rheumatology',
-];
 
 export function ManageDoctors() {
   const { userId } = useAuth();
@@ -56,7 +50,12 @@ export function ManageDoctors() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const fullPhone = `${form.phoneCode}${form.phone}`;
-    
+    const emailExists = await checkUserExistence('email', form.email);
+    if (emailExists && (!editingDoc || form.email !== editingDoc.email)) {
+      alert(t('emailAlreadyExists'));
+      return;
+    }
+
     let finalUserId = editingDoc?.userId || editingDoc?.id || generateId();
     let finalId = editingDoc?.id || finalUserId;
 
@@ -91,21 +90,30 @@ export function ManageDoctors() {
       }
     }
 
+    // Unify Identity by Checking if Doctor already exists (by email)
+    const existingDoctors = getDoctors();
+    const existing = existingDoctors.find(d => d.email === form.email);
+    
+    // NEW Unified Record (Preserve existing balance if they already had one!)
     const doc: Doctor = {
-      id: finalId,
-      userId: finalUserId,
-      name: editingDoc ? form.name : `${t(`title_${form.title}`)} ${form.name}`,
+      ...(existing || {}),
+      id: existing?.id || editingDoc?.id || generateId(),
+      userId: finalUserId, // Ensure userId is always set, especially for new Supabase users
+      name: form.name,
       specialty: form.specialty,
-      experienceYears: form.experienceYears,
-      phone: fullPhone,
+      experienceYears: Number(form.experienceYears),
+      phone: `${form.phoneCode}${form.phone}`,
       email: form.email,
       hospitalId: myHospital?.id || 'default',
       hospitalName: myHospital?.name || 'Hospital',
-      availability: editingDoc?.availability || [],
-      isActive: editingDoc?.isActive ?? true,
-      isVerified: true, // Pre-verified by hospital
+      location: existing?.location || editingDoc?.location || myHospital?.location || null,
+      availability: existing?.availability || editingDoc?.availability || [],
+      isActive: existing?.isActive ?? editingDoc?.isActive ?? true,
+      balance: existing?.balance || 0,
+      isVerified: true, // Hospital-added doctors are pre-verified
       role: 'doctor'
     };
+    
     saveDoctor(doc);
     refresh();
     setShowForm(false);

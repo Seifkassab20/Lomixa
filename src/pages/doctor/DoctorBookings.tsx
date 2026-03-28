@@ -1,9 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { getVisits, saveVisit, getDoctors, Visit, VisitStatus, pushNotification } from '@/lib/store';
+import { 
+  getVisits, saveVisit, getDoctors, Visit, VisitStatus, pushNotification,
+  processVisitPayment, getSalesReps, saveSalesRep, saveDoctorAvailability, getDoctorAvailability,
+  refundVisitPayment, saveRating, generateId, Rating
+} from '@/lib/store';
+
+
 import { useAuth } from '@/lib/auth';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar, Video, Phone, MapPin, MessageSquare, CheckCircle2, XCircle, Clock, FileText, X } from 'lucide-react';
+import { Calendar, Video, Phone, MapPin, MessageSquare, CheckCircle2, XCircle, Clock, FileText, X, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { JitsiMeeting } from '@/components/JitsiMeeting';
 import { useTranslation } from 'react-i18next';
@@ -26,6 +32,8 @@ export function DoctorBookings() {
   const [meetingRoom, setMeetingRoom] = useState<string | null>(null);
   const [outcomeModal, setOutcomeModal] = useState<Visit | null>(null);
   const [outcomeNotes, setOutcomeNotes] = useState('');
+  const [repRating, setRepRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
 
   const loadVisits = () => {
     const doctors = getDoctors();
@@ -45,17 +53,51 @@ export function DoctorBookings() {
   }, [userId]);
 
   const handleAction = (visit: Visit, action: 'Confirmed' | 'Cancelled') => {
+    const isConfirming = action === 'Confirmed';
+    const isRejectingPending = action === 'Cancelled' && visit.status === 'Pending';
+
+    // 1. Process Financials ONLY on Confirmation
+    if (isConfirming && visit.status === 'Pending') {
+      if (visit.price) {
+        processVisitPayment(visit.price, visit.doctorId);
+      }
+    } else if (isRejectingPending) {
+      // Rejecting a pending visit: Refund the REP's locked budget
+      const reps = getSalesReps();
+      const repObj = reps.find(r => r.id === visit.repId);
+      if (repObj && visit.price) {
+        saveSalesRep({ ...repObj, balance: (repObj.balance || 0) + visit.price });
+        // NOTE: No refundVisitPayment needed here since we haven't paid out yet. 
+      }
+
+      // AND Free the slot!
+      const avail = getDoctorAvailability(visit.doctorId);
+      const updatedAvail = avail.map(s => {
+        // Precise matching using slotId, falling back to date/time for legacy support
+        const isMatch = visit.slotId ? s.id === visit.slotId : (s.date === visit.date && s.time === visit.time);
+        if (isMatch) {
+          return { ...s, isBooked: false };
+        }
+        return s;
+      });
+      saveDoctorAvailability(visit.doctorId, updatedAvail);
+    }
+
+
+
     const updated = { ...visit, status: action };
     saveVisit(updated);
     setVisits(prev => prev.map(v => v.id === visit.id ? updated : v));
 
-    // Notify the REP (not ourselves)
+    // Notify the REP
     if (visit.repUserId) {
       pushNotification({
         userId: visit.repUserId,
-        title: `Visit ${action}`,
-        message: `Dr. ${visit.doctorName} has ${action.toLowerCase()} your visit request on ${new Date(visit.date).toLocaleDateString('en-SA', { month: 'short', day: 'numeric' })} at ${visit.time}.`,
-        type: action === 'Confirmed' ? 'confirmation' : 'cancellation',
+        title: isConfirming ? `Visit Confirmed!` : `Visit Rejected`,
+        message: isConfirming 
+          ? `Dr. ${visit.doctorName} has accepted your visit on ${new Date(visit.date).toLocaleDateString('en-SA', { month: 'short', day: 'numeric' })}. The funds have been released.`
+          : `Dr. ${visit.doctorName} was unable to accept your visit on ${new Date(visit.date).toLocaleDateString('en-SA', { month: 'short', day: 'numeric' })}. The budget has been refunded to your account.`,
+        type: isConfirming ? 'confirmation' : 'cancellation',
       });
     }
     // Also notify ourselves
@@ -69,21 +111,56 @@ export function DoctorBookings() {
 
   const handleComplete = () => {
     if (!outcomeModal) return;
-    const updated = { ...outcomeModal, status: 'Completed' as VisitStatus, outcomeNotes: outcomeNotes.trim() || undefined };
+    const updated = { ...outcomeModal, status: 'Completed' as VisitStatus, outcomeNotes: outcomeNotes.trim() || undefined, repRating: repRating || undefined };
     saveVisit(updated);
+    
+    if (repRating > 0) {
+      const newRating: Rating = {
+        id: generateId(),
+        visitId: outcomeModal.id,
+        doctorId: doctorId,
+        repId: outcomeModal.repId,
+        rating: repRating,
+        comment: outcomeNotes,
+        type: 'doctor_to_rep',
+        createdAt: new Date().toISOString()
+      };
+      saveRating(newRating);
+      
+      if (outcomeModal.repUserId) {
+        pushNotification({
+          userId: outcomeModal.repUserId,
+          title: t('newRatingReceived') || 'New Rating Received',
+          message: `Dr. ${updated.doctorName} has rated your interaction.`,
+          type: 'rating'
+        });
+      }
+    }
     setVisits(prev => prev.map(v => v.id === outcomeModal.id ? updated : v));
 
     // Notify the rep
     if (outcomeModal.repUserId) {
       pushNotification({
         userId: outcomeModal.repUserId,
-        title: 'Visit Completed',
+        title: t('visitCompleted') || 'Visit Completed',
         message: `Dr. ${outcomeModal.doctorName} has marked your visit on ${new Date(outcomeModal.date).toLocaleDateString('en-SA', { month: 'short', day: 'numeric' })} as completed.`,
         type: 'info',
       });
+
+      // Update the sales rep's visit counter since it's now officially completed
+      const reps = getSalesReps();
+      const rep = reps.find(r => r.id === outcomeModal.repId);
+      if (rep) {
+        saveSalesRep({
+          ...rep,
+          visitsThisMonth: (rep.visitsThisMonth || 0) + 1
+        });
+      }
     }
     setOutcomeModal(null);
     setOutcomeNotes('');
+    setRepRating(0);
+    loadVisits();
   };
 
   const tabs = ['All', 'Pending', 'Confirmed', 'Completed', 'Cancelled'];
@@ -122,6 +199,26 @@ export function DoctorBookings() {
                 className="w-full rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-white px-3 py-2.5 text-sm placeholder:text-gray-400 dark:placeholder:text-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
             </div>
+            
+            <div className="mb-6">
+              <label className="text-sm font-medium dark:text-slate-300 flex items-center gap-1.5 mb-3">
+                <Star className="h-4 w-4 text-amber-500" /> {t('rateTheRep') || 'Rate the Representative'}
+              </label>
+              <div className="flex justify-center gap-2 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border dark:border-slate-700">
+                {[1, 2, 3, 4, 5].map(s => (
+                  <button
+                    key={s}
+                    onMouseEnter={() => setHoverRating(s)}
+                    onMouseLeave={() => setHoverRating(0)}
+                    onClick={() => setRepRating(s)}
+                    className="transition-transform hover:scale-110 active:scale-95"
+                  >
+                    <Star className={cn("h-8 w-8 transition-colors", s <= (hoverRating || repRating) ? "text-amber-500 fill-amber-500" : "text-slate-200 dark:text-slate-700")} />
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="flex gap-3">
               <Button variant="outline" onClick={() => { setOutcomeModal(null); setOutcomeNotes(''); }} className="flex-1 dark:border-slate-600 dark:text-slate-300">{t('cancel')}</Button>
               <Button onClick={handleComplete} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white">
@@ -185,9 +282,21 @@ export function DoctorBookings() {
                         </div>
                       )}
                       {visit.outcomeNotes && (
-                        <div className="mt-2 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 rounded-lg px-2.5 py-1.5 flex items-start gap-1.5 border border-blue-200 dark:border-blue-500/20">
-                          <CheckCircle2 className="h-3 w-3 mt-0.5 shrink-0" />
-                          <span>{visit.outcomeNotes}</span>
+                        <div className="mt-2 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 rounded-lg px-2.5 py-1.5 flex flex-col gap-1 border border-blue-200 dark:border-blue-500/20">
+                          <div className="flex items-start gap-1.5">
+                            <CheckCircle2 className="h-3 w-3 mt-0.5 shrink-0" />
+                            <span>{visit.outcomeNotes}</span>
+                          </div>
+                          {visit.repRating && (
+                            <div className="flex items-center gap-1 mt-1 border-t dark:border-slate-800 pt-1">
+                              <span className="text-[10px] uppercase font-bold opacity-60">Your Rating:</span>
+                              <div className="flex">
+                                {[1, 2, 3, 4, 5].map(s => (
+                                  <Star key={s} className={cn("h-2.5 w-2.5", s <= (visit.repRating || 0) ? "text-amber-500 fill-amber-500" : "text-slate-300 dark:text-slate-700")} />
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
