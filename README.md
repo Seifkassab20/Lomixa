@@ -10,7 +10,7 @@
 
 ## 🗺️ High-Level System Architecture & Flow
 
-The following diagram illustrates the complete operational lifecycle inside the LOMIXA ecosystem—from initial verification to successful visit completion.
+The following diagram illustrates the complete operational lifecycle inside the LOMIXA ecosystem—from initial verification to successful visit completion and the subsequent quality/feedback loop.
 
 ```mermaid
 flowchart TD
@@ -47,9 +47,19 @@ flowchart TD
     Doctor -- Accepts/Rejects --> Visit
     Visit -- Status Updates --> Rep
     
-    %% Post-Visit
+    %% Post-Visit & Quality Loop
     Rep & Doctor -- Executes Meeting --> Visit
-    Visit -- Marked as Completed --> Analytics[(Analytics & Reports)]
+    Visit -- Completed --> Reports([Post-Visit Reports])
+    Reports -- Triggers --> Rating([Rating & Peer Review])
+    Rating -- High Performance --> TopRep[Top Rep Badge]
+    Rating -- Feedback --> Outcome[(Feedback Data)]
+    
+    %% Notification Layer
+    Visit & Rating -- Event --> Notify([Notification Hub])
+    Notify -- Real-time Alerts --> Rep & Doctor & Pharma
+
+    %% Analytics
+    Visit -- Data Point --> Analytics[(Analytics & TPA Monitoring)]
     Pharma -. Monitors Performance .-> Analytics
     Hospital -. Monitors Engagement .-> Analytics
 
@@ -59,6 +69,7 @@ flowchart TD
     classDef hospital fill:#10b981,stroke:#047857,color:#fff,font-weight:bold;
     classDef doc fill:#14b8a6,stroke:#0f766e,color:#fff,font-weight:bold;
     classDef action fill:#8b5cf6,stroke:#6d28d9,color:#fff;
+    classDef feedback fill:#ec4899,stroke:#be185d,color:#fff;
     classDef db fill:#64748b,stroke:#475569,color:#fff;
 
     class Admin admin;
@@ -67,7 +78,8 @@ flowchart TD
     class Rep rep;
     class Doctor doc;
     class Visit,Slots action;
-    class Credits,Analytics db;
+    class Reports,Rating,Notify feedback;
+    class Credits,Analytics,Outcome db;
 ```
 
 ---
@@ -76,25 +88,32 @@ flowchart TD
 
 ### 👑 LOMIXA Admin Desk
 - **Grid Security**: Manually review, vet, and verify newly registered Hospitals and Pharma companies before allowing them onto the network.
-- **Ecosystem Oversight**: Control global platform metrics, user densities, and resolve active bundle purchase queries.
+- **Financial Audit**: Consolidated "Income History" and auditing for global bundle purchases.
+- **Ecosystem Oversight**: Control global platform metrics and resolve active entity queries.
 
 ### 🏢 Pharma Control Center
-- **Subordinate Management**: Create, edit, and organize field Sales Representatives.
-- **Credit Economics**: Purchase high-value Visit Bundles utilizing secure virtual transfers, then distribute these allocated credits to individual representatives dynamically.
-- **Advanced Analytics**: Monitor rep targets, monthly completion statistics, and general field success pipelines.
+- **Balance Synchronization**: Robust, bidirectional data persistence between local state and cloud datasets for Visit Fund management.
+- **Subordinate Management**: Create, edit, and organize field Sales Representatives with individual balance allocation.
+- **Advanced TPA Analytics**: Monitor Targets vs. Performance (TPA) with real-time completion statistics.
 
 ### 🏥 Hospital & Clinic Portal
-- **Clinical Roster Setup**: Independently rapidly onboard staff Doctors as 'Pre-Verified' network participants, skipping global-admin congestion.
-- **Engagement Surveillance**: Track exactly how much time your clinical staff spends interacting with Pharma reps through comprehensive analytics endpoints.
+- **Facility Branding**: Dedicated paths for "Hospital" vs "Clinic" identity with immutable role designations to ensure organizational integrity.
+- **Clinical Roster Setup**: Independently rapidly onboard staff Doctors as 'Pre-Verified' network participants.
+- **Engagement Surveillance**: Track clinical staff interaction metrics via comprehensive analytics endpoints.
 
 ### 🩺 Doctor Hub
-- **Availability Matrix**: Fine-tune daily/weekly booking slots precisely defining when Representatives can request an audience.
-- **Direct Connectivity**: Accept or decline inbound visits seamlessly; engage via In-Person routing, Video Tele-conferencing, or Phone.
+- **Availability Matrix**: Fine-tune daily/weekly booking slots precisely defining audience windows.
+- **Direct Connectivity**: Accept or decline inbound visits; engage via In-Person routing, Video Tele-conferencing, or Phone.
+- **Peer Accountability**: Rate representative professional conduct and provide structured clinical feedback.
 
 ### 💼 Field Representative (Rep) Dashboard
-- **Visit Planner**: Search the global network for highly-rated Doctors or target specific Hospitals.
-- **Credit-Authorized Booking**: Convert allocated pharma credits into direct, scheduled appointments into a Doctor's open slots.
-- **Visit Tracking**: Keep live tabs on Pending, Confirmed, and Completed visits, complete with Post-Visit outcome summaries.
+- **Optimized Visit Booking**: Search doctors/hospitals via professional select-based interface with automatic credit refunding on rejection.
+- **Post-Visit Reporting**: Structured outcome forms to document interaction summaries and follow-up requirements.
+- **Target Tracking**: Real-time progress monitoring against monthly performance benchmarks.
+
+### 🔔 Notification Hub
+- **Real-time Alerts**: Global notification system for booking requests, status updates, and peer reviews.
+- **Transactional Communication**: Integrated automation for critical account and visit events.
 
 ---
 
@@ -103,6 +122,7 @@ flowchart TD
 - **Frontend Application**: React (via Vite compiler)
 - **Styling Architecture**: Tailwind CSS v4 & Framer Motion (for highly fluid interactions)
 - **Authentication & Backend**: Supabase (PostgreSQL handling RLS, Auth flows, and real-time triggers)
+- **Email Notifications**: Resend API (Automated transactional emails for system-wide alerts)
 - **Internationalization (i18n)**: `i18next` (Seamless multi-lingual Arabic/English real-time LTR/RTL transitioning)
 - **Resilient Data State**: Hardened Hybrid-Local Persistence algorithm that gracefully merges memory-mapped states with live Supabase datasets.
 - **Virtual Meetings**: Integrated WebRTC Jitsi components for immediate Video calls.
@@ -114,6 +134,7 @@ flowchart TD
 ### Prerequisites
 - Node.js (v18+)
 - Active Supabase Project configuration
+- Resend API key (optional for local dev)
 
 ### Installation
 
@@ -129,10 +150,11 @@ flowchart TD
    ```env
    VITE_SUPABASE_URL=your-supabase-url
    VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+   VITE_RESEND_API_KEY=your-resend-key
    ```
 
 3. **Database Initialization**:
-   Run the provided `supabase_schema.sql` script within your Supabase SQL Editor to rapidly deploy the tables, constraints, and Row Level Security (RLS) policies necessary to operate the multi-role environment.
+   Run the provided `supabase_schema.sql` script within your Supabase SQL Editor to rapidly deploy the tables, constraints, and Row Level Security (RLS) policies.
 
 4. **Launch Application**:
    ```bash
@@ -143,9 +165,8 @@ flowchart TD
 
 ## 🧪 Security & Quality Verification
 
-Before utilizing LOMIXA in a live healthcare environment, confirm these critical conditions:
-
 - [x] **Role Access Isolation**: A 'Doctor' strictly cannot navigate or fetch endpoints belonging to a 'Pharma'.
-- [x] **Row Level Security (RLS)**: The Supabase schema properly asserts that data mutations are restricted purely to authorized hierarchy paths.
-- [x] **State Cohesion**: The system successfully prevents overwrite collisions when merging local storage states with cloud states upon rapid rep re-allocations (Zero Credit-loss bugs).
-- [x] **Bilingual Completeness**: The interface transitions cleanly between English and Arabic semantics including layout direction.
+- [x] **Authentication Constraints**: Enforced "one email per role" uniqueness across the global network.
+- [x] **Row Level Security (RLS)**: Data mutations are restricted purely to authorized hierarchy paths.
+- [x] **State Cohesion**: Prevention of overwrite collisions when merging local storage with cloud states.
+- [x] **Bilingual Completeness**: Interface transitions cleanly between English and Arabic including layout direction and iconography.
