@@ -4,10 +4,13 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { 
   LayoutDashboard, Users, Calendar, CreditCard, Settings, Activity,
-  Stethoscope, Clock, BookOpen, Bell, Plus, History, ChevronLeft, ChevronRight, ShieldCheck
+  Stethoscope, Clock, BookOpen, Bell, Plus, History, ChevronLeft, ChevronRight, ShieldCheck,
+  Building2, TrendingUp
 } from 'lucide-react';
+
 import { useTranslation } from 'react-i18next';
-import { getNotifications } from '@/lib/store';
+import { getNotifications, getHospitals, getPharmaCompanies, getBundleRequests } from '@/lib/store';
+
 
 export function Sidebar() {
   const { role, userId } = useAuth();
@@ -15,17 +18,22 @@ export function Sidebar() {
   const { t, i18n } = useTranslation();
   const [notifCount, setNotifCount] = useState(0);
   const [collapsed, setCollapsed] = useState(false);
+  const [facilityType, setFacilityType] = useState<'hospital' | 'clinic' | null>(null);
   const isRTL = i18n.language === 'ar';
 
   useEffect(() => {
     const refresh = () => {
       const n = getNotifications().filter(n => !n.read && (!n.userId || n.userId === userId)).length;
       setNotifCount(n);
+      if (role === 'hospital' && userId) {
+        const h = getHospitals().find(h => h.userId === userId);
+        if (h) setFacilityType(h.type);
+      }
     };
     refresh();
     const interval = setInterval(refresh, 3000);
     return () => clearInterval(interval);
-  }, [userId]);
+  }, [userId, role]);
 
   const getLinks = () => {
     const base = [
@@ -34,10 +42,15 @@ export function Sidebar() {
 
     switch (role) {
       case 'admin': return [
-        { key: 'admin', name: 'LOMIXA Admin', href: '/admin-control', icon: ShieldCheck },
+        { key: 'verification', name: t('facilityVerificationDesk'), href: '/admin-control/verification', icon: ShieldCheck, badge: (getHospitals().filter(h => !h.isVerified).length + getPharmaCompanies().filter(p => !p.isVerified).length) },
+        { key: 'bundles', name: t('pendingApprovalDesk'), href: '/admin-control/bundles', icon: CreditCard, badge: getBundleRequests().filter(r => r.status === 'pending').length },
+        { key: 'pharma', name: t('pharmaEcosystemManagement'), href: '/admin-control/pharma', icon: Building2 },
+        { key: 'income', name: 'Income History', href: '/admin-control/income', icon: TrendingUp },
+        { key: 'activity', name: 'Ecosystem Activity', href: '/admin-control/activity', icon: Activity },
         { key: 'notifications', name: t('notifications'), href: '/notifications', icon: Bell, badge: notifCount },
         { key: 'settings', name: t('settings'), href: '/settings', icon: Settings },
       ];
+
       case 'pharma': return [
         ...base,
         { key: 'subordinates', name: t('manageRepresentatives') || 'Manage Representatives', href: '/subordinates', icon: Users },
@@ -72,12 +85,15 @@ export function Sidebar() {
   };
 
   const links = getLinks();
+  const displayRole = role === 'hospital' && facilityType ? facilityType : role;
 
   const roleSubtitleKey: Record<string, string> = {
-    pharma: 'pharmaCompany',
+    admin: 'admin',
+    pharma: 'pharma',
     hospital: 'hospital',
     doctor: 'doctor',
     rep: 'salesRepShort',
+    clinic: 'clinic',
   };
 
   return (
@@ -96,7 +112,7 @@ export function Sidebar() {
               {t('appName')}
             </div>
             <div className="text-[10px] text-gray-400 dark:text-slate-500 whitespace-nowrap">
-              {role ? t(roleSubtitleKey[role] || 'dashboard') : 'Portal'}
+              {displayRole ? t(roleSubtitleKey[displayRole] || 'dashboard') : 'Portal'}
             </div>
           </div>
         )}

@@ -90,22 +90,30 @@ export function ManageDoctors() {
       }
     }
 
+    // Unify Identity by Checking if Doctor already exists (by email)
+    const existingDoctors = getDoctors();
+    const existing = existingDoctors.find(d => d.email === form.email);
+    
+    // NEW Unified Record (Preserve existing balance if they already had one!)
     const doc: Doctor = {
-      id: finalId,
-      userId: finalUserId,
-      name: editingDoc ? form.name : `${t(`title_${form.title}`)} ${form.name}`,
+      ...(existing || {}),
+      id: existing?.id || editingDoc?.id || generateId(),
+      userId: finalUserId, // Ensure userId is always set, especially for new Supabase users
+      name: form.name,
       specialty: form.specialty,
-      experienceYears: form.experienceYears,
-      phone: fullPhone,
+      experienceYears: Number(form.experienceYears),
+      phone: `${form.phoneCode}${form.phone}`,
       email: form.email,
       hospitalId: myHospital?.id || 'default',
       hospitalName: myHospital?.name || 'Hospital',
-      location: editingDoc?.location || myHospital?.location || null,
-      availability: editingDoc?.availability || [],
-      isActive: editingDoc?.isActive ?? true,
-      isVerified: true, // Pre-verified by hospital
+      location: existing?.location || editingDoc?.location || myHospital?.location || null,
+      availability: existing?.availability || editingDoc?.availability || [],
+      isActive: existing?.isActive ?? editingDoc?.isActive ?? true,
+      balance: existing?.balance || 0,
+      isVerified: true, // Hospital-added doctors are pre-verified
       role: 'doctor'
     };
+    
     saveDoctor(doc);
     refresh();
     setShowForm(false);

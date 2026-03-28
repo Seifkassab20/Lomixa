@@ -10,6 +10,8 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '@/lib/currency';
 
+
+
 const STATUS_COLORS: Record<string, string> = {
   Pending: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 border-amber-200 dark:border-amber-500/30',
   Confirmed: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30',
@@ -123,7 +125,10 @@ export function PharmaDashboard() {
         ))}
       </div>
 
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+
         {/* Recent Visits */}
         <div className="lg:col-span-2 bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">

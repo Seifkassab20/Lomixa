@@ -1,13 +1,19 @@
 import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   getPharmaCompanies, savePharmaCompany, PharmaCompany, getHospitals, Hospital, 
   getDoctors, getSalesReps, getBundleRequests, saveBundleRequest, pushNotification,
   BundleRequest, generateId, saveTransaction, saveHospital,
   deleteHospital, deletePharma, deleteSalesRep, getPharmaBundles, savePharmaBundle, deletePharmaBundle, Bundle,
-  syncCloudData, getTransactions, getAdminBalance
+  syncCloudData, getTransactions, getAdminBalance, getVisits, Transaction
 } from '@/lib/store';
+
+
 import { useTranslation } from 'react-i18next';
+import { TPAAnalysis } from '@/components/shared/TPAAnalysis';
+
 import { useAuth } from '@/lib/auth';
 import { getProfile } from '@/lib/store';
 import { 
@@ -22,16 +28,33 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
+import { Select } from '@/components/ui/select';
+
 import { useToast } from '../../components/ui/Toast';
+
+
 
 export function AdminDashboard() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { tab: urlTab } = useParams();
+  const navigate = useNavigate();
   const [pharma, setPharma] = useState<PharmaCompany[]>([]);
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [search, setSearch] = useState('');
   const [requests, setRequests] = useState<BundleRequest[]>([]);
-  const [activeTab, setActiveTab] = useState<'verification' | 'bundles' | 'pharma'>('verification');
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [incomeTypeFilter, setIncomeTypeFilter] = useState<string>('all');
+  const [incomeSearch, setIncomeSearch] = useState('');
+  const [incomeFromFilter, setIncomeFromFilter] = useState('');
+  const [incomeToFilter, setIncomeToFilter] = useState('');
+  const [activeTab, setActiveTab] = useState<'verification' | 'bundles' | 'pharma' | 'activity' | 'income'>((urlTab as any) || 'verification');
+
+
+
+
+
   const [platformBalance, setPlatformBalance] = useState(0);
   const { userId } = useAuth();
   const [adminCountry, setAdminCountry] = useState('sa');
@@ -51,9 +74,15 @@ export function AdminDashboard() {
     if (editingPharma) {
       setCustomBundles(getPharmaBundles(editingPharma.id));
     }
+    setTransactions(getTransactions());
     setPlatformBalance(getAdminBalance());
+
     syncCloudData(); // Trigger cloud refresh whenever Admin refreshes
   };
+
+  useEffect(() => { 
+    if (urlTab) setActiveTab(urlTab as any);
+  }, [urlTab]);
 
   useEffect(() => { 
     if (userId) {
@@ -64,6 +93,7 @@ export function AdminDashboard() {
   }, [userId]);
 
   const handleVerifyUser = (type: 'hospital' | 'pharma', id: string) => {
+
     if (type === 'hospital') {
       const h = hospitals.find(hosp => hosp.id === id);
       if (h) {
@@ -178,12 +208,17 @@ export function AdminDashboard() {
     // 3. Record transaction
     saveTransaction({
       id: generateId(),
-      pharmaId: pc.id,
-      bundleName: req.bundleName,
-      fundsAdded: req.balance,
-      amountSAR: req.price,
-      date: new Date().toISOString(),
+      type: 'pharma_deposit',
+      amount: req.price,
+      currency: 'SAR',
+      fromId: pc.id,
+      fromName: pc.name,
+      toId: 'admin',
+      toName: 'Platform Admin',
+      relatedId: req.id,
+      createdAt: new Date().toISOString(),
     });
+
 
     // 4. Notify pharma
     if (pc.userId) {
@@ -220,15 +255,62 @@ export function AdminDashboard() {
 
   const filteredPharma = uniquePharma.filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()));
 
+  const filteredTransactions = transactions.filter(tx => {
+    const s = incomeSearch.toLowerCase();
+    const fromN = (tx.fromName || '').toLowerCase();
+    const toN = (tx.toName || '').toLowerCase();
+    const txId = (tx.id || '').toLowerCase();
+
+    const matchesSearch = !incomeSearch || 
+      fromN.includes(s) || 
+      toN.includes(s) ||
+      txId.includes(s);
+    
+    const matchesType = incomeTypeFilter === 'all' || tx.type === incomeTypeFilter;
+    
+    const matchesFrom = !incomeFromFilter || 
+      tx.fromId === incomeFromFilter ||
+      fromN.trim() === (incomeFromFilter || '').toLowerCase().trim();
+    
+    const matchesTo = !incomeToFilter || 
+      tx.toId === incomeToFilter ||
+      toN.trim() === (incomeToFilter || '').toLowerCase().trim();
+
+    return matchesSearch && matchesType && matchesFrom && matchesTo;
+  });
+
+
+  const allDoctors = getDoctors();
+  const allReps = getSalesReps();
+
+  const entityRegistry = [
+    { label: '-- ' + t('system') + ' --', options: [
+      { id: 'admin', name: 'System Admin' },
+      { id: 'system', name: 'System Escrow' },
+    ]},
+    { label: '-- ' + t('hospitals') + ' --', options: uniqueHospitals.map(h => ({ id: h.id, name: h.name })) },
+    { label: '-- ' + t('pharma') + ' --', options: uniquePharma.map(p => ({ id: p.id, name: p.name })) },
+    { label: '-- ' + t('doctors') + ' --', options: allDoctors.map(d => ({ id: d.id, name: d.name })) },
+    { label: '-- ' + t('reps') + ' --', options: allReps.map(r => ({ id: r.id, name: r.name })) },
+  ];
+
+
+
   return (
+
     <div className="space-y-8 pb-12" dir={t('appName') === 'لوميكسا' ? 'rtl' : 'ltr'}>
-      <div className="flex items-center justify-between">
+
+
+      <div className="flex items-center justify-between border-b dark:border-slate-800 pb-8">
         <div className="flex items-center gap-8">
            <div>
-              <h1 className="text-3xl font-black tracking-tighter text-gray-900 dark:text-white uppercase italic">
-                {t('appName')} Admin
+              <h1 className="text-4xl font-black tracking-tighter text-gray-900 dark:text-white uppercase italic">
+                {t(activeTab === 'verification' ? 'facilityVerificationDesk' : 
+                   activeTab === 'bundles' ? 'pendingApprovalDesk' : 
+                   activeTab === 'pharma' ? 'pharmaEcosystemManagement' :
+                   activeTab === 'income' ? 'Income History' : 'Ecosystem Activity')}
               </h1>
-              <p className="text-sm text-gray-500 dark:text-slate-400 mt-1 uppercase tracking-widest font-bold opacity-60">{t('systemOverlord')}</p>
+              <p className="text-sm text-gray-500 dark:text-slate-400 mt-1 uppercase tracking-widest font-bold opacity-60">LOMIXA Admin Control Desk</p>
            </div>
         </div>
         <div className="flex items-center gap-3 bg-brand/10 border border-brand/20 rounded-2xl px-6 py-3">
@@ -242,36 +324,8 @@ export function AdminDashboard() {
         </div>
       </div>
 
-      {/* Command Tabs */}
-      <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900/50 p-1.5 rounded-[1.5rem] border dark:border-slate-800 w-fit">
-        {[
-          { id: 'verification', label: t('facilityVerificationDesk'), icon: ShieldCheck, color: 'emerald', count: totalPendingVerification },
-          { id: 'bundles', label: t('pendingApprovalDesk'), icon: CreditCard, color: 'blue', count: pendingRequests.length },
-          { id: 'pharma', label: t('pharmaEcosystemManagement'), icon: Building2, color: 'purple' },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black uppercase italic tracking-widest text-[10px] transition-all duration-300 relative whitespace-nowrap ${
-              activeTab === tab.id 
-                ? (tab.color === 'emerald' ? 'bg-brand shadow-brand/20' : 
-                   tab.color === 'blue' ? 'bg-blue-600 shadow-blue-500/20' : 
-                   'bg-purple-600 shadow-purple-500/20') + ' text-white shadow-lg scale-[1.02]'
-                : "text-slate-500 hover:text-slate-900 dark:hover:text-slate-300"
-            }`}
-          >
-            <tab.icon className="w-4 h-4" />
-            {tab.label}
-            {tab.count !== undefined && tab.count > 0 && (
-              <span className={`absolute -top-1 -right-1 h-5 w-5 rounded-full flex items-center justify-center text-[8px] font-black border-2 border-white dark:border-slate-900 ${
-                activeTab === tab.id ? 'bg-white text-brand-dark' : 'bg-red-500 text-white'
-              }`}>
-                {tab.count}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
+      <div className="min-w-0">
+
 
       {/* --- TAB: VERIFICATION --- */}
       {activeTab === 'verification' && (
@@ -663,6 +717,22 @@ export function AdminDashboard() {
                              className="scale-90"
                            />
                          </div>
+                         {!pc.isActive && (
+                           <Button 
+                             size="icon" 
+                             variant="ghost" 
+                             className="h-10 w-10 rounded-xl text-red-500 hover:bg-red-500/10"
+                             onClick={() => {
+                               if (confirm(`Remove ${pc.name} and all its data?`)) {
+                                 deletePharma(pc.id);
+                                 refresh();
+                                 toast(`${pc.name} removed from the grid.`, 'error');
+                               }
+                             }}
+                           >
+                             <Trash2 className="w-4 h-4" />
+                           </Button>
+                         )}
                       </div>
                     </div>
                 </div>
@@ -674,7 +744,223 @@ export function AdminDashboard() {
         </div>
       </>
     )}
+
+    {/* --- TAB: ECOSYSTEM ACTIVITY --- */}
+    {activeTab === 'activity' && (
+      <section className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="bg-slate-900/40 border border-slate-800 rounded-[3rem] p-10 overflow-hidden relative">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-brand/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2" />
+          <div className="relative z-10 flex flex-col list-none">
+             <TPAAnalysis role="all" />
+          </div>
+        </div>
+
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="space-y-4">
+             <div className="flex items-center gap-2 px-6">
+                <Building2 className="w-4 h-4 text-purple-500" />
+                <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">{t('pharmaPerformance') || 'Pharma Performance'}</h3>
+             </div>
+             <div className="bg-white dark:bg-slate-900/50 border dark:border-slate-800 rounded-[2.5rem] p-8">
+                <TPAAnalysis role="pharma" hideTitle />
+             </div>
+          </div>
+
+          <div className="space-y-4">
+             <div className="flex items-center gap-2 px-6">
+                <Users className="w-4 h-4 text-emerald-500" />
+                <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">{t('repPerformance') || 'Sales Rep Performance'}</h3>
+             </div>
+             <div className="bg-white dark:bg-slate-900/50 border dark:border-slate-800 rounded-[2.5rem] p-8">
+                <TPAAnalysis role="rep" hideTitle />
+             </div>
+          </div>
+
+          <div className="space-y-4">
+             <div className="flex items-center gap-2 px-6">
+                <HospitalIcon className="w-4 h-4 text-blue-500" />
+                <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">{t('hospitalEngagement') || 'Hospital Engagement'}</h3>
+             </div>
+             <div className="bg-white dark:bg-slate-900/50 border dark:border-slate-800 rounded-[2.5rem] p-8">
+                <TPAAnalysis role="hospital" hideTitle />
+             </div>
+          </div>
+
+          <div className="space-y-4">
+             <div className="flex items-center gap-2 px-6">
+                <Stethoscope className="w-4 h-4 text-amber-500" />
+                <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">{t('doctorAvailability') || 'Doctor Availability'}</h3>
+             </div>
+             <div className="bg-white dark:bg-slate-900/50 border dark:border-slate-800 rounded-[2.5rem] p-8">
+                <TPAAnalysis role="doctor" hideTitle />
+             </div>
+          </div>
+        </div>
+      </section>
+    )}
+
+    {/* --- TAB: INCOME HISTORY --- */}
+    {activeTab === 'income' && (
+      <section className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+        <div className="flex items-center justify-between">
+           <div className="flex items-center gap-3 text-emerald-500">
+              <TrendingUp className="w-6 h-6" />
+              <h2 className="text-xl font-black uppercase italic tracking-tighter">Income History & Audit Log</h2>
+           </div>
+           <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Real-time Financial Ledger</span>
+           </div>
+        </div>
+
+        {/* --- INCOME FILTERS --- */}
+        <div className="flex flex-col md:flex-row items-center gap-4 bg-white dark:bg-slate-900 border dark:border-slate-800 p-6 rounded-[2rem] shadow-sm">
+           <div className="flex-1 relative w-full group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-emerald-500 transition-colors" />
+              <Input 
+                value={incomeSearch}
+                onChange={e => setIncomeSearch(e.target.value)}
+                placeholder="Search transaction ID, sender or recipient..."
+                className="pl-12 h-12 bg-slate-50 dark:bg-black/40 border-slate-200 dark:border-slate-800 rounded-2xl text-xs font-bold"
+              />
+           </div>
+           
+           <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 no-scrollbar">
+              <div className="flex items-center gap-2 bg-slate-50 dark:bg-black/40 border dark:border-slate-800 p-1.5 rounded-2xl">
+                 <Select 
+                   value={incomeFromFilter}
+                   onChange={e => setIncomeFromFilter(e.target.value)}
+                   className="h-9 w-44 border-none bg-transparent text-[10px] font-black uppercase tracking-widest italic"
+                 >
+                    <option value="">{t('fromSource') || 'From: All Sources'}</option>
+                    {entityRegistry.map(group => (
+                      <optgroup key={group.label} label={group.label} className="bg-slate-900 text-white">
+                        {group.options.map(opt => (
+                          <option key={opt.id} value={opt.id}>{opt.name}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                 </Select>
+                 <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1" />
+                 <Select 
+                    value={incomeToFilter}
+                    onChange={e => setIncomeToFilter(e.target.value)}
+                    className="h-9 w-44 border-none bg-transparent text-[10px] font-black uppercase tracking-widest italic"
+                 >
+                    <option value="">{t('toDestination') || 'To: All Destinations'}</option>
+                    {entityRegistry.map(group => (
+                      <optgroup key={group.label} label={group.label} className="bg-slate-900 text-white">
+                        {group.options.map(opt => (
+                          <option key={opt.id} value={opt.id}>{opt.name}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                 </Select>
+              </div>
+
+              
+              {[
+                { id: 'all', label: 'All Transfers' },
+
+                { id: 'visit_payout', label: 'Payouts' },
+                { id: 'admin_commission', label: 'Commissions' },
+                { id: 'pharma_deposit', label: 'Deposits' },
+              ].map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => setIncomeTypeFilter(f.id)}
+                  className={cn(
+                    "px-6 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest italic transition-all whitespace-nowrap",
+                    incomeTypeFilter === f.id 
+                      ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20" 
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700"
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+           </div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-[2.5rem] overflow-hidden shadow-xl">
+
+           <table className="w-full text-left border-collapse">
+              <thead>
+                 <tr className="bg-slate-50 dark:bg-slate-800/50 border-b dark:border-slate-800">
+                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-500">Transaction ID</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-500">Date/Time</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-500">Type</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-500">From / To</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Amount</th>
+                 </tr>
+              </thead>
+              <tbody className="divide-y dark:divide-slate-800">
+                 {filteredTransactions.length === 0 ? (
+                   <tr>
+                     <td colSpan={5} className="px-8 py-20 text-center">
+                        <Filter className="w-12 h-12 text-slate-200 dark:text-slate-800 mx-auto mb-4 opacity-50" />
+                        <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">No matching transactions found in the filtered grid</p>
+                        {(incomeSearch || incomeTypeFilter !== 'all' || incomeFromFilter || incomeToFilter) && (
+                          <button 
+                            onClick={() => { 
+                              setIncomeSearch(''); 
+                              setIncomeTypeFilter('all'); 
+                              setIncomeFromFilter(''); 
+                              setIncomeToFilter(''); 
+                            }}
+                            className="mt-4 text-[10px] font-black uppercase text-emerald-500 hover:underline"
+                          >
+                            Reset System Filters
+                          </button>
+                        )}
+
+                     </td>
+                   </tr>
+                 ) : (
+                   filteredTransactions.map((tx) => (
+
+                     <tr key={tx.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
+                        <td className="px-8 py-5 text-[10px] font-mono font-bold text-slate-500">#{tx.id.slice(0,8)}</td>
+                        <td className="px-8 py-5 text-xs font-bold text-slate-400">{new Date(tx.createdAt).toLocaleString()}</td>
+                        <td className="px-8 py-5">
+                           <Badge className={cn(
+                             "font-black uppercase tracking-widest text-[8px] border-none",
+                             tx.type === 'visit_payout' ? "bg-blue-500/10 text-blue-500" :
+                             tx.type === 'admin_commission' ? "bg-emerald-500/10 text-emerald-500" :
+                             tx.type === 'pharma_deposit' ? "bg-purple-500/10 text-purple-500" :
+                             "bg-slate-200 text-slate-600"
+                           )}>
+                             {(tx.type || 'transaction').replace('_', ' ')}
+                           </Badge>
+
+                        </td>
+                        <td className="px-8 py-5">
+                           <div className="flex flex-col">
+                              <span className="text-xs font-black dark:text-white uppercase italic">{tx.fromName || 'Unknown Entity'}</span>
+                              <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
+                                 <ArrowUpRight className="w-2 h-2" /> {tx.toName || 'Unknown Entity'}
+                              </span>
+                           </div>
+                        </td>
+                        <td className="px-8 py-5 text-right font-black text-emerald-500">
+                           {formatCurrency(tx.amount || 0, adminCountry)}
+                        </td>
+                     </tr>
+                   ))
+                 )}
+              </tbody>
+           </table>
+        </div>
+      </section>
+    )}
+
+
+       </div> {/* End of min-w-0 */}
+
+
     {/* --- REJECTION REASON MODAL --- */}
+
     <AnimatePresence>
       {rejectingUser && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">

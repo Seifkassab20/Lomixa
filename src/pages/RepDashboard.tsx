@@ -12,6 +12,8 @@ import { useTranslation } from 'react-i18next';
 import { useToast } from '@/components/ui/Toast';
 import { formatCurrency } from '@/lib/currency';
 
+
+
 export function RepDashboard() {
   const { userId, user } = useAuth();
   const navigate = useNavigate();
@@ -25,36 +27,23 @@ export function RepDashboard() {
   const [meetingRoom, setMeetingRoom] = useState<string | null>(null);
   const [repInfo, setRepInfo] = useState({ name: '', pharmaId: '', pharmaName: '', target: 25 });
 
-  useEffect(() => {
+  const loadData = React.useCallback(() => {
     const reps = getSalesReps();
-    let myRep = reps.find(r => r.userId === userId);
-    if (!myRep && userId) {
-      const companies = getPharmaCompanies();
-      const myCompany = companies.find(c => c.userId === userId) || companies[0];
-      myRep = {
-        id: userId,
-        name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || t('repUser'),
-        email: user?.email || '',
-        phone: user?.user_metadata?.mobile || '',
-        pharmaId: myCompany?.id || 'default',
-        pharmaName: myCompany?.name || t('myPharma'),
-        visitsThisMonth: 0,
-        target: 25,
-        userId: userId,
-        balance: 0,
-        isActive: true,
-        isVerified: true,
-      };
-      saveSalesRep(myRep);
-    }
+    const myRep = reps.find(r => r.userId === userId);
     if (myRep) {
-      setRepInfo({ name: myRep.name, pharmaId: myRep.pharmaId, pharmaName: myRep.pharmaName, target: myRep.target });
-      const myVisits = getVisits().filter(v => v.repId === myRep!.id);
-      setVisits(myVisits.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
-      setBalance(myRep!.balance || 0);
-      setCountry(myRep!.location?.country || 'sa');
+       setRepInfo({ name: myRep.name, pharmaId: myRep.pharmaId, pharmaName: myRep.pharmaName, target: myRep.target });
+       const myVisits = getVisits().filter(v => v.repId === myRep!.id);
+       setVisits(myVisits.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+       setBalance(myRep!.balance || 0);
+       setCountry(myRep!.location?.country || 'sa');
     }
-  }, [userId, t, user?.email, user?.user_metadata?.full_name, user?.user_metadata?.mobile]);
+  }, [userId]);
+
+  useEffect(() => {
+    loadData();
+    const interval = setInterval(loadData, 10000);
+    return () => clearInterval(interval);
+  }, [loadData]);
 
   const TYPE_ICONS = { 'In Person': MapPin, Video, Call: Phone, Text: Clock };
   const thisMonth = new Date().getMonth();
@@ -117,7 +106,10 @@ export function RepDashboard() {
         </div>
       </div>
 
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+
         {/* Recent Visits */}
         <div className="lg:col-span-2 bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">

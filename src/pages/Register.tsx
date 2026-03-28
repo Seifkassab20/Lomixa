@@ -13,7 +13,8 @@ import {
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '@/components/ui/Toast';
-import { saveDoctor, saveHospital, savePharmaCompany, saveSalesRep, getPharmaCompanies, generateId, pushNotification, checkUserExistence } from '@/lib/store';
+import { saveDoctor, saveHospital, savePharmaCompany, saveSalesRep, getPharmaCompanies, getHospitals, generateId, pushNotification, checkUserExistence } from '@/lib/store';
+
 import { sendEmail, EmailTemplates } from '@/lib/email';
 import { motion, AnimatePresence } from 'motion/react';
 import { ARABIC_COUNTRY_CODES, COUNTRIES, CITY_MAP, SPECIALTIES } from '@/lib/constants';
@@ -50,6 +51,8 @@ export function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [existingPharmaCompanies, setExistingPharmaCompanies] = useState<any[]>([]);
+  const [hospitals, setHospitals] = useState<any[]>([]);
+
 
   const [formData, setFormData] = useState({
     email: '',
@@ -64,6 +67,8 @@ export function Register() {
     specialty: '',
     yearsExperience: '',
     roleTitle: '',
+    selectedHospitalId: '',
+
     // For Pharma/Hospital
     organizationName: '',
     // Location
@@ -79,10 +84,11 @@ export function Register() {
     products: [{ id: generateId(), category: '', name: '', form: '', description: '', indications: '', doses: '' }],
     targetSpecialties: [] as string[],
     // Document Uploads
-    commCertificate: null as File | null,
-    natAddress: null as File | null,
     vatCertificate: null as File | null,
+    // Doctor Specific
+    doctorType: 'independent' as 'hospital' | 'independent',
   });
+
 
   useEffect(() => {
     if (role) {
@@ -90,14 +96,37 @@ export function Register() {
       setSelectedRole(actualRole);
     }
     setExistingPharmaCompanies(getPharmaCompanies());
+    // Also load hospitals for doctor selection
+    setHospitals(getHospitals());
   }, [role]);
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    
+    let extraChanges: any = {};
+    if (name === 'phoneCode') {
+      const match = ARABIC_COUNTRY_CODES.find(c => c.code === value);
+      if (match) {
+        extraChanges.country = match.countryId;
+        extraChanges.city = '';
+        extraChanges.cities = [];
+        extraChanges.area = '';
+      }
+    } else if (name === 'country') {
+      const match = ARABIC_COUNTRY_CODES.find(c => c.countryId === value);
+      if (match) {
+        extraChanges.phoneCode = match.code;
+      }
+      extraChanges.city = '';
+      extraChanges.cities = [];
+      extraChanges.area = '';
+    }
+
     setFormData(prev => ({ 
       ...prev, 
       [name]: value,
-      ...(name === 'country' ? { city: '', cities: [], areas: [], area: '' } : {})
+      ...extraChanges
     }));
   };
 
@@ -207,12 +236,14 @@ export function Register() {
           title: formData.title,
           specialty: formData.specialty,
           experienceYears: parseInt(formData.yearsExperience) || 0,
-          hospitalId: '',
-          hospitalName: '',
+          hospitalId: formData.doctorType === 'hospital' ? formData.selectedHospitalId : 'default',
+          hospitalName: formData.doctorType === 'hospital' ? (hospitals.find(h => h.id === formData.selectedHospitalId)?.name || t('pendingHospital')) : (formData.organizationName || t('independentClinic')),
           isVerified: false,
           isActive: true,
           availability: [],
         });
+
+
       } else if (selectedRole === 'rep') {
         saveSalesRep({
           ...profileData,
@@ -482,11 +513,74 @@ export function Register() {
                               {SPECIALTIES.map(s => <option key={s} value={s}>{t(`spec_${s.toLowerCase().slice(0, 5)}`) || s}</option>)}
                            </select>
                         </div>
-                        <div className="space-y-3">
-                           <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">{t('yearsExperience')}</Label>
-                           <Input type="number" name="yearsExperience" value={formData.yearsExperience} onChange={handleChange} className="h-14 rounded-2xl bg-black/40 border-slate-800 font-bold focus:border-emerald-500" />
-                        </div>
-                     </div>
+                         <div className="space-y-3">
+                            <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">{t('yearsExperience')}</Label>
+                            <Input type="number" name="yearsExperience" value={formData.yearsExperience} onChange={handleChange} className="h-14 rounded-2xl bg-black/40 border-slate-800 font-bold focus:border-emerald-500" />
+                         </div>
+                         <div className="md:col-span-2 space-y-4 pt-4 border-t border-white/5">
+                            <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">Practice Setting</Label>
+                            <div className="grid grid-cols-2 gap-4">
+                               {[
+                                 { id: 'hospital', label: 'Hospital Facility', icon: Building2 },
+                                 { id: 'independent', label: 'Independent / Clinic', icon: Stethoscope }
+                               ].map(type => (
+                                 <button
+                                   key={type.id}
+                                   type="button"
+                                   onClick={() => setFormData(f => ({ ...f, doctorType: type.id as any }))}
+                                   className={cn(
+                                     "flex items-center gap-4 p-5 rounded-3xl border-2 transition-all text-left group",
+                                     formData.doctorType === type.id 
+                                       ? "border-emerald-500 bg-emerald-500/10" 
+                                       : "border-slate-800 bg-black/40 hover:border-slate-700"
+                                   )}
+                                 >
+                                    <div className={cn("p-2.5 rounded-xl transition-colors", formData.doctorType === type.id ? "bg-emerald-500 text-white" : "bg-slate-900 text-slate-500")}>
+                                       <type.icon className="w-5 h-5" />
+                                    </div>
+                                    <span className={cn("text-xs font-black uppercase tracking-tight", formData.doctorType === type.id ? "text-white" : "text-slate-500")}>{type.label}</span>
+                                 </button>
+                               ))}
+                            </div>
+                         </div>
+
+                         {formData.doctorType === 'hospital' && (
+                           <div className="md:col-span-2 space-y-3 animate-in fade-in slide-in-from-top-2">
+                              <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">Select your Hospital*</Label>
+                              <div className="relative group/input">
+                                 <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                                 <select 
+                                   name="selectedHospitalId" 
+                                   value={formData.selectedHospitalId} 
+                                   onChange={handleChange}
+                                   required
+                                   className="w-full h-14 rounded-2xl bg-black/40 border border-slate-800 pl-12 pr-4 text-sm font-bold text-white outline-none focus:border-emerald-500 appearance-none cursor-pointer"
+                                 >
+                                    <option value="">Choose Hospital...</option>
+                                    {hospitals.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                                 </select>
+                              </div>
+                           </div>
+                         )}
+
+                         {formData.doctorType === 'independent' && (
+                           <div className="md:col-span-2 space-y-3 animate-in fade-in slide-in-from-top-2">
+                              <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">Clinic / Group Name (Optional)</Label>
+                              <div className="relative group/input">
+                                 <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                                 <Input 
+                                   name="organizationName" 
+                                   value={formData.organizationName} 
+                                   onChange={handleChange}
+                                   className="h-14 pl-12 rounded-2xl bg-black/40 border-slate-800 font-bold focus:border-emerald-500" 
+                                   placeholder="e.g. Hope Clinic"
+                                 />
+                              </div>
+                           </div>
+                         )}
+                      </div>
+
+
                    )}
 
                    {selectedRole === 'rep' && (
@@ -626,15 +720,15 @@ export function Register() {
 
                        {selectedRole !== 'rep' ? (
                          <div className="space-y-3">
-                            <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">City*</Label>
+                            <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">{t('city')}*</Label>
                             <select name="city" value={formData.city} onChange={handleChange} required className="w-full h-14 rounded-2xl bg-black/40 border border-slate-800 px-4 text-sm font-bold text-white outline-none focus:border-emerald-500">
-                               <option value="">Select City</option>
-                               {CITY_MAP[formData.country]?.map(city => <option key={city} value={city}>{city}</option>)}
+                               <option value="">{t('selectCity')}</option>
+                               {CITY_MAP[formData.country]?.map(city => <option key={city} value={city}>{t(`city_${city.replace(/^city_/, "").toLowerCase().replace(/\s+/g, '_')}`, city.replace(/^city_/, ""))}</option>)}
                             </select>
                          </div>
                        ) : (
                          <div className="md:col-span-2 space-y-4">
-                            <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">Operating Cities* (Select Multiple)</Label>
+                            <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">{t('operation_cities')}*</Label>
                             <div className="flex flex-wrap gap-2">
                                {CITY_MAP[formData.country]?.map(city => {
                                  const isSelected = formData.cities.includes(city);
@@ -648,7 +742,7 @@ export function Register() {
                                        isSelected ? "bg-orange-500 border-orange-500 text-white" : "bg-black/40 border-slate-800 text-slate-500 hover:border-slate-700"
                                      )}
                                    >
-                                     {city}
+                                     {t(`city_${city.replace(/^city_/, "").toLowerCase().replace(/\s+/g, '_')}`, city.replace(/^city_/, ""))}
                                    </button>
                                  );
                                })}

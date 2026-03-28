@@ -58,7 +58,10 @@ export function SettingsPage() {
     avatar: "",
     newPassword: "",
     specialty: "",
+    hospitalId: "default",
+    facilityType: "hospital" as "hospital" | "clinic",
   });
+
   const [testApiKey, setTestApiKey] = useState("");
   const [saved, setSaved] = useState(false);
   const [verifyingEmail, setVerifyingEmail] = useState(false);
@@ -136,7 +139,10 @@ export function SettingsPage() {
           "",
         newPassword: "",
         specialty: doctorEntity?.specialty || "",
+        hospitalId: doctorEntity?.hospitalId || "default",
+        facilityType: (role === "hospital" ? (entity as any)?.type : "hospital") || "hospital",
       });
+
     }
   }, [userId, user]);
 
@@ -255,6 +261,7 @@ export function SettingsPage() {
             ...(typeof h.location === "object" ? h.location : {}),
             country: form.country,
           },
+          type: form.facilityType,
         });
       }
     }
@@ -395,8 +402,11 @@ export function SettingsPage() {
     doctor: "doctor",
     rep: "salesRep",
   };
-
+  
+  const isAffiliatedDoctor = role === "doctor" && form.hospitalId && form.hospitalId !== "default";
   const showOrgField = role === "doctor" || role === "rep";
+
+
 
   return (
     <div className="space-y-8 max-w-3xl pb-12">
@@ -494,9 +504,16 @@ export function SettingsPage() {
                   <div className="relative w-28 shrink-0 group">
                     <select
                       value={form.phoneCode}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, phoneCode: e.target.value }))
-                      }
+                      onChange={(e) => {
+                        const code = e.target.value;
+                        const match = ARABIC_COUNTRY_CODES.find(c => c.code === code);
+                        setForm((f) => ({ 
+                          ...f, 
+                          phoneCode: code,
+                          country: match?.countryId || f.country,
+                          city: match?.countryId && match.countryId !== f.country ? "" : f.city
+                        }));
+                      }}
                       className="w-full h-12 pl-3 pr-8 rounded-xl bg-app-card border border-slate-200 dark:border-slate-800 text-xs font-bold focus:ring-2 focus:ring-emerald-500/20 outline-none appearance-none"
                     >
                       {ARABIC_COUNTRY_CODES.map((c) => (
@@ -561,19 +578,48 @@ export function SettingsPage() {
                   <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">
                     {role === "doctor" ? t("hospital") : t("pharmaCompany")}
                   </Label>
-                  <div className="relative group">
+                   <div className={cn("relative group", isAffiliatedDoctor && "opacity-60")}>
                     <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-brand transition-colors" />
                     <Input
                       value={form.organization}
                       onChange={(e) =>
                         setForm((f) => ({ ...f, organization: e.target.value }))
                       }
+                      disabled={isAffiliatedDoctor}
+
                       placeholder={
                         role === "doctor" ? t("hospital") : t("pharmaCompany")
                       }
                       className="pl-12 h-12 rounded-xl bg-app-card dark:border-slate-800"
                     />
                   </div>
+                </div>
+              )}
+              {role === "hospital" && (
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">
+                    {t("facilityType") || "Organization Type"}
+                  </Label>
+                  <div className="flex gap-2">
+                    {[
+                      { id: "hospital", label: t("hospital") },
+                      { id: "clinic", label: t("clinic") }
+                    ].map(t => {
+                      const isActive = form.facilityType === t.id;
+                      if (!isActive) return null; // Show ONLY the current type
+                      return (
+                        <div
+                          key={t.id}
+                          className="flex-1 h-12 rounded-xl text-xs font-black uppercase flex items-center justify-center tracking-widest italic bg-brand text-white shadow-lg shadow-brand/20 border border-brand/10"
+                        >
+                          {t.label}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[9px] text-slate-400 ml-1 italic">
+                    Organization type is linked to your registration and cannot be changed here.
+                  </p>
                 </div>
               )}
 
@@ -626,13 +672,16 @@ export function SettingsPage() {
                   <select
                     name="country"
                     value={form.country}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const countryId = e.target.value;
+                      const match = ARABIC_COUNTRY_CODES.find(c => c.countryId === countryId);
                       setForm((f) => ({
                         ...f,
-                        country: e.target.value,
+                        country: countryId,
+                        phoneCode: match?.code || f.phoneCode,
                         city: "",
-                      }))
-                    }
+                      }));
+                    }}
                     className="w-full h-12 pl-12 pr-10 rounded-xl bg-app-card border border-app-border text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none appearance-none"
                   >
                     {COUNTRIES.map((c) => (
@@ -663,7 +712,7 @@ export function SettingsPage() {
                     </option>
                     {CITY_MAP[form.country]?.map((c) => (
                       <option key={c} value={c}>
-                        {t(`city_${c}`) || c}
+                        {t(`city_${c.replace(/^city_/, "").toLowerCase().replace(/\s+/g, "_")}`, c.replace(/^city_/, ""))}
                       </option>
                     ))}
                   </select>
@@ -790,39 +839,8 @@ export function SettingsPage() {
                   >
                     {p.name}
                   </span>
-                  <span className="text-[9px] text-slate-500 mt-0.5">
-                    {p.desc}
-                  </span>
                 </button>
               ))}
-            </div>
-
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
-              <div className="h-10 w-10 rounded-xl bg-white dark:bg-slate-900 flex items-center justify-center border dark:border-slate-700">
-                {theme === "dark" ? (
-                  <Lock className="w-5 h-5 text-slate-400" />
-                ) : (
-                  <Sparkles className="w-5 h-5 text-brand" />
-                )}
-              </div>
-              <div className="flex-1">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                  {t("darkMode") || "Night Mode"}
-                </p>
-                <p className="text-xs text-slate-400">
-                  {t("toggleThemeDesc") ||
-                    "Switch between light and dark interface"}
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                className="rounded-xl border-slate-200 dark:border-slate-700"
-              >
-                {theme === "dark" ? t("switchToLight") : t("switchToDark")}
-              </Button>
             </div>
           </div>
         </div>

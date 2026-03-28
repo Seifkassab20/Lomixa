@@ -9,6 +9,8 @@ import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '@/lib/currency';
 
+
+
 export function DoctorDashboard() {
   const { userId, user } = useAuth();
   const navigate = useNavigate();
@@ -18,13 +20,14 @@ export function DoctorDashboard() {
   const [meetingRoom, setMeetingRoom] = useState<string | null>(null);
   const [balance, setBalance] = useState(0);
   const [country, setCountry] = useState('sa');
-
-  useEffect(() => {
+  const [myDoc, setMyDoc] = useState<any>(null);
+  
+  const refreshData = () => {
     const doctors = getDoctors();
-    let myDoc = doctors.find(d => d.userId === userId);
-    if (!myDoc && userId) {
-      myDoc = {
-        id: generateId(),
+    let doc = doctors.find(d => d.userId === userId);
+    if (!doc && userId) {
+      doc = {
+        id: userId,
         name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || t('docUser'),
         specialty: user?.user_metadata?.specialty || t('spec_general'),
         experienceYears: user?.user_metadata?.experienceYears || 0,
@@ -37,15 +40,22 @@ export function DoctorDashboard() {
         isActive: true,
         isVerified: true,
       };
-      saveDoctor(myDoc);
+      saveDoctor(doc);
     }
-    if (myDoc) {
-      setDoctorId(myDoc.id);
-      setBalance(myDoc.balance || 0);
-      setCountry(myDoc.location?.country || 'sa');
-      const myVisits = getVisits().filter(v => v.doctorId === myDoc!.id);
+    if (doc) {
+      setMyDoc(doc);
+      setDoctorId(doc.id);
+      setBalance(doc.balance || 0);
+      setCountry(doc.location?.country || 'sa');
+      const myVisits = getVisits().filter(v => v.doctorId === doc!.id);
       setVisits(myVisits.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
     }
+  };
+
+  useEffect(() => {
+    refreshData();
+    const interval = setInterval(refreshData, 10000);
+    return () => clearInterval(interval);
   }, [userId]);
 
   const today = new Date().toISOString().split('T')[0];
@@ -59,18 +69,30 @@ export function DoctorDashboard() {
     Pending: t('pending'), Confirmed: t('confirmed'), Completed: t('completed'), Cancelled: t('cancelled'),
   };
 
+  const isAffiliated = !doctorId || (getDoctors().find(d => d.id === doctorId)?.hospitalId !== 'default');
+  const kpiCardsCount = isAffiliated ? 3 : 4;
+
   return (
     <div className="space-y-6">
       {meetingRoom && <JitsiMeeting roomName={meetingRoom} displayName="Doctor" onClose={() => setMeetingRoom(null)} />}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={cn(
+        "grid grid-cols-1 md:grid-cols-2 gap-6 mb-8",
+        kpiCardsCount === 3 ? "lg:grid-cols-3" : "lg:grid-cols-4"
+      )}>
+
+
         {[
           { label: t('visitsTodayLabel'), value: todayVisits.length, sub: `${confirmedToday.length} ${t('confirmed')}`, icon: Calendar, color: 'emerald' },
           { label: t('pendingRequests'), value: pendingVisits.length, sub: t('needYourAction'), icon: Clock, color: 'amber' },
           { label: t('totalVisitsLabel'), value: visits.length, sub: `${visits.filter(v => v.status === 'Completed').length} ${t('completedVisitsStat')}`, icon: CheckCircle2, color: 'blue' },
-          { label: t('earnings'), value: formatCurrency(balance, country), sub: t('estFromVisits'), icon: DollarSign, color: 'purple' },
+          ...((!doctorId || (getDoctors().find(d => d.id === doctorId)?.hospitalId === 'default')) 
+            ? [{ label: t('earnings'), value: formatCurrency(balance, country), sub: t('estFromVisits'), icon: DollarSign, color: 'purple' }] 
+            : []
+          ),
         ].map(({ label, value, sub, icon: Icon, color }) => (
+
           <div key={label} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-medium text-gray-500 dark:text-slate-400">{label}</span>
@@ -84,7 +106,10 @@ export function DoctorDashboard() {
         ))}
       </div>
 
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+
         {/* Pending Requests */}
         <div className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">

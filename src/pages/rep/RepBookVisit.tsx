@@ -75,20 +75,35 @@ export function RepBookVisit() {
 
   useEffect(() => {
     refreshData();
+    const interval = setInterval(refreshData, 5000);
+    return () => clearInterval(interval);
   }, [userId]);
+
+
+  // Keep selectedDoctor reactive to the latest doctors data
+  useEffect(() => {
+    if (selectedDoctor) {
+      const latest = doctors.find(d => d.id === selectedDoctor.id);
+      if (latest && JSON.stringify(latest.availability) !== JSON.stringify(selectedDoctor.availability)) {
+        setSelectedDoctor(latest);
+      }
+    }
+  }, [doctors]);
+
 
   const filtered = doctors.filter(d => {
     // Location matchmaker (Strict filters)
     const repCountry = repData?.location?.country || 'sa';
     const repCities = repData?.location?.cities || [];
     
-    // Country must match
-    const matchCountry = d.location?.country === repCountry;
+    // Country must match (Default to match if doctor location is uninitialized)
+    const matchCountry = !d.location?.country || d.location?.country === repCountry;
     
-    // City must be in the rep's operating cities
-    const matchCity = !repCities.length || (d.location?.city && repCities.includes(d.location.city));
+    // City must match (Default to match if city is uninitialized)
+    const matchCity = !repCities.length || !d.location?.city || repCities.includes(d.location.city);
     
     if (!matchCountry || !matchCity) return false;
+
 
     const matchSearch = !search || d.name.toLowerCase().includes(search.toLowerCase()) || d.hospitalName.toLowerCase().includes(search.toLowerCase());
     const matchSpecialty = specialtyFilter === 'All' || d.specialty === specialtyFilter;
@@ -182,10 +197,14 @@ export function RepBookVisit() {
         durationMinutes: slot.duration,
         price: slot.price,
         notes: visitNotes.trim() || undefined,
+        slotId: slot.id,
         createdAt: new Date().toISOString(),
       };
+
       saveVisit(visit);
     });
+
+
 
     const bookedIds = slotsToBook.map(s => s.id);
     const updatedAvail = selectedDoctor.availability.map(s =>

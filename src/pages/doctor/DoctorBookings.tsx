@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { 
   getVisits, saveVisit, getDoctors, Visit, VisitStatus, pushNotification,
-  processVisitPayment, getSalesReps, saveSalesRep, saveDoctorAvailability, getDoctorAvailability
+  processVisitPayment, getSalesReps, saveSalesRep, saveDoctorAvailability, getDoctorAvailability,
+  refundVisitPayment
 } from '@/lib/store';
+
+
 import { useAuth } from '@/lib/auth';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -50,32 +53,35 @@ export function DoctorBookings() {
   const handleAction = (visit: Visit, action: 'Confirmed' | 'Cancelled') => {
     const isConfirming = action === 'Confirmed';
     const isRejectingPending = action === 'Cancelled' && visit.status === 'Pending';
-    
-    // 1. Process Financials if applicable
+
+    // 1. Process Financials ONLY on Confirmation
     if (isConfirming && visit.status === 'Pending') {
-      // Confirming a pending visit: Trigger the payment split
       if (visit.price) {
         processVisitPayment(visit.price, visit.doctorId);
       }
     } else if (isRejectingPending) {
-      // Rejecting a pending visit: Refund the REP
+      // Rejecting a pending visit: Refund the REP's locked budget
       const reps = getSalesReps();
       const repObj = reps.find(r => r.id === visit.repId);
       if (repObj && visit.price) {
         saveSalesRep({ ...repObj, balance: (repObj.balance || 0) + visit.price });
+        // NOTE: No refundVisitPayment needed here since we haven't paid out yet. 
       }
 
       // AND Free the slot!
       const avail = getDoctorAvailability(visit.doctorId);
       const updatedAvail = avail.map(s => {
-        // Match by date and time to find the slot
-        if (s.date === visit.date && s.time === visit.time) {
+        // Precise matching using slotId, falling back to date/time for legacy support
+        const isMatch = visit.slotId ? s.id === visit.slotId : (s.date === visit.date && s.time === visit.time);
+        if (isMatch) {
           return { ...s, isBooked: false };
         }
         return s;
       });
       saveDoctorAvailability(visit.doctorId, updatedAvail);
     }
+
+
 
     const updated = { ...visit, status: action };
     saveVisit(updated);

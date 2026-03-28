@@ -123,6 +123,8 @@ export default function App() {
                 
                 {/* Admin */}
                 <Route path="admin-control" element={<AdminDashboard />} />
+                <Route path="admin-control/:tab" element={<AdminDashboard />} />
+
               </Route>
 
               <Route path="*" element={<Navigate to="/" replace />} />

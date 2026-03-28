@@ -56,6 +56,8 @@ export interface SalesRep {
   location?: {
     country: string;
     city?: string;
+    cities?: string[];
+    area?: string;
     areas?: string[];
   };
   products?: any[];
@@ -79,7 +81,9 @@ export interface Hospital {
     address: boolean;
     vat: boolean;
   };
+  balance?: number;
 }
+
 
 export interface PharmaCompany {
   id: string;
@@ -128,8 +132,10 @@ export interface Visit {
   notes?: string;           
   outcomeNotes?: string;    
   cancelledByRep?: boolean; 
+  slotId?: string;
   createdAt: string;
 }
+
 
 export interface Bundle {
   id: string;
@@ -165,12 +171,17 @@ export interface Notification {
 
 export interface Transaction {
   id: string;
-  pharmaId: string;
-  bundleName: string;
-  fundsAdded: number;
-  amountSAR: number;
-  date: string;
+  type: 'visit_payout' | 'pharma_deposit' | 'admin_commission' | 'rep_booking_deduction' | 'refund';
+  amount: number;
+  currency: string;
+  fromId: string;
+  fromName: string;
+  toId: string;
+  toName: string;
+  relatedId?: string; // Visit ID or Bundle ID
+  createdAt: string;
 }
+
 
 const BUNDLES: Bundle[] = [
   {
@@ -242,8 +253,10 @@ function mapVisitToDB(v: Visit) {
     notes: v.notes,
     outcome_notes: v.outcomeNotes,
     cancelled_by_rep: v.cancelledByRep,
+    slot_id: v.slotId
   };
 }
+
 
 function mapVisitFromDB(db: any): Visit {
   return {
@@ -266,9 +279,57 @@ function mapVisitFromDB(db: any): Visit {
     notes: db.notes,
     outcomeNotes: db.outcome_notes,
     cancelledByRep: db.cancelled_by_rep,
+    slotId: db.slot_id,
     createdAt: db.created_at,
   };
 }
+
+export function getTransactions(): Transaction[] {
+  return load<Transaction[]>('transactions', []);
+}
+
+export function saveTransaction(t: Transaction) {
+  const list = getTransactions();
+  list.unshift(t);
+  save('transactions', list.slice(0, 1000));
+  notifyMutation();
+  if (isSupabaseConfigured) {
+    supabase.from('transactions').upsert(mapTransactionToDB(t)).then(({error}) => error && console.error("Cloud push failed:", error));
+  }
+}
+
+function mapTransactionToDB(t: Transaction) {
+  return {
+    id: t.id,
+    type: t.type,
+    amount: t.amount || 0,
+    currency: t.currency || 'SAR',
+    from_id: t.fromId || 'unknown',
+    from_name: t.fromName || 'Unknown',
+    to_id: t.toId || 'unknown',
+    to_name: t.toName || 'Unknown',
+    related_id: t.relatedId || null,
+    created_at: t.createdAt || new Date().toISOString()
+  };
+}
+
+function mapTransactionFromDB(db: any): Transaction {
+  return {
+    id: db.id || 'err-' + Math.random().toString(36).slice(2, 7),
+    type: db.type || 'transaction',
+    amount: Number(db.amount) || 0,
+    currency: db.currency || 'SAR',
+    fromId: db.from_id || '',
+    fromName: db.from_name || 'Unknown Entity',
+    toId: db.to_id || '',
+    toName: db.to_name || 'Unknown Entity',
+    relatedId: db.related_id,
+    createdAt: db.created_at || new Date().toISOString()
+  };
+}
+
+
+
 
 function mapDoctorToDB(d: Doctor) {
   return {
@@ -325,9 +386,11 @@ function mapHospitalToDB(h: Hospital) {
     type: h.type,
     phone: h.phone,
     email: h.email,
-    avatar: h.avatar
+    avatar: h.avatar,
+    balance: h.balance || 0
   };
 }
+
 
 function mapHospitalFromDB(db: any): Hospital {
   let docs = null;
@@ -344,9 +407,11 @@ function mapHospitalFromDB(db: any): Hospital {
     role: db.role,
     type: db.type || 'hospital',
     avatar: db.avatar,
-    documents: docs
+    documents: docs,
+    balance: db.balance || 0
   };
 }
+
 
 function mapPharmaToDB(p: PharmaCompany) {
   const data: any = { 
@@ -445,6 +510,25 @@ function mapBundleRequestFromDB(db: any): BundleRequest {
   };
 }
 
+const mergeData = (local: any[], cloud: any[], fallbackKeys: string[] = []) => {
+  const map = new Map(local.map(i => [i.id, i]));
+  cloud.forEach(i => {
+    const existing = map.get(i.id);
+    if (existing) {
+      fallbackKeys.forEach(k => {
+        // Local fallback (existing[k]) wins for critical fields 
+        // unless local is truly empty/null/undefined
+        // Local wins for critical fields (existing[k]) 
+        if (existing[k] !== undefined && existing[k] !== null) {
+          i[k] = existing[k];
+        }
+      });
+    }
+    // If it exists in cloud, this overwrites the local item in the map with the merged version
+    map.set(i.id, { ...(existing || {}), ...i });
+  });
+  return Array.from(map.values());
+};
 
 // BACKGROUND SYNC POLLER
 export async function syncCloudData() {
@@ -465,35 +549,22 @@ export async function syncCloudData() {
 
     // Only skip merging local-to-cloud push if mutation was VERY recent (within 2s)
     // This allows background cloud-to-local sync to be more aggressive
-    if (Date.now() - getLastMutationTime() < 2000) return;
+    // Increase safety window to 5s to prevent race conditions during cloud pull/push
+    if (Date.now() - getLastMutationTime() < 5000) return;
 
-    const mergeData = (local: any[], cloud: any[], fallbackKeys: string[] = []) => {
-      const map = new Map(local.map(i => [i.id, i]));
-      cloud.forEach(i => {
-        const existing = map.get(i.id);
-        if (existing) {
-          fallbackKeys.forEach(k => {
-            // Only use local fallback if cloud is truly missing/null, 
-            // but NOT if cloud is 0 (as 0 might be a legitimate update)
-            if (i[k] === null || i[k] === undefined) {
-              i[k] = existing[k] !== undefined ? existing[k] : i[k];
-            }
-          });
-        }
-        map.set(i.id, i);
-      });
-      return Array.from(map.values());
-    };
 
-    if (hospitals.data) save('hospitals', mergeData(getHospitals(), hospitals.data.map(mapHospitalFromDB)));
-    if (doctors.data) save('doctors', mergeData(getDoctors(), doctors.data.map(mapDoctorFromDB)));
+
+    if (hospitals.data) save('hospitals', mergeData(getHospitals(), hospitals.data.map(mapHospitalFromDB), ['balance']));
+    if (doctors.data) save('doctors', mergeData(getDoctors(), doctors.data.map(mapDoctorFromDB), ['balance', 'availability']));
     if (reps.data) save('sales_reps', mergeData(getSalesReps(), reps.data.map(mapRepFromDB), ['balance', 'target', 'visitsThisMonth']));
     if (pharma.data) save('pharma_companies', mergeData(getPharmaCompanies(), pharma.data.map(mapPharmaFromDB), ['balance']));
-    if (visits.data) save('visits', mergeData(getVisits(), visits.data.map(mapVisitFromDB)));
-    if (notifications.data) save('notifications', mergeData(load('notifications', []), notifications.data.map(mapNotifFromDB).slice(0, 100)));
+    if (visits.data) save('visits', mergeData(getVisits(), visits.data.map(mapVisitFromDB), ['status', 'price', 'outcomeNotes']));
+    if (notifications.data) save('notifications', mergeData(load('notifications', []), notifications.data.map(mapNotifFromDB).slice(0, 100), ['read']));
+
     if (bundleReqs.data) save('bundle_requests', mergeData(getBundleRequests(), bundleReqs.data.map(mapBundleRequestFromDB)));
     if (transactions.data) save('transactions', mergeData(getTransactions(), transactions.data.map(mapTransactionFromDB)));
     if (finance.data && finance.data[0]) save('admin_balance', finance.data[0].admin_balance);
+
 
     const slots = await supabase.from('availability_slots').select('*');
     if (slots.data && Date.now() - getLastMutationTime() > 10000) {
@@ -516,7 +587,9 @@ setInterval(syncCloudData, 10000);
 
 
 // ── DATA ACCESS & MUTATION FUNCTIONS ─────────────────────────────
-export function getHospitals(): Hospital[] { return load<Hospital[]>('hospitals', []); }
+export function getHospitals(): Hospital[] { 
+  return load<Hospital[]>('hospitals', []).map(h => h.location ? { ...h, location: { ...h.location, city: h.location.city?.replace(/^city_/, '') } } : h); 
+}
 export function saveHospital(hospital: Hospital) {
   const list = getHospitals();
   const idx = list.findIndex(h => h.id === hospital.id);
@@ -536,7 +609,7 @@ export function deleteHospital(id: string) {
 }
 
 export function getDoctors(): Doctor[] { 
-  return load<Doctor[]>('doctors', []).map(d => ({ ...d, availability: getDoctorAvailability(d.id) }));
+  return load<Doctor[]>('doctors', []).map(d => d.location ? { ...d, location: { ...d.location, city: d.location.city?.replace(/^city_/, '') } } : d).map(d => ({ ...d, availability: getDoctorAvailability(d.id) }));
 }
 export function saveDoctor(doctor: Doctor) {
   const list = getDoctors();
@@ -559,7 +632,9 @@ export function deleteDoctor(id: string) {
   }
 }
 
-export function getSalesReps(): SalesRep[] { return load<SalesRep[]>('sales_reps', []); }
+export function getSalesReps(): SalesRep[] { 
+  return load<SalesRep[]>('sales_reps', []).map(r => r.location ? { ...r, location: { ...r.location, city: r.location.city?.replace(/^city_/, ''), cities: r.location.cities?.map(c => c.replace(/^city_/, '')) } } : r); 
+}
 export function saveSalesRep(rep: SalesRep) {
   const list = getSalesReps();
   const idx = list.findIndex(r => r.id === rep.id);
@@ -609,7 +684,9 @@ export function topupRepBalance(repId: string, amount: number) {
   saveSalesRep(reps[idx]);
 }
 
-export function getPharmaCompanies(): PharmaCompany[] { return load<PharmaCompany[]>('pharma_companies', []); }
+export function getPharmaCompanies(): PharmaCompany[] { 
+  return load<PharmaCompany[]>('pharma_companies', []).map(p => p.location ? { ...p, location: { ...p.location, city: p.location.city?.replace(/^city_/, '') } } : p); 
+}
 export function savePharmaCompany(company: PharmaCompany) {
   const list = getPharmaCompanies();
   const idx = list.findIndex(c => c.id === company.id);
@@ -621,6 +698,17 @@ export function savePharmaCompany(company: PharmaCompany) {
   }
 }
 export function deletePharma(id: string) {
+  // 1. Purge associated representatives from the grid
+  const reps = getSalesReps();
+  const associatedReps = reps.filter(r => r.pharmaId === id);
+  associatedReps.forEach(r => {
+    save('sales_reps', getSalesReps().filter(sr => sr.id !== r.id));
+    if (isSupabaseConfigured) {
+      supabase.from('sales_reps').delete().eq('id', r.id).then();
+    }
+  });
+
+  // 2. Remove the Pharma entity
   save('pharma_companies', getPharmaCompanies().filter(p => p.id !== id));
   notifyMutation();
   if (isSupabaseConfigured) {
@@ -671,33 +759,24 @@ export function markNotificationRead(id: string) {
   if (isSupabaseConfigured) supabase.from('notifications').update({ read: true }).eq('id', id).then(({error}) => error && console.error("Cloud push failed:", error));
 }
 export function markAllNotificationsRead() {
-  const list = getNotifications().map(n => ({ ...n, read: true }));
+  const current = getNotifications();
+  const unreadIds = current.filter(n => !n.read).map(n => n.id);
+  
+  const list = current.map(n => ({ ...n, read: true }));
   save('notifications', list);
   notifyMutation();
-}
-
-export function getTransactions(): Transaction[] { return load<Transaction[]>('transactions', []); }
-export function saveTransaction(t: Transaction) {
-  const list = getTransactions();
-  list.unshift(t);
-  save('transactions', list);
-  notifyMutation();
-  if (isSupabaseConfigured) {
-    supabase.from('transactions').upsert({
-      id: t.id, pharma_id: t.pharmaId, bundle_name: t.bundleName,
-      funds_added: t.fundsAdded, amount_sar: t.amountSAR, date: t.date
-    }).then(({error}) => error && console.error("Transaction Cloud Push Failed:", error));
+  
+  if (isSupabaseConfigured && unreadIds.length > 0) {
+    supabase.from('notifications')
+      .update({ read: true })
+      .in('id', unreadIds)
+      .then(({error}) => error && console.error("Cloud push failed:", error));
   }
 }
 
-function mapTransactionFromDB(db: any): Transaction {
-  return {
-    id: db.id, pharmaId: db.pharma_id, bundleName: db.bundle_name,
-    fundsAdded: db.funds_added, amountSAR: db.amount_sar, date: db.date
-  };
-}
 
 export function getAdminBalance(): number { return load<number>('admin_balance', 0); }
+
 export function saveAdminBalance(balance: number) {
   save('admin_balance', balance);
   notifyMutation();
@@ -711,22 +790,138 @@ export function saveAdminBalance(balance: number) {
 }
 
 export function processVisitPayment(amount: number, doctorId: string) {
-  // 1. Calculate split (20% to admin, 80% to doctor)
+  if (!amount || amount <= 0) return;
+
+  // 1. Calculate split (20% to admin, 80% to service provider)
   const adminShare = Math.floor(amount * 0.2);
-  const doctorShare = amount - adminShare; // Better than Math.floor(amount * 0.8) to avoid losing pennies
+  const providerShare = amount - adminShare; 
 
   // 2. Update Admin Balance
   const currentAdminBalance = getAdminBalance();
   saveAdminBalance(currentAdminBalance + adminShare);
 
-  // 3. Update Doctor Balance
+  // 3. Determine if doctor belongs to a hospital
   const doctors = getDoctors();
-  const docIdx = doctors.findIndex(d => d.id === doctorId);
-  if (docIdx >= 0) {
-    doctors[docIdx].balance = (doctors[docIdx].balance || 0) + doctorShare;
-    saveDoctor(doctors[docIdx]);
+  let doctor = doctors.find(d => d.id === doctorId);
+  
+  // Extra safety: If not found by ID (maybe old data), try by userId or email
+  if (!doctor) doctor = doctors.find(d => d.userId === doctorId);
+
+  if (!doctor) return;
+
+  // Self-Healing: If we find a LATER record with a hospital link for this same person, use that!
+  const betterLinkedDoc = doctors.find(d => d.email === doctor.email && d.hospitalId && d.hospitalId !== 'default');
+  if (betterLinkedDoc) doctor = betterLinkedDoc;
+
+  const hospitalId = doctor.hospitalId;
+
+
+  if (hospitalId && hospitalId !== 'default') {
+    // Split 80% to Hospital
+    const hospitals = getHospitals();
+    const hospIdx = hospitals.findIndex(h => h.id === hospitalId);
+    if (hospIdx >= 0) {
+      hospitals[hospIdx].balance = (Number(hospitals[hospIdx].balance) || 0) + providerShare;
+      saveHospital(hospitals[hospIdx]);
+      
+      // Log Hospital Payout
+      saveTransaction({
+        id: generateId(),
+        type: 'visit_payout',
+        amount: providerShare,
+        currency: 'SAR',
+        fromId: 'system',
+        fromName: 'Escrow',
+        toId: hospitals[hospIdx].id,
+        toName: hospitals[hospIdx].name,
+        createdAt: new Date().toISOString()
+      });
+    } else {
+      // Fallback to doctor if hospital not found
+      doctor.balance = (Number(doctor.balance) || 0) + providerShare;
+      saveDoctor(doctor);
+
+      // Log Doctor Payout
+      saveTransaction({
+        id: generateId(),
+        type: 'visit_payout',
+        amount: providerShare,
+        currency: 'SAR',
+        fromId: 'system',
+        fromName: 'Escrow',
+        toId: doctor.id,
+        toName: doctor.name,
+        createdAt: new Date().toISOString()
+      });
+    }
+  } else {
+    // 80% to independent Doctor
+    doctor.balance = (Number(doctor.balance) || 0) + providerShare;
+    saveDoctor(doctor);
+
+    // Log Independent Payout
+    saveTransaction({
+      id: generateId(),
+      type: 'visit_payout',
+      amount: providerShare,
+      currency: 'SAR',
+      fromId: 'system',
+      fromName: 'Escrow',
+      toId: doctor.id,
+      toName: doctor.name,
+      createdAt: new Date().toISOString()
+    });
+  }
+
+  // Log Admin Commission
+  saveTransaction({
+    id: generateId(),
+    type: 'admin_commission',
+    amount: adminShare,
+    currency: 'SAR',
+    fromId: doctor.id,
+    fromName: doctor.name,
+    toId: 'admin',
+    toName: 'System Admin',
+    createdAt: new Date().toISOString()
+  });
+}
+
+
+export function refundVisitPayment(amount: number, doctorId: string) {
+  if (!amount || amount <= 0) return;
+
+  const adminShare = Math.floor(amount * 0.2);
+  const providerShare = amount - adminShare;
+
+  // 1. Deduct from Admin
+  const currentAdminBalance = getAdminBalance();
+  saveAdminBalance(Math.max(0, currentAdminBalance - adminShare));
+
+  // 2. Deduct from Doctor or Hospital
+  const doctors = getDoctors();
+  const doctor = doctors.find(d => d.id === doctorId);
+  if (!doctor) return;
+
+  const hospitalId = doctor.hospitalId;
+
+  if (hospitalId && hospitalId !== 'default') {
+    const hospitals = getHospitals();
+    const hospIdx = hospitals.findIndex(h => h.id === hospitalId);
+    if (hospIdx >= 0) {
+      hospitals[hospIdx].balance = Math.max(0, (Number(hospitals[hospIdx].balance) || 0) - providerShare);
+      saveHospital(hospitals[hospIdx]);
+    } else {
+      doctor.balance = Math.max(0, (Number(doctor.balance) || 0) - providerShare);
+      saveDoctor(doctor);
+    }
+  } else {
+    doctor.balance = Math.max(0, (Number(doctor.balance) || 0) - providerShare);
+    saveDoctor(doctor);
   }
 }
+
+
 
 export function getBundles(): Bundle[] { return BUNDLES; }
 
@@ -1017,13 +1212,23 @@ export async function ensureUserEntityExists(user: any) {
 
     if (error) return;
 
-    // Sync cloud data to local state
-    if (role === 'pharma') savePharmaCompany(mapPharmaFromDB(data));
-    else if (role === 'hospital') saveHospital(mapHospitalFromDB(data));
-    else if (role === 'doctor') saveDoctor(mapDoctorFromDB(data));
-    else if (role === 'rep') saveSalesRep(mapRepFromDB(data));
+    // Sync cloud data to local state with conflict resolution (Local-First)
+    if (role === 'pharma') {
+      const cloud = mapPharmaFromDB(data);
+      savePharmaCompany(mergeData(getPharmaCompanies(), [cloud], ['balance']).find(p => p.id === cloud.id) || cloud);
+    } else if (role === 'hospital') {
+      const cloud = mapHospitalFromDB(data);
+      saveHospital(mergeData(getHospitals(), [cloud], ['balance']).find(h => h.id === cloud.id) || cloud);
+    } else if (role === 'doctor') {
+      const cloud = mapDoctorFromDB(data);
+      saveDoctor(mergeData(getDoctors(), [cloud], ['balance', 'availability']).find(d => d.id === cloud.id) || cloud);
+    } else if (role === 'rep') {
+      const cloud = mapRepFromDB(data);
+      saveSalesRep(mergeData(getSalesReps(), [cloud], ['balance', 'target', 'visitsThisMonth']).find(r => r.id === cloud.id) || cloud);
+    }
     
     notifyMutation();
+
   } catch (err) {
     console.error("Failed to ensure user entity exists:", err);
   }
