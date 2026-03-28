@@ -134,6 +134,13 @@ export interface Visit {
   cancelledByRep?: boolean; 
   slotId?: string;
   createdAt: string;
+  
+  // New reporting fields
+  samplesDelivered?: string[];
+  interestLevel?: 'Low' | 'Medium' | 'High';
+  followUpDate?: string;
+  doctorRating?: number;
+  repRating?: number;
 }
 
 
@@ -164,8 +171,19 @@ export interface Notification {
   userId: string;
   title: string;
   message: string;
-  type: 'booking' | 'confirmation' | 'cancellation' | 'info';
+  type: 'booking' | 'confirmation' | 'cancellation' | 'info' | 'rating';
   read: boolean;
+  createdAt: string;
+}
+
+export interface Rating {
+  id: string;
+  visitId: string;
+  doctorId: string;
+  repId: string;
+  rating: number; // 1-5
+  comment?: string;
+  type: 'doctor_to_rep' | 'rep_to_doctor';
   createdAt: string;
 }
 
@@ -771,6 +789,43 @@ export function markAllNotificationsRead() {
       .update({ read: true })
       .in('id', unreadIds)
       .then(({error}) => error && console.error("Cloud push failed:", error));
+  }
+}
+
+export function clearAllNotifications() {
+  save('notifications', []);
+  notifyMutation();
+  // Optional: Add cloud delete if needed
+}
+
+// ── RATINGS ──────────────────────────────────────────────────
+export function getRatings(): Rating[] {
+  return load<Rating[]>('ratings', []);
+}
+
+export function doctorAverageRating(doctorId: string): number {
+  const all = getRatings().filter(r => r.doctorId === doctorId && r.type === 'rep_to_doctor');
+  if (all.length === 0) return 0;
+  return Math.round((all.reduce((s, r) => s + r.rating, 0) / all.length) * 10) / 10;
+}
+
+export function saveRating(r: Rating) {
+  const list = getRatings();
+  list.push(r);
+  save('ratings', list);
+  notifyMutation();
+  
+  if (isSupabaseConfigured) {
+    supabase.from('ratings').upsert({
+      id: r.id,
+      visit_id: r.visitId,
+      doctor_id: r.doctorId,
+      rep_id: r.repId,
+      rating: r.rating,
+      comment: r.comment,
+      type: r.type,
+      created_at: r.createdAt
+    }).then();
   }
 }
 

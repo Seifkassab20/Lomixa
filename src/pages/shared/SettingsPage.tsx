@@ -39,7 +39,12 @@ import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useTheme } from "@/components/ThemeProvider";
 import { cn } from "@/lib/utils";
 import { Palette, Sparkles, Layout } from "lucide-react";
-import { ARABIC_COUNTRY_CODES, COUNTRIES, CITY_MAP, SPECIALTIES } from "@/lib/constants";
+import {
+  ARABIC_COUNTRY_CODES,
+  COUNTRIES,
+  CITY_MAP,
+  SPECIALTIES,
+} from "@/lib/constants";
 
 export function SettingsPage() {
   const { userId, user, role } = useAuth();
@@ -140,9 +145,10 @@ export function SettingsPage() {
         newPassword: "",
         specialty: doctorEntity?.specialty || "",
         hospitalId: doctorEntity?.hospitalId || "default",
-        facilityType: (role === "hospital" ? (entity as any)?.type : "hospital") || "hospital",
+        facilityType:
+          (role === "hospital" ? (entity as any)?.type : "hospital") ||
+          "hospital",
       });
-
     }
   }, [userId, user]);
 
@@ -402,11 +408,10 @@ export function SettingsPage() {
     doctor: "doctor",
     rep: "salesRep",
   };
-  
-  const isAffiliatedDoctor = role === "doctor" && form.hospitalId && form.hospitalId !== "default";
+
+  const isAffiliatedDoctor =
+    role === "doctor" && form.hospitalId && form.hospitalId !== "default";
   const showOrgField = role === "doctor" || role === "rep";
-
-
 
   return (
     <div className="space-y-8 max-w-3xl pb-12">
@@ -506,12 +511,17 @@ export function SettingsPage() {
                       value={form.phoneCode}
                       onChange={(e) => {
                         const code = e.target.value;
-                        const match = ARABIC_COUNTRY_CODES.find(c => c.code === code);
-                        setForm((f) => ({ 
-                          ...f, 
+                        const match = ARABIC_COUNTRY_CODES.find(
+                          (c) => c.code === code,
+                        );
+                        setForm((f) => ({
+                          ...f,
                           phoneCode: code,
                           country: match?.countryId || f.country,
-                          city: match?.countryId && match.countryId !== f.country ? "" : f.city
+                          city:
+                            match?.countryId && match.countryId !== f.country
+                              ? ""
+                              : f.city,
                         }));
                       }}
                       className="w-full h-12 pl-3 pr-8 rounded-xl bg-app-card border border-slate-200 dark:border-slate-800 text-xs font-bold focus:ring-2 focus:ring-emerald-500/20 outline-none appearance-none"
@@ -578,7 +588,12 @@ export function SettingsPage() {
                   <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">
                     {role === "doctor" ? t("hospital") : t("pharmaCompany")}
                   </Label>
-                   <div className={cn("relative group", isAffiliatedDoctor && "opacity-60")}>
+                  <div
+                    className={cn(
+                      "relative group",
+                      isAffiliatedDoctor && "opacity-60",
+                    )}
+                  >
                     <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-brand transition-colors" />
                     <Input
                       value={form.organization}
@@ -586,7 +601,6 @@ export function SettingsPage() {
                         setForm((f) => ({ ...f, organization: e.target.value }))
                       }
                       disabled={isAffiliatedDoctor}
-
                       placeholder={
                         role === "doctor" ? t("hospital") : t("pharmaCompany")
                       }
@@ -603,8 +617,8 @@ export function SettingsPage() {
                   <div className="flex gap-2">
                     {[
                       { id: "hospital", label: t("hospital") },
-                      { id: "clinic", label: t("clinic") }
-                    ].map(t => {
+                      { id: "clinic", label: t("clinic") },
+                    ].map((t) => {
                       const isActive = form.facilityType === t.id;
                       if (!isActive) return null; // Show ONLY the current type
                       return (
@@ -618,7 +632,8 @@ export function SettingsPage() {
                     })}
                   </div>
                   <p className="text-[9px] text-slate-400 ml-1 italic">
-                    Organization type is linked to your registration and cannot be changed here.
+                    Organization type is linked to your registration and cannot
+                    be changed here.
                   </p>
                 </div>
               )}
@@ -636,7 +651,9 @@ export function SettingsPage() {
                       }
                       className="w-full h-12 pl-4 pr-10 rounded-xl bg-app-card border border-slate-200 dark:border-slate-800 text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none appearance-none font-bold"
                     >
-                      <option value="">{t("selectSpecialty") || "Select Specialty"}</option>
+                      <option value="">
+                        {t("selectSpecialty") || "Select Specialty"}
+                      </option>
                       {SPECIALTIES.map((s) => (
                         <option key={s} value={s}>
                           {t(s.toLowerCase().replace(" ", "")) || s}
@@ -674,7 +691,9 @@ export function SettingsPage() {
                     value={form.country}
                     onChange={(e) => {
                       const countryId = e.target.value;
-                      const match = ARABIC_COUNTRY_CODES.find(c => c.countryId === countryId);
+                      const match = ARABIC_COUNTRY_CODES.find(
+                        (c) => c.countryId === countryId,
+                      );
                       setForm((f) => ({
                         ...f,
                         country: countryId,
@@ -712,7 +731,13 @@ export function SettingsPage() {
                     </option>
                     {CITY_MAP[form.country]?.map((c) => (
                       <option key={c} value={c}>
-                        {t(`city_${c.replace(/^city_/, "").toLowerCase().replace(/\s+/g, "_")}`, c.replace(/^city_/, ""))}
+                        {t(
+                          `city_${c
+                            .replace(/^city_/, "")
+                            .toLowerCase()
+                            .replace(/\s+/g, "_")}`,
+                          c.replace(/^city_/, ""),
+                        )}
                       </option>
                     ))}
                   </select>

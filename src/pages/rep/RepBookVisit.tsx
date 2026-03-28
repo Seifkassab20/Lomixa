@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   getDoctors, saveVisit, saveDoctor, getSalesReps, getPharmaCompanies, savePharmaCompany,
   generateId, Visit, VisitType, pushNotification, Doctor, SalesRep, saveSalesRep, saveDoctorAvailability, processVisitPayment,
-  getAdminBalance, saveAdminBalance
+  getAdminBalance, saveAdminBalance, doctorAverageRating
 } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { useTranslation } from 'react-i18next';
@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { JitsiMeeting } from '@/components/JitsiMeeting';
-import { Search, Video, Phone, MapPin, MessageSquare, Calendar, Clock, CheckCircle2, CreditCard, X, FileText, Sparkles, Zap, ChevronDown, Stethoscope } from 'lucide-react';
+import { Search, Video, Phone, MapPin, MessageSquare, Calendar, Clock, CheckCircle2, CreditCard, X, FileText, Sparkles, Zap, ChevronDown, Stethoscope, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { sendEmail, EmailTemplates } from '@/lib/email';
 
@@ -372,6 +372,10 @@ export function RepBookVisit() {
                             <Clock className="h-3 w-3" />
                             {openSlots} {t('slotsOpen', { count: openSlots }) || 'slots open'}
                           </div>
+                          <div className="flex items-center gap-1 mt-1">
+                            <Star className="h-3 w-3 text-amber-500 fill-amber-500" />
+                            <span className="text-xs font-bold text-amber-600 dark:text-amber-400">{doctorAverageRating(doc.id) || 'New'}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -413,6 +417,10 @@ export function RepBookVisit() {
                         </div>
                         <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">
                           📍 {doc.hospitalName} &nbsp;•&nbsp; {doc.experienceYears}y exp
+                        </div>
+                        <div className="flex items-center gap-1 mt-1.5">
+                          <Star className="h-3 w-3 text-amber-500 fill-amber-500" />
+                          <span className="text-xs font-bold text-amber-600 dark:text-amber-400">{doctorAverageRating(doc.id) || 'New'}</span>
                         </div>
                       </div>
                     </div>

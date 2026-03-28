@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getNotifications, markNotificationRead, markAllNotificationsRead, Notification } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
-import { Bell, CheckCheck, Calendar, X, Info, AlertCircle } from 'lucide-react';
+import { Bell, CheckCheck, Calendar, X, Info, AlertCircle, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +11,7 @@ const TYPE_ICONS = {
   confirmation: CheckCheck,
   cancellation: X,
   info: Info,
+  rating: Star,
 };
 
 const TYPE_COLORS = {
@@ -18,6 +19,7 @@ const TYPE_COLORS = {
   confirmation: 'text-emerald-500 bg-emerald-100 dark:bg-emerald-500/20',
   cancellation: 'text-red-500 bg-red-100 dark:bg-red-500/20',
   info: 'text-amber-500 bg-amber-100 dark:bg-amber-500/20',
+  rating: 'text-indigo-500 bg-indigo-100 dark:bg-indigo-500/20',
 };
 
 export function NotificationsPage() {
