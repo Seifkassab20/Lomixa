@@ -484,7 +484,8 @@ function mapRepToDB(r: SalesRep) {
     first_name: r.firstName,
     last_name: r.lastName,
     role_title: r.roleTitle,
-    target_specialties: r.targetSpecialties ? JSON.stringify(r.targetSpecialties) : null
+    target_specialties: r.targetSpecialties ? JSON.stringify(r.targetSpecialties) : null,
+    products: r.products ? JSON.stringify(r.products) : null
   };
 }
 

@@ -87,7 +87,7 @@ const resources = {
           badge: 'Enterprise'
         },
         hospital: {
-          title: 'Added Hospital / Clinic',
+          title: 'Hospital / Clinic',
           desc: 'Manage doctors and facility schedules',
           badge: 'Facility'
         },
@@ -442,7 +442,7 @@ const resources = {
       streetPlaceholder: 'Street, Building...',
 
       // ── Roles ──────────────────────────────────────────────────
-      hospital: 'Added Hospital',
+      hospital: 'Hospital',
       clinic: 'Clinic',
       hospitalDesc: 'Managing healthcare facilities requires precise coordination between medical staff and external partners. Our platform centralizes these interactions to ensure that clinical operations remain the top priority. Hospital managers can oversee all visitor activity while maintaining a professional environment for patients. Streamline your facility\'s scheduling and improve the structure of pharmaceutical engagement within your institution.',
       doctor: 'Doctor',

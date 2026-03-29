@@ -262,6 +262,7 @@ export function Login() {
                             return (
                               <button
                                 key={r.id}
+                                id={`role-btn-${r.id}`}
                                 type="button"
                                 onClick={() => setSelectedRole(r.id)}
                                 className={cn(
@@ -292,6 +293,7 @@ export function Login() {
                           <div className="relative group/input">
                             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 group-focus-within/input:text-emerald-500 transition-colors" />
                             <Input
+                              id="login-email"
                               type="email"
                               value={email}
                               onChange={(e) => setEmail(e.target.value)}
@@ -309,6 +311,7 @@ export function Login() {
                           <div className="relative group/input">
                             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 group-focus-within/input:text-emerald-500 transition-colors" />
                             <Input
+                              id="login-password"
                               type="password"
                               value={password}
                               onChange={(e) => setPassword(e.target.value)}
@@ -324,6 +327,7 @@ export function Login() {
                       )}
 
                       <Button 
+                        id="login-submit"
                         type="submit" 
                         disabled={loading}
                         className="w-full h-16 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-black uppercase tracking-[0.2em] text-sm shadow-xl shadow-emerald-900/40 transition-all hover:scale-[1.02] active:scale-[0.98]"

@@ -87,6 +87,8 @@ export function Register() {
     vatCertificate: null as File | null,
     // Doctor Specific
     doctorType: 'independent' as 'hospital' | 'independent',
+    // Hospital/Clinic Specific
+    hospitalType: 'hospital' as 'hospital' | 'clinic',
   });
 
 
@@ -277,7 +279,7 @@ export function Register() {
         const orgData = {
           ...profileData,
           name: formData.organizationName,
-          type: selectedRole as any,
+          type: selectedRole === 'hospital' ? formData.hospitalType : selectedRole as any,
           isActive: true,
           isVerified: false,
           documents: {
@@ -581,6 +583,35 @@ export function Register() {
                       </div>
 
 
+                   )}
+
+                   {selectedRole === 'hospital' && (
+                     <div className="md:col-span-2 space-y-4 pt-4 border-t border-white/5">
+                        <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic uppercase">{t('facilityType')}*</Label>
+                        <div className="grid grid-cols-2 gap-4">
+                           {[
+                             { id: 'hospital', label: t('hospital'), icon: Building2 },
+                             { id: 'clinic', label: t('clinic'), icon: Stethoscope }
+                           ].map(type => (
+                             <button
+                               key={type.id}
+                               type="button"
+                               onClick={() => setFormData(f => ({ ...f, hospitalType: type.id as any }))}
+                               className={cn(
+                                 "flex items-center gap-4 p-5 rounded-3xl border-2 transition-all text-left group",
+                                 formData.hospitalType === type.id 
+                                   ? "border-emerald-500 bg-emerald-500/10" 
+                                   : "border-slate-800 bg-black/40 hover:border-slate-700"
+                               )}
+                             >
+                                <div className={cn("p-2.5 rounded-xl transition-colors", formData.hospitalType === type.id ? "bg-emerald-500 text-white" : "bg-slate-900 text-slate-500")}>
+                                   <type.icon className="w-5 h-5" />
+                                </div>
+                                <span className={cn("text-xs font-black uppercase tracking-tight", formData.hospitalType === type.id ? "text-white" : "text-slate-500")}>{type.label}</span>
+                             </button>
+                           ))}
+                        </div>
+                     </div>
                    )}
 
                    {selectedRole === 'rep' && (
