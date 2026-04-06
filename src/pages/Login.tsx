@@ -166,11 +166,8 @@ export function Login() {
     { id: 'doctor', title: t('doctor'), icon: Stethoscope, color: 'bg-sky-500', light: 'bg-sky-500/10', border: 'border-sky-500/30' },
     { id: 'pharma', title: t('pharmaCompanyFull'), icon: Building2, color: 'bg-indigo-500', light: 'bg-indigo-500/10', border: 'border-indigo-500/30' },
     { id: 'rep', title: t('salesRep'), icon: Briefcase, color: 'bg-orange-500', light: 'bg-orange-500/10', border: 'border-orange-500/30' },
+    { id: 'admin', title: t('adminRole') || 'Administration', icon: Shield, color: 'bg-indigo-600', light: 'bg-indigo-600/10', border: 'border-indigo-600/30' },
   ];
-
-  if (showAdmin) {
-    roles.push({ id: 'admin', title: t('adminRole'), icon: Shield, color: 'bg-purple-500', light: 'bg-purple-500/10', border: 'border-purple-500/30' });
-  }
 
   const toggleLanguage = () => {
     const newLang = i18n.language === 'en' ? 'ar' : 'en';

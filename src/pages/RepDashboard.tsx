@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
-import { getVisits, getSalesReps, getPharmaCompanies, saveSalesRep, generateId } from '@/lib/store';
+import { getVisits, getSalesReps, getPharmaCompanies, saveSalesRep, generateId, useStoreListener, getBundleRequests } from '@/lib/store';
 import { Calendar, CreditCard, Clock, Target, Video, Phone, MapPin, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -11,27 +11,41 @@ import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '@/components/ui/Toast';
 import { formatCurrency } from '@/lib/currency';
-
-
+import { isRepSubscribed, getSubscriptionRemainingDays, getSubscriptionMaxDays } from '@/lib/store';
+import { ShieldAlert, Rocket, Lock } from 'lucide-react';
 
 export function RepDashboard() {
   const { userId, user } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { toast } = useToast();
+  const [subscribed, setSubscribed] = useState<boolean | null>(null);
+  const [remainingDays, setRemainingDays] = useState<number | null>(null);
+  const [maxDays, setMaxDays] = useState(30);
   const [visits, setVisits] = useState<ReturnType<typeof getVisits>>([]);
   const [balance, setBalance] = useState(0);
   const [country, setCountry] = useState('sa');
   const [showTopup, setShowTopup] = useState(false);
   const [topupAmount, setTopupAmount] = useState(500);
   const [meetingRoom, setMeetingRoom] = useState<string | null>(null);
-  const [repInfo, setRepInfo] = useState({ name: '', pharmaId: '', pharmaName: '', target: 25 });
+  const [repInfo, setRepInfo] = useState({ name: '', pharmaId: '', pharmaName: '', target: 25, id: '' });
 
-  const loadData = React.useCallback(() => {
+  const [hasPendingRequest, setHasPendingRequest] = useState(false);
+
+  const loadData = React.useCallback(async () => {
+    const isSub = isRepSubscribed(userId || '');
+    setSubscribed(isSub);
+    setRemainingDays(getSubscriptionRemainingDays(userId || ''));
+    setMaxDays(getSubscriptionMaxDays(userId || ''));
+
+    const reqs = getBundleRequests();
+    const myPending = reqs.find(r => (r.pharmaId === userId) && r.status === 'pending' && r.type === 'rep');
+    setHasPendingRequest(!!myPending);
+
     const reps = getSalesReps();
     const myRep = reps.find(r => r.userId === userId);
     if (myRep) {
-       setRepInfo({ name: myRep.name, pharmaId: myRep.pharmaId, pharmaName: myRep.pharmaName, target: myRep.target });
+       setRepInfo({ id: myRep.id, name: myRep.name, pharmaId: myRep.pharmaId, pharmaName: myRep.pharmaName, target: myRep.target });
        const myVisits = getVisits().filter(v => v.repId === myRep!.id);
        setVisits(myVisits.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
        setBalance(myRep!.balance || 0);
@@ -39,11 +53,13 @@ export function RepDashboard() {
     }
   }, [userId]);
 
+  useStoreListener(loadData);
+
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 10000);
-    return () => clearInterval(interval);
   }, [loadData]);
+
+  if (subscribed === null) return null;
 
   const TYPE_ICONS = { 'In Person': MapPin, Video, Call: Phone, Text: Clock };
   const thisMonth = new Date().getMonth();
@@ -66,25 +82,63 @@ export function RepDashboard() {
     <div className="space-y-6">
       {meetingRoom && <JitsiMeeting roomName={meetingRoom} displayName={repInfo.name} onClose={() => setMeetingRoom(null)} />}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: t('visitsThisMonth'), value: monthVisits, sub: `${t('target')}: ${repInfo.target}`, icon: Calendar, color: 'emerald' },
-          { label: t('myCredits') || 'My Balance', value: formatCurrency(balance, country), sub: t('availableForBookings'), icon: CreditCard, color: 'blue' },
-          { label: t('pendingApprovals'), value: pendingVisits.length, sub: t('awaitingResponse'), icon: Clock, color: 'amber' },
-          { label: t('confirmedVisits'), value: confirmedVisits.length, sub: t('readyToAttend'), icon: Target, color: 'purple' },
-        ].map(({ label, value, sub, icon: Icon, color }) => (
-          <div key={label} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium text-gray-500 dark:text-slate-400">{label}</span>
-              <div className={`h-8 w-8 rounded-lg bg-${color}-100 dark:bg-${color}-500/20 flex items-center justify-center`}>
-                <Icon className={`h-4 w-4 text-${color}-600 dark:text-${color}-400`} />
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+         {/* Subscription Status Widget */}
+         <div className="lg:col-span-1 bg-slate-900/40 border dark:border-slate-800 rounded-[2.5rem] p-10 flex flex-col items-center justify-center text-center space-y-6 backdrop-blur-xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-emerald-500/10 transition-all duration-700"></div>
+            
+            <div className="relative w-36 h-36">
+              <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                <circle className="text-slate-800 stroke-current" strokeWidth="6" fill="transparent" r="42" cx="50" cy="50" />
+                <circle 
+                  className={cn(
+                    "stroke-current transition-all duration-1000 ease-out",
+                    (remainingDays && remainingDays < 7) ? "text-amber-500" : "text-emerald-500"
+                  )} 
+                  strokeWidth="6" 
+                  strokeDasharray={264} 
+                  strokeDashoffset={264 - (264 * Math.min(100, ((remainingDays || 0) / maxDays) * 100)) / 100} 
+                  strokeLinecap="round" 
+                  fill="transparent" 
+                  r="42" cx="50" cy="50" 
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                 <div className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-1">Time Left</div>
+                 <span className="text-4xl font-black italic tracking-tighter text-white leading-none">{remainingDays || '-'}</span>
+                 <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mt-1">Days</span>
               </div>
             </div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">{value}</div>
-            <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">{sub}</div>
-          </div>
-        ))}
+
+            <div className="space-y-1 py-2">
+               <h3 className="text-sm font-black italic uppercase tracking-widest text-white leading-none">Account Access</h3>
+               <div className="flex items-center justify-center gap-2">
+                  <div className="h-1 w-1 rounded-full bg-emerald-500 animate-pulse" />
+                  <p className="text-[8px] font-black uppercase tracking-[0.3em] text-emerald-500/60">Live Authentication</p>
+               </div>
+            </div>
+         </div>
+
+         {/* KPI Grid Cards */}
+         <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[
+              { label: t('visitsThisMonth'), value: monthVisits, sub: `${t('target')}: ${repInfo.target}`, icon: Calendar, color: 'emerald' },
+              { label: t('myCredits') || 'My Balance', value: formatCurrency(balance, country), sub: t('availableForBookings'), icon: CreditCard, color: 'blue' },
+              { label: t('pendingApprovals'), value: pendingVisits.length, sub: t('awaitingResponse'), icon: Clock, color: 'amber' },
+              { label: t('confirmedVisits'), value: confirmedVisits.length, sub: t('readyToAttend'), icon: Target, color: 'purple' },
+            ].map(({ label, value, sub, icon: Icon, color }) => (
+              <div key={label} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-2xl p-6 hover:shadow-xl transition-all">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{label}</span>
+                  <div className={`h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500`}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                </div>
+                <div className="text-3xl font-black italic tracking-tighter text-gray-900 dark:text-white leading-none">{value}</div>
+                <div className="text-xs font-bold text-slate-500 mt-2 italic">{sub}</div>
+              </div>
+            ))}
+         </div>
       </div>
 
       {/* Progress bar */}

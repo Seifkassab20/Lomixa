@@ -12,7 +12,6 @@ import {
   saveHospital,
 } from "@/lib/store";
 import { convertCurrency, CountryCode } from "@/lib/currency";
-import { sendEmail, EmailTemplates } from "@/lib/email";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,7 +66,6 @@ export function SettingsPage() {
     facilityType: "hospital" as "hospital" | "clinic",
   });
 
-  const [testApiKey, setTestApiKey] = useState("");
   const [saved, setSaved] = useState(false);
   const [verifyingEmail, setVerifyingEmail] = useState(false);
   const [verifyingPhone, setVerifyingPhone] = useState(false);
@@ -868,71 +866,7 @@ export function SettingsPage() {
               ))}
             </div>
           </div>
-        </div>
-
-        <div className="pt-8 border-t border-slate-100 dark:border-slate-800 space-y-4">
-          <div className="flex flex-col gap-4 p-6 rounded-3xl bg-indigo-500/5 border border-indigo-500/10">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 shrink-0">
-                <Mail className="h-6 w-6 text-indigo-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-black uppercase tracking-widest text-indigo-400">
-                  Communication Debugger
-                </h4>
-                <p className="text-xs text-slate-500 mt-1">
-                  Verify real-time email triggers for{" "}
-                  <strong>{form.email}</strong>
-                </p>
-              </div>
-              <Button
-                type="button"
-                onClick={async () => {
-                  const template = EmailTemplates.welcome(
-                    form.fullName || "User",
-                  );
-                  const result: any = await sendEmail(
-                    { to: form.email, ...template },
-                    testApiKey,
-                  );
-                  if (result.mode === "live") {
-                    toast(
-                      "Real-time test email dispatched successfully.",
-                      "success",
-                    );
-                  } else if (result.mode === "demo") {
-                    toast(
-                      "Demo Email Triggered! Check your browser console (F12) to see raw content.",
-                      "info",
-                    );
-                  } else {
-                    toast("Email trigger processed.", "success");
-                  }
-                }}
-                className="rounded-2xl bg-indigo-500 hover:bg-indigo-600 text-white font-bold h-12 px-6 shadow-lg shadow-indigo-500/20"
-              >
-                Send Test Email
-              </Button>
-            </div>
-
-            <div className="mt-2 space-y-2">
-              <Label className="text-[9px] font-black uppercase tracking-[0.2em] text-indigo-400/70 ml-1">
-                Testing API Key (Resend)
-              </Label>
-              <Input
-                placeholder="Add ur API Key"
-                value={testApiKey}
-                onChange={(e) => setTestApiKey(e.target.value)}
-                type="password"
-                className="h-12 rounded-xl bg-white dark:bg-slate-900 border-indigo-500/20 focus:border-indigo-500 font-mono text-xs"
-              />
-              <p className="text-[9px] text-slate-400 ml-1 italic">
-                For security, this key is only stored in memory for the current
-                session.
-              </p>
-            </div>
           </div>
-        </div>
 
         <div className="pt-8 border-t dark:border-slate-800 flex items-center justify-end gap-4">
           {saved && (

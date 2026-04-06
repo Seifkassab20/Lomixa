@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 
 import { motion, AnimatePresence } from "motion/react";
@@ -28,6 +28,8 @@ import {
   getTransactions,
   getAdminBalance,
   getVisits,
+  processRepSubscription,
+  saveSalesRep,
   Transaction,
 } from "@/lib/store";
 
@@ -88,7 +90,7 @@ export function AdminDashboard() {
   const [incomeToFilter, setIncomeToFilter] = useState("");
   const [activeTab, setActiveTab] = useState<
     "verification" | "bundles" | "pharma" | "activity" | "income"
-  >((urlTab as any) || "verification");
+  >((urlTab as any) || "activity");
 
   const [platformBalance, setPlatformBalance] = useState(0);
   const { userId } = useAuth();
@@ -107,18 +109,20 @@ export function AdminDashboard() {
     name: string;
   } | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [pageSize, setPageSize] = useState(20);
+  const [page, setPage] = useState(1);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   const refresh = () => {
-    setPharma(getPharmaCompanies());
-    setHospitals(getHospitals());
-    setRequests(getBundleRequests());
-    if (editingPharma) {
-      setCustomBundles(getPharmaBundles(editingPharma.id));
+    try {
+      setPharma(getPharmaCompanies());
+      setHospitals(getHospitals());
+      setRequests(getBundleRequests());
+      setTransactions(getTransactions());
+      setPlatformBalance(getAdminBalance());
+    } finally {
+      setIsInitializing(false);
     }
-    setTransactions(getTransactions());
-    setPlatformBalance(getAdminBalance());
-
-    syncCloudData(); // Trigger cloud refresh whenever Admin refreshes
   };
 
   useEffect(() => {
@@ -126,6 +130,7 @@ export function AdminDashboard() {
   }, [urlTab]);
 
   useEffect(() => {
+    console.log("[AdminDashboard] Render start, user:", userId, "country:", adminCountry);
     if (userId) {
       const profile = getProfile(userId);
       setAdminCountry(profile.country || "sa");
@@ -250,8 +255,36 @@ export function AdminDashboard() {
   };
 
   const handleApproveRequest = (req: BundleRequest) => {
+    console.log(`[AdminDashboard] Approving request:`, req);
     // Try to find the company by ID or UserID for mapping robustness
     const allPharmas = getPharmaCompanies();
+    const allReps = getSalesReps();
+
+    if (req.type === "rep") {
+      const rep = allReps.find(
+        (r) => r.id === req.pharmaId || r.userId === req.pharmaId,
+      );
+      
+      console.log(`[AdminDashboard] Found rep for approval:`, rep ? rep.name : 'NOT FOUND');
+
+      if (rep) {
+        processRepSubscription(
+          rep.id,
+          req.bundleId as any,
+          req.price,
+          "SAR",
+        );
+        const updatedReq = { ...req, status: "approved" as const };
+        saveBundleRequest(updatedReq);
+        refresh();
+        syncCloudData(); // Trigger immediate cloud push
+        toast(`Subscription approved for ${req.pharmaName}`, "success");
+        return;
+      } else {
+        console.warn(`[AdminDashboard] Rep ${req.pharmaId} not found in sales_reps list.`);
+      }
+    }
+
     let pc = allPharmas.find(
       (p) => p.id === req.pharmaId || p.userId === req.pharmaId,
     );
@@ -321,74 +354,83 @@ export function AdminDashboard() {
   const pendingRequests = requests.filter((r) => r.status === "pending");
 
   // Deduplicate everything
-  const uniquePharma = Array.from(
-    new Map<string, PharmaCompany>(pharma.map((p) => [p.id, p])).values(),
-  );
-  const uniqueHospitals = Array.from(
-    new Map<string, Hospital>(hospitals.map((h) => [h.id, h])).values(),
-  );
+  const uniquePharma = useMemo(() => Array.from(
+    new Map<string, PharmaCompany>((pharma || []).filter(p => p && p.id).map((p) => [p.id, p])).values(),
+  ), [pharma]);
 
-  const pendingHosps = uniqueHospitals.filter((h) => h.isVerified === false);
-  const pendingPharmas = uniquePharma.filter((p) => p.isVerified === false);
+  const uniqueHospitals = useMemo(() => Array.from(
+    new Map<string, Hospital>((hospitals || []).filter(h => h && h.id).map((h) => [h.id, h])).values(),
+  ), [hospitals]);
+
+  const pendingHosps = useMemo(() => uniqueHospitals.filter((h) => h.isVerified === false), [uniqueHospitals]);
+  const pendingPharmas = useMemo(() => uniquePharma.filter((p) => p.isVerified === false), [uniquePharma]);
   const totalPendingVerification = pendingHosps.length + pendingPharmas.length;
 
-  const filteredPharma = uniquePharma.filter(
+  const filteredPharma = useMemo(() => uniquePharma.filter(
     (p) => !search || p.name.toLowerCase().includes(search.toLowerCase()),
-  );
+  ), [uniquePharma, search]);
 
-  const filteredTransactions = transactions.filter((tx) => {
-    const s = incomeSearch.toLowerCase();
-    const fromN = (tx.fromName || "").toLowerCase();
-    const toN = (tx.toName || "").toLowerCase();
-    const txId = (tx.id || "").toLowerCase();
+  const filteredTransactions = useMemo(() => {
+    return (transactions || []).filter((tx) => {
+      if (!tx) return false;
+      const s = (incomeSearch || "").toLowerCase();
+      const fromN = (tx.fromName || "").toLowerCase();
+      const toN = (tx.toName || "").toLowerCase();
+      const txId = (tx.id || "").toLowerCase();
 
-    const matchesSearch =
-      !incomeSearch || fromN.includes(s) || toN.includes(s) || txId.includes(s);
+      const matchesSearch =
+        !incomeSearch || fromN.includes(s) || toN.includes(s) || txId.includes(s);
 
-    const matchesType =
-      incomeTypeFilter === "all" || tx.type === incomeTypeFilter;
+      const matchesType =
+        incomeTypeFilter === "all" || tx.type === incomeTypeFilter;
 
-    const matchesFrom =
-      !incomeFromFilter ||
-      tx.fromId === incomeFromFilter ||
-      fromN.trim() === (incomeFromFilter || "").toLowerCase().trim();
+      const matchesFrom =
+        !incomeFromFilter ||
+        tx.fromId === incomeFromFilter ||
+        fromN.trim() === (incomeFromFilter || "").toLowerCase().trim();
 
-    const matchesTo =
-      !incomeToFilter ||
-      tx.toId === incomeToFilter ||
-      toN.trim() === (incomeToFilter || "").toLowerCase().trim();
+      const matchesTo =
+        !incomeToFilter ||
+        tx.toId === incomeToFilter ||
+        toN.trim() === (incomeToFilter || "").toLowerCase().trim();
 
-    return matchesSearch && matchesType && matchesFrom && matchesTo;
-  });
+      return matchesSearch && matchesType && matchesFrom && matchesTo;
+    });
+  }, [transactions, incomeSearch, incomeTypeFilter, incomeFromFilter, incomeToFilter]);
 
-  const allDoctors = getDoctors();
-  const allReps = getSalesReps();
+  const pagedTransactions = useMemo(() => {
+    return filteredTransactions.slice(0, page * pageSize);
+  }, [filteredTransactions, page, pageSize]);
 
-  const entityRegistry = [
-    {
-      label: "-- " + t("system") + " --",
-      options: [
-        { id: "admin", name: "System Admin" },
-        { id: "system", name: "System Escrow" },
-      ],
-    },
-    {
-      label: "-- " + t("hospitals") + " --",
-      options: uniqueHospitals.map((h) => ({ id: h.id, name: h.name })),
-    },
-    {
-      label: "-- " + t("pharma") + " --",
-      options: uniquePharma.map((p) => ({ id: p.id, name: p.name })),
-    },
-    {
-      label: "-- " + t("doctors") + " --",
-      options: allDoctors.map((d) => ({ id: d.id, name: d.name })),
-    },
-    {
-      label: "-- " + t("reps") + " --",
-      options: allReps.map((r) => ({ id: r.id, name: r.name })),
-    },
-  ];
+  const entityRegistry = useMemo(() => {
+    const allDocs = getDoctors();
+    const allR = getSalesReps();
+    return [
+      {
+        label: "-- " + t("system") + " --",
+        options: [
+          { id: "admin", name: "System Admin" },
+          { id: "system", name: "System Escrow" },
+        ],
+      },
+      {
+        label: "-- " + t("hospitals") + " --",
+        options: uniqueHospitals.filter(h => h && h.id).map((h) => ({ id: h.id, name: h.name || "Unnamed Hospital" })),
+      },
+      {
+        label: "-- " + t("pharma") + " --",
+        options: uniquePharma.filter(p => p && p.id).map((p) => ({ id: p.id, name: p.name || "Unnamed Pharma" })),
+      },
+      {
+        label: "-- " + t("doctors") + " --",
+        options: (allDocs || []).filter(d => d && d.id).map((d) => ({ id: d.id, name: d.name || "Unnamed Doctor" })),
+      },
+      {
+        label: "-- " + t("reps") + " --",
+        options: (allR || []).filter(r => r && r.id).map((r) => ({ id: r.id, name: r.name || "Unnamed Rep" })),
+      },
+    ];
+  }, [uniqueHospitals, uniquePharma, t]);
 
   return (
     <div
@@ -472,7 +514,9 @@ export function AdminDashboard() {
                       {hosp.name}
                     </h4>
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">
-                      {hosp.location}
+                      {typeof hosp.location === "object"
+                        ? `${hosp.location.city || ""}, ${hosp.location.country || ""}`
+                        : hosp.location}
                     </p>
 
                     <div className="grid grid-cols-2 gap-3 mt-auto">
@@ -740,19 +784,18 @@ export function AdminDashboard() {
                       </div>
                       <div className="text-right">
                         <div className="text-xl font-black text-brand tracking-tighter">
-                          {formatCurrency(
-                            req.price,
-                            pharma.find((p) => p.id === req.pharmaId)?.location
-                              ?.country || "sa",
-                          )}
+                          {(() => {
+                            const entityCountry = req.type === 'rep' 
+                              ? getSalesReps().find(r => r.id === req.pharmaId || r.userId === req.pharmaId)?.location?.country 
+                              : pharma.find((p) => p.id === req.pharmaId)?.location?.country;
+                            return formatCurrency(req.price, entityCountry || "sa");
+                          })()}
                         </div>
                         <div className="text-[10px] text-slate-500 font-bold">
-                          {formatCurrency(
+                          {req.type === 'rep' ? `${req.balance} Months Access` : formatCurrency(
                             req.balance,
-                            pharma.find((p) => p.id === req.pharmaId)?.location
-                              ?.country || "sa",
-                          )}{" "}
-                          {t("balanceLabel") || "Balance"}
+                            pharma.find((p) => p.id === req.pharmaId)?.location?.country || "sa",
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1024,7 +1067,6 @@ export function AdminDashboard() {
         {activeTab === "activity" && (
           <section className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="bg-slate-900/40 border border-slate-800 rounded-[3rem] p-10 overflow-hidden relative">
-              <div className="absolute top-0 right-0 w-96 h-96 bg-brand/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2" />
               <div className="relative z-10 flex flex-col list-none">
                 <TPAAnalysis role="all" />
               </div>
@@ -1093,7 +1135,7 @@ export function AdminDashboard() {
                 </h2>
               </div>
               <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <div className="h-2 w-2 rounded-full bg-emerald-500" />
                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
                   Real-time Financial Ledger
                 </span>
@@ -1167,6 +1209,7 @@ export function AdminDashboard() {
                   { id: "visit_payout", label: "Payouts" },
                   { id: "admin_commission", label: "Commissions" },
                   { id: "pharma_deposit", label: "Deposits" },
+                  { id: "rep_subscription", label: "Subscriptions" },
                 ].map((f) => (
                   <button
                     key={f.id}
@@ -1206,7 +1249,7 @@ export function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y dark:divide-slate-800">
-                  {filteredTransactions.length === 0 ? (
+                  {pagedTransactions.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="px-8 py-20 text-center">
                         <Filter className="w-12 h-12 text-slate-200 dark:text-slate-800 mx-auto mb-4 opacity-50" />
@@ -1232,16 +1275,18 @@ export function AdminDashboard() {
                       </td>
                     </tr>
                   ) : (
-                    filteredTransactions.map((tx) => (
+                    pagedTransactions.map((tx) => (
                       <tr
                         key={tx.id}
                         className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group"
                       >
                         <td className="px-8 py-5 text-[10px] font-mono font-bold text-slate-500">
-                          #{tx.id.slice(0, 8)}
+                          #{(tx.id || "00000000").slice(0, 8)}
                         </td>
                         <td className="px-8 py-5 text-xs font-bold text-slate-400">
-                          {new Date(tx.createdAt).toLocaleString()}
+                          {tx.createdAt
+                            ? new Date(tx.createdAt).toLocaleString()
+                            : "N/A"}
                         </td>
                         <td className="px-8 py-5">
                           <Badge
@@ -1253,7 +1298,9 @@ export function AdminDashboard() {
                                   ? "bg-emerald-500/10 text-emerald-500"
                                   : tx.type === "pharma_deposit"
                                     ? "bg-purple-500/10 text-purple-500"
-                                    : "bg-slate-200 text-slate-600",
+                                    : tx.type === "rep_subscription"
+                                      ? "bg-amber-500/10 text-amber-500"
+                                      : "bg-slate-200 text-slate-600",
                             )}
                           >
                             {(tx.type || "transaction").replace("_", " ")}
@@ -1271,7 +1318,7 @@ export function AdminDashboard() {
                           </div>
                         </td>
                         <td className="px-8 py-5 text-right font-black text-emerald-500">
-                          {formatCurrency(tx.amount || 0, adminCountry)}
+                          {formatCurrency(tx.amount || 0, adminCountry || "sa")}
                         </td>
                       </tr>
                     ))
@@ -1279,6 +1326,19 @@ export function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+
+            {filteredTransactions.length > pageSize && (
+              <div className="flex justify-center pt-8 pb-4">
+                <Button
+                  variant="outline"
+                  className="rounded-2xl border-emerald-500/30 text-emerald-500 font-black uppercase italic tracking-widest text-[10px] h-12 px-10 hover:bg-emerald-500/10"
+                  onClick={() => setPage(page + 1)}
+                  disabled={page * pageSize >= filteredTransactions.length}
+                >
+                  {t("loadMore") || "Load More Transactions"}
+                </Button>
+              </div>
+            )}
           </section>
         )}
       </div>{" "}
@@ -1309,7 +1369,7 @@ export function AdminDashboard() {
                 </div>
                 <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">
                   {t("rejectionReasonLabel")}{" "}
-                  <span className="text-white">{rejectingUser.name}</span>
+                  <span className="text-white">{rejectingUser?.name || ""}</span>
                 </p>
               </div>
 

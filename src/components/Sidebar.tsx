@@ -28,6 +28,7 @@ import {
   getHospitals,
   getPharmaCompanies,
   getBundleRequests,
+  getSubscriptionRemainingDays,
 } from "@/lib/store";
 
 export function Sidebar() {
@@ -71,13 +72,19 @@ export function Sidebar() {
       case "admin":
         return [
           {
+            key: "dashboard",
+            name: t("dashboard"),
+            href: "/dashboard",
+            icon: LayoutDashboard,
+          },
+          {
             key: "verification",
             name: t("facilityVerificationDesk"),
             href: "/admin-control/verification",
             icon: ShieldCheck,
             badge:
-              getHospitals().filter((h) => !h.isVerified).length +
-              getPharmaCompanies().filter((p) => !p.isVerified).length,
+              (getHospitals() || []).filter((h) => h && !h.isVerified).length +
+              (getPharmaCompanies() || []).filter((p) => p && !p.isVerified).length,
           },
           {
             key: "bundles",
@@ -244,9 +251,37 @@ export function Sidebar() {
 
   const links = getLinks();
   const displayRole = role === "hospital" && facilityType ? facilityType : role;
+  const [remainingDays, setRemainingDays] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (role === 'rep' && userId) {
+      const { getSubscriptionRemainingDays, addNotification, getNotifications, generateId } = require('@/lib/store');
+      const days = getSubscriptionRemainingDays(userId);
+      setRemainingDays(days);
+
+      if (days !== null && days <= 7) {
+        // Trigger notification if not already sent today
+        const notifs = getNotifications();
+        const todayStr = new Date().toISOString().split('T')[0];
+        const existing = notifs.find(n => n.userId === userId && n.type === 'subscription' && n.date.startsWith(todayStr));
+        
+        if (!existing) {
+          addNotification({
+            id: generateId(),
+            userId: userId,
+            title: 'Critical Renewal Required',
+            message: `Your professional bundle will expire in ${days} days. Please top up your balance and renew soon.`,
+            type: 'subscription',
+            read: false,
+            date: new Date().toISOString()
+          });
+        }
+      }
+    }
+  }, [role, userId]);
 
   const roleSubtitleKey: Record<string, string> = {
-    admin: "admin",
+    admin: "systemAdmin",
     pharma: "pharma",
     hospital: "hospital",
     doctor: "doctor",
@@ -277,7 +312,7 @@ export function Sidebar() {
         </div>
         {!collapsed && (
           <div className="overflow-hidden">
-            <div className="text-sm font-bold text-gray-900 dark:text-white leading-tight whitespace-nowrap tracking-widest">
+            <div className="text-sm font-bold text-gray-900 dark:text-white leading-tight whitespace-nowrap tracking-widest uppercase italic underline decoration-emerald-500/50 decoration-2 underline-offset-4">
               {t("appName")}
             </div>
             <div className="text-[10px] text-gray-400 dark:text-slate-500 whitespace-nowrap">
@@ -307,7 +342,7 @@ export function Sidebar() {
                     "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 relative group",
                     collapsed ? "justify-center" : "",
                     isActive
-                      ? "bg-brand-muted text-brand shadow-sm"
+                      ? "bg-brand-muted text-brand shadow-sm font-bold italic"
                       : "text-gray-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-gray-900 dark:hover:text-slate-200",
                   )}
                 >
@@ -317,7 +352,7 @@ export function Sidebar() {
                       isActive ? "text-brand" : "",
                     )}
                   />
-                  {!collapsed && <span className="truncate">{link.name}</span>}
+                  {!collapsed && <span className="truncate uppercase tracking-tighter italic">{link.name}</span>}
                   {badge > 0 && (
                     <span
                       className={cn(
@@ -346,6 +381,36 @@ export function Sidebar() {
           })}
         </ul>
       </nav>
+
+      {/* Subscription Footer for Rep */}
+      {!collapsed && role === 'rep' && remainingDays !== null && remainingDays <= 7 && (
+        <div className="p-4 mt-auto">
+          <div className="bg-amber-500/10 rounded-2xl p-4 border border-amber-500/20 space-y-3 shadow-[0_0_20px_rgba(245,158,11,0.1)]">
+             <div className="flex items-center justify-between">
+                <span className="text-[9px] font-black uppercase tracking-widest text-amber-600/60 font-bold">Bundle Expiring soon</span>
+             </div>
+             <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500">
+                   <Clock className="w-4 h-4" />
+                </div>
+                <div>
+                   <div className="text-sm font-black italic text-amber-600 leading-none mb-1 uppercase tracking-tighter">
+                     {remainingDays} Days Left
+                   </div>
+                   <div className="text-[8px] font-black text-amber-600/50 uppercase tracking-widest font-bold">Critical Renewal</div>
+                </div>
+             </div>
+             <Link 
+               to="/rep-subscription"
+               className="flex items-center justify-center h-10 w-full rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-black uppercase tracking-widest italic transition-all shadow-lg shadow-amber-500/20"
+             >
+                Renew Bundle
+             </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Default persistent info card if not expiring (Optional, but let's keep the dashboard cleanup by only showing when needed as requested) */}
 
       {/* Collapse toggle */}
       <button

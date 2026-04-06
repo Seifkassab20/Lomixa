@@ -62,6 +62,15 @@ export function RoleSelection() {
       path: '/register/rep',
       gradient: 'from-orange-500 to-amber-600',
       badge: t('roleSelection.rep.badge')
+    },
+    {
+      id: 'admin',
+      title: 'Administrative Control',
+      desc: 'System governance, financial audits, and organizational verification.',
+      icon: Shield,
+      path: '/register/admin',
+      gradient: 'from-slate-700 to-slate-900',
+      badge: 'PRO'
     }
   ];
 

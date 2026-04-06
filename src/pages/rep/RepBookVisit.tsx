@@ -45,7 +45,7 @@ export function RepBookVisit() {
   ];
 
   const refreshData = () => {
-    setDoctors(getDoctors());
+    setDoctors(getDoctors(true));
     const reps = getSalesReps();
     const myRep = reps.find(r => r.userId === userId);
     if (myRep) {
