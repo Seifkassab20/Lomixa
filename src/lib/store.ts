@@ -149,6 +149,19 @@ export interface Visit {
   repRating?: number;
 }
 
+export interface Appointment {
+  id: string;
+  doctorId: string;
+  doctorUserId: string;
+  repId: string;
+  repUserId: string;
+  startTime: string;
+  endTime: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  meetingId: string;
+  createdAt: string;
+}
+
 
 export interface Bundle {
   id: string;
@@ -346,6 +359,35 @@ function mapVisitFromDB(db: any): Visit {
     cancelledByRep: db.cancelled_by_rep,
     slotId: db.slot_id,
     createdAt: db.created_at,
+  };
+}
+
+function mapAppointmentToDB(a: Appointment) {
+  return {
+    id: a.id,
+    doctor_id: a.doctorId,
+    doctor_user_id: a.doctorUserId,
+    rep_id: a.repId,
+    rep_user_id: a.repUserId,
+    start_time: a.startTime,
+    end_time: a.endTime,
+    status: a.status,
+    meeting_id: a.meetingId
+  };
+}
+
+function mapAppointmentFromDB(db: any): Appointment {
+  return {
+    id: db.id,
+    doctorId: db.doctor_id,
+    doctorUserId: db.doctor_user_id,
+    repId: db.rep_id,
+    repUserId: db.rep_user_id,
+    startTime: db.start_time,
+    endTime: db.end_time,
+    status: db.status,
+    meetingId: db.meeting_id,
+    createdAt: db.created_at
   };
 }
 
@@ -600,7 +642,7 @@ export async function syncCloudData() {
   if (!isSupabaseConfigured) return;
 
   try {
-    const [hospitals, doctors, reps, pharma, visits, notifications, bundleReqs, transactions, finance] = await Promise.all([
+    const [hospitals, doctors, reps, pharma, visits, notifications, bundleReqs, transactions, finance, appointments] = await Promise.all([
       supabase.from('hospitals').select('*'),
       supabase.from('doctors').select('*'),
       supabase.from('sales_reps').select('*'),
@@ -610,6 +652,7 @@ export async function syncCloudData() {
       supabase.from('bundle_requests').select('*'),
       supabase.from('transactions').select('*'),
       supabase.from('platform_finance').select('*').limit(1),
+      supabase.from('appointments').select('*'),
     ]);
 
     // Only skip merging local-to-cloud push if mutation was VERY recent (within 2s)
@@ -647,6 +690,7 @@ export async function syncCloudData() {
     if (bundleReqs.data) save('bundle_requests', mergeData(getBundleRequests(), bundleReqs.data.map(mapBundleRequestFromDB)));
     if (transactions.data) save('transactions', mergeData(getTransactions(), transactions.data.map(mapTransactionFromDB)));
     if (finance.data && finance.data[0]) save('admin_balance', finance.data[0].admin_balance);
+    if (appointments.data) save('appointments', mergeData(getAppointments(), appointments.data.map(mapAppointmentFromDB)));
 
 
     const slots = await supabase.from('availability_slots').select('*');
@@ -1389,24 +1433,7 @@ export async function ensureUserEntityExists(user: any) {
 }
 
 export function isRepSubscribed(repIdOrUserId: string): boolean {
-  if (!repIdOrUserId) return false;
-  const reps = getSalesReps();
-  const rep = reps.find(r => r.id === repIdOrUserId || r.userId === repIdOrUserId);
-  
-  if (rep && rep.subscription && rep.subscription.status === 'active') {
-    const expiry = new Date(rep.subscription.expiryDate);
-    if (expiry > new Date()) return true;
-  }
-
-  // Fallback: search approved bundle requests for this user or their name
-  const requests = getBundleRequests();
-  const approvedRequest = requests.find(r => 
-     r.status === 'approved' && 
-     r.type === 'rep' &&
-     (r.pharmaId === repIdOrUserId || (rep?.name && r.pharmaName && r.pharmaName.toUpperCase() === rep.name.toUpperCase()))
-  );
-  
-  return !!approvedRequest;
+  return true; // Subscription requirement removed as per user request
 }
 
 /**
@@ -1428,7 +1455,7 @@ export function getSubscriptionRemainingDays(repIdOrUserId: string): number | nu
   const req = requests.find(r => 
      r.status === 'approved' && 
      r.type === 'rep' &&
-     (r.pharmaId === repIdOrUserId || (rep?.name && r.pharmaName && r.pharmaName.toUpperCase() === rep.name.toUpperCase()))
+     (r.pharmaId === repIdOrUserId || (rep?.name && r.pharmaName && rep.name && r.pharmaName.toUpperCase() === rep.name.toUpperCase()))
   );
 
   if (req) {
@@ -1459,7 +1486,7 @@ export function getSubscriptionMaxDays(repIdOrUserId: string): number {
   const req = requests.find(r => 
      r.status === 'approved' && 
      r.type === 'rep' &&
-     (r.pharmaId === repIdOrUserId || (rep?.name && r.pharmaName && r.pharmaName.toUpperCase() === rep.name.toUpperCase()))
+     (r.pharmaId === repIdOrUserId || (rep?.name && r.pharmaName && rep.name && r.pharmaName.toUpperCase() === rep.name.toUpperCase()))
   );
   
   if (req) {
@@ -1553,4 +1580,39 @@ export function processRepSubscription(
     message: `Thank you for subscribing to our ${planId.replace('_', ' ')} plan! Your access is fully active until ${expiryDate.toLocaleDateString()}.`,
     type: 'info'
   });
+}
+
+// ── APPOINTMENTS & VIDEO CALLS ──────────────────────────────────
+export function getAppointments(): Appointment[] {
+  return load<Appointment[]>('appointments', []);
+}
+
+export function saveAppointment(appointment: Appointment) {
+  const list = getAppointments();
+  const idx = list.findIndex(a => a.id === appointment.id);
+  if (idx >= 0) list[idx] = appointment; else list.push(appointment);
+  save('appointments', list);
+  notifyMutation();
+  if (isSupabaseConfigured) {
+    supabase.from('appointments').upsert(mapAppointmentToDB(appointment)).then(({error}) => error && console.error("Appointment Cloud Push Failed:", error));
+  }
+}
+
+export async function getServerTime(): Promise<Date> {
+  if (!isSupabaseConfigured) return new Date();
+  try {
+    const { data, error } = await supabase.rpc('get_server_time');
+    if (error) throw error;
+    return new Date(data);
+  } catch (err) {
+    console.warn("getServerTime RPC failed, trying fallback:", err);
+    try {
+      // Fallback: try to get time from any table metadata or just use client time
+      const { data } = await supabase.from('appointments').select('now()').limit(1);
+      if (data && (data as any)[0]?.now) return new Date((data as any)[0].now);
+    } catch (fallbackErr) {
+       console.warn("getServerTime fallback failed:", fallbackErr);
+    }
+    return new Date(); 
+  }
 }

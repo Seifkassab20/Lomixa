@@ -1,65 +1,59 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
-import { getVisits, getSalesReps, getPharmaCompanies, saveSalesRep, generateId, useStoreListener, getBundleRequests } from '@/lib/store';
+import { getVisits, getSalesReps, saveSalesRep, useStoreListener, Appointment, getAppointments, getServerTime } from '@/lib/store';
 import { Calendar, CreditCard, Clock, Target, Video, Phone, MapPin, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { JitsiMeeting } from '@/components/JitsiMeeting';
+import { VideoCall } from '@/components/VideoCall';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '@/components/ui/Toast';
 import { formatCurrency } from '@/lib/currency';
-import { isRepSubscribed, getSubscriptionRemainingDays, getSubscriptionMaxDays } from '@/lib/store';
-import { ShieldAlert, Rocket, Lock } from 'lucide-react';
+
 
 export function RepDashboard() {
   const { userId, user } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { toast } = useToast();
-  const [subscribed, setSubscribed] = useState<boolean | null>(null);
-  const [remainingDays, setRemainingDays] = useState<number | null>(null);
-  const [maxDays, setMaxDays] = useState(30);
+  const [loading, setLoading] = useState(true);
   const [visits, setVisits] = useState<ReturnType<typeof getVisits>>([]);
   const [balance, setBalance] = useState(0);
   const [country, setCountry] = useState('sa');
   const [showTopup, setShowTopup] = useState(false);
   const [topupAmount, setTopupAmount] = useState(500);
-  const [meetingRoom, setMeetingRoom] = useState<string | null>(null);
+  const [activeAppointment, setActiveAppointment] = useState<Appointment | null>(null);
+  const [serverTime, setServerTime] = useState<Date>(new Date());
   const [repInfo, setRepInfo] = useState({ name: '', pharmaId: '', pharmaName: '', target: 25, id: '' });
 
-  const [hasPendingRequest, setHasPendingRequest] = useState(false);
-
   const loadData = React.useCallback(async () => {
-    const isSub = isRepSubscribed(userId || '');
-    setSubscribed(isSub);
-    setRemainingDays(getSubscriptionRemainingDays(userId || ''));
-    setMaxDays(getSubscriptionMaxDays(userId || ''));
-
-    const reqs = getBundleRequests();
-    const myPending = reqs.find(r => (r.pharmaId === userId) && r.status === 'pending' && r.type === 'rep');
-    setHasPendingRequest(!!myPending);
-
     const reps = getSalesReps();
     const myRep = reps.find(r => r.userId === userId);
     if (myRep) {
        setRepInfo({ id: myRep.id, name: myRep.name, pharmaId: myRep.pharmaId, pharmaName: myRep.pharmaName, target: myRep.target });
        const myVisits = getVisits().filter(v => v.repId === myRep!.id);
-       setVisits(myVisits.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+       setVisits(myVisits.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')));
        setBalance(myRep!.balance || 0);
        setCountry(myRep!.location?.country || 'sa');
     }
+    setLoading(false);
   }, [userId]);
 
   useStoreListener(loadData);
 
   useEffect(() => {
     loadData();
+    const interval = setInterval(() => {
+       loadData();
+       getServerTime().then(setServerTime);
+    }, 10000);
+    getServerTime().then(setServerTime);
+    return () => clearInterval(interval);
   }, [loadData]);
 
-  if (subscribed === null) {
+  if (loading) {
      return (
         <div className="flex flex-col h-[60vh] items-center justify-center gap-4">
            <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center animate-spin">
@@ -67,70 +61,6 @@ export function RepDashboard() {
            </div>
            <div className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500 animate-pulse italic">Synchronizing LOMIXA Grid...</div>
         </div>
-     );
-  }
-
-  if (!subscribed) {
-     return (
-       <div className="max-w-4xl mx-auto py-12 space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <div className="bg-slate-900 shadow-3xl border border-amber-500/20 rounded-[3.5rem] p-12 text-center space-y-8 relative overflow-hidden backdrop-blur-3xl group">
-             {/* Background Decoration */}
-             <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-[100px] -z-10 group-hover:bg-amber-500/10 transition-all duration-700"></div>
-             
-             <div className="relative mx-auto w-40 h-40">
-                <div className="absolute inset-0 bg-amber-500/20 rounded-full blur-3xl animate-pulse"></div>
-                <div className="relative w-40 h-40 rounded-[2.5rem] bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shadow-inner">
-                   <Lock className="w-20 h-20 text-amber-500" />
-                </div>
-             </div>
-
-             <div className="space-y-4 max-w-2xl mx-auto">
-                <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-amber-500/5 border border-amber-500/20 text-amber-500 text-[10px] font-black uppercase tracking-[0.3em]">
-                   <ShieldAlert className="w-4 h-4" />
-                   Access Restricted
-                </div>
-                <h2 className="text-5xl font-black italic tracking-tighter uppercase text-white leading-none">Professional <span className="text-amber-500">Subscription Required</span></h2>
-                <p className="text-slate-400 font-medium leading-relaxed italic text-lg">
-                   Your account does not have a 1-year professional license active. Access to the Sales Dashboard and doctor booking network is restricted.
-                </p>
-             </div>
-
-             {hasPendingRequest ? (
-                <div className="p-8 rounded-[2rem] bg-emerald-500/5 border border-emerald-500/20 max-w-xl mx-auto flex items-center gap-6">
-                   <Clock className="w-10 h-10 text-emerald-500 shrink-0" />
-                   <div className="text-left">
-                      <h4 className="text-sm font-black text-white uppercase italic tracking-widest">Subscription Audit Pending</h4>
-                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none mt-1">Your bundle request is awaiting administrative authority confirmation.</p>
-                   </div>
-                </div>
-             ) : (
-                <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-                   <Button 
-                      onClick={() => navigate('/rep-subscription')} 
-                      className="h-16 px-12 rounded-2xl bg-amber-600 hover:bg-amber-500 text-white font-black uppercase italic tracking-widest text-xs shadow-2xl shadow-amber-500/20 group"
-                   >
-                      Upgrade Account <Rocket className="w-4 h-4 ml-3 transition-transform group-hover:-translate-y-1 group-hover:translate-x-1" />
-                   </Button>
-                   <Button 
-                      variant="ghost" 
-                      onClick={() => navigate('/settings')} 
-                      className="h-16 px-12 rounded-2xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white font-black uppercase italic tracking-widest text-xs"
-                   >
-                      Manage Profile
-                   </Button>
-                </div>
-             )}
-          </div>
-
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 px-6">
-             {[{ l: 'Bookings', i: Calendar }, { l: 'Analytics', i: Target }, { l: 'Revenue', i: CreditCard }, { l: 'Network', i: Rocket }].map(({ l, i: Icon }) => (
-                <div key={l} className="p-6 bg-white/5 border border-white/5 rounded-3xl text-center space-y-3 opacity-40">
-                   <Icon className="w-8 h-8 text-slate-500 mx-auto" />
-                   <span className="block text-[8px] font-black uppercase tracking-widest text-slate-500 leading-none">{l}</span>
-                </div>
-             ))}
-          </div>
-       </div>
      );
   }
 
@@ -153,65 +83,29 @@ export function RepDashboard() {
 
   return (
     <div className="space-y-6">
-      {meetingRoom && <JitsiMeeting roomName={meetingRoom} displayName={repInfo.name} onClose={() => setMeetingRoom(null)} />}
+      {activeAppointment && (
+        <VideoCall appointment={activeAppointment} onClose={() => setActiveAppointment(null)} />
+      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-         {/* Subscription Status Widget */}
-         <div className="lg:col-span-1 bg-slate-900/40 border dark:border-slate-800 rounded-[2.5rem] p-10 flex flex-col items-center justify-center text-center space-y-6 backdrop-blur-xl relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-emerald-500/10 transition-all duration-700"></div>
-            
-            <div className="relative w-36 h-36">
-              <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-                <circle className="text-slate-800 stroke-current" strokeWidth="6" fill="transparent" r="42" cx="50" cy="50" />
-                <circle 
-                  className={cn(
-                    "stroke-current transition-all duration-1000 ease-out",
-                    (remainingDays && remainingDays < 7) ? "text-amber-500" : "text-emerald-500"
-                  )} 
-                  strokeWidth="6" 
-                  strokeDasharray={264} 
-                  strokeDashoffset={264 - (264 * Math.min(100, ((remainingDays || 0) / maxDays) * 100)) / 100} 
-                  strokeLinecap="round" 
-                  fill="transparent" 
-                  r="42" cx="50" cy="50" 
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                 <div className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-1">Time Left</div>
-                 <span className="text-4xl font-black italic tracking-tighter text-white leading-none">{remainingDays || '-'}</span>
-                 <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mt-1">Days</span>
+      {/* KPI Grid Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: t('visitsThisMonth'), value: monthVisits, sub: `${t('target')}: ${repInfo.target}`, icon: Calendar, color: 'emerald' },
+          { label: t('myCredits') || 'My Balance', value: formatCurrency(balance, country), sub: t('availableForBookings'), icon: CreditCard, color: 'blue' },
+          { label: t('pendingApprovals'), value: pendingVisits.length, sub: t('awaitingResponse'), icon: Clock, color: 'amber' },
+          { label: t('confirmedVisits'), value: confirmedVisits.length, sub: t('readyToAttend'), icon: Target, color: 'purple' },
+        ].map(({ label, value, sub, icon: Icon, color }) => (
+          <div key={label} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-2xl p-6 hover:shadow-xl transition-all">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{label}</span>
+              <div className={`h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500`}>
+                <Icon className="h-5 w-5" />
               </div>
             </div>
-
-            <div className="space-y-1 py-2">
-               <h3 className="text-sm font-black italic uppercase tracking-widest text-white leading-none">Account Access</h3>
-               <div className="flex items-center justify-center gap-2">
-                  <div className="h-1 w-1 rounded-full bg-emerald-500 animate-pulse" />
-                  <p className="text-[8px] font-black uppercase tracking-[0.3em] text-emerald-500/60">Live Authentication</p>
-               </div>
-            </div>
-         </div>
-
-         {/* KPI Grid Cards */}
-         <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[
-              { label: t('visitsThisMonth'), value: monthVisits, sub: `${t('target')}: ${repInfo.target}`, icon: Calendar, color: 'emerald' },
-              { label: t('myCredits') || 'My Balance', value: formatCurrency(balance, country), sub: t('availableForBookings'), icon: CreditCard, color: 'blue' },
-              { label: t('pendingApprovals'), value: pendingVisits.length, sub: t('awaitingResponse'), icon: Clock, color: 'amber' },
-              { label: t('confirmedVisits'), value: confirmedVisits.length, sub: t('readyToAttend'), icon: Target, color: 'purple' },
-            ].map(({ label, value, sub, icon: Icon, color }) => (
-              <div key={label} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-2xl p-6 hover:shadow-xl transition-all">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{label}</span>
-                  <div className={`h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500`}>
-                    <Icon className="h-5 w-5" />
-                  </div>
-                </div>
-                <div className="text-3xl font-black italic tracking-tighter text-gray-900 dark:text-white leading-none">{value}</div>
-                <div className="text-xs font-bold text-slate-500 mt-2 italic">{sub}</div>
-              </div>
-            ))}
-         </div>
+            <div className="text-3xl font-black italic tracking-tighter text-gray-900 dark:text-white leading-none">{value}</div>
+            <div className="text-xs font-bold text-slate-500 mt-2 italic">{sub}</div>
+          </div>
+        ))}
       </div>
 
       {/* Progress bar */}
@@ -264,11 +158,28 @@ export function RepDashboard() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {visit.status === 'Confirmed' && visit.visitType === 'Video' && (
-                        <Button size="sm" onClick={() => setMeetingRoom(`lomixa_${visit.id}`)} className="h-7 text-xs gap-1 bg-blue-600 hover:bg-blue-700 text-white">
-                          <Video className="h-3 w-3" /> {t('join')}
-                        </Button>
-                      )}
+                      {visit.status === 'Confirmed' && visit.visitType === 'Video' && (() => {
+                          const appointment = getAppointments().find(a => 
+                             a.doctorId === visit.doctorId && 
+                             a.repId === visit.repId && 
+                             a.startTime.includes(visit.date)
+                          );
+                          
+                          if (!appointment) return null;
+                          
+                          const now = serverTime.getTime();
+                          const start = new Date(appointment.startTime).getTime();
+                          const end = new Date(appointment.endTime).getTime();
+                          const isNow = now >= start && now <= end;
+                          
+                          if (!isNow) return null;
+
+                          return (
+                            <Button size="sm" onClick={() => setActiveAppointment(appointment)} className="h-7 text-xs gap-1 bg-blue-600 hover:bg-blue-700 text-white animate-pulse">
+                              <Video className="h-3 w-3" /> {t('joinCall') || 'Join'}
+                            </Button>
+                          );
+                      })()}
                       <span className={cn('text-xs font-medium', statusColors[visit.status])}>
                         {statusLabel[visit.status] || visit.status}
                       </span>
@@ -319,7 +230,7 @@ export function RepDashboard() {
                   <div className="space-y-6">
                      <div className="space-y-2">
                         <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-4">
-                          Amount ({formatCurrency(0, country).split('0')[1].trim() || formatCurrency(0, country).split('٠')[1]?.trim() || 'Amount'})
+                          Amount ({formatCurrency(0, country).replace(/[0-9.,٠-٩]/g, '').trim() || 'Amount'})
                         </Label>
                         <Input type="number" value={topupAmount} onChange={e => setTopupAmount(parseInt(e.target.value) || 0)} className="h-14 rounded-2xl bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-xl font-black italic px-6 focus:border-emerald-500" />
                      </div>

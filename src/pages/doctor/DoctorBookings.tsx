@@ -2,16 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { 
   getVisits, saveVisit, getDoctors, Visit, VisitStatus, pushNotification,
   processVisitPayment, getSalesReps, saveSalesRep, saveDoctorAvailability, getDoctorAvailability,
-  refundVisitPayment, saveRating, generateId, Rating
+  refundVisitPayment, saveRating, generateId, Rating,
+  Appointment, saveAppointment, getAppointments, getServerTime
 } from '@/lib/store';
-
-
+import { VideoCall } from '@/components/VideoCall';
 import { useAuth } from '@/lib/auth';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar, Video, Phone, MapPin, MessageSquare, CheckCircle2, XCircle, Clock, FileText, X, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { JitsiMeeting } from '@/components/JitsiMeeting';
 import { useTranslation } from 'react-i18next';
 
 const STATUS_COLORS: Record<VisitStatus, string> = {
@@ -29,7 +28,8 @@ export function DoctorBookings() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [filter, setFilter] = useState('All');
   const [doctorId, setDoctorId] = useState('');
-  const [meetingRoom, setMeetingRoom] = useState<string | null>(null);
+  const [activeAppointment, setActiveAppointment] = useState<Appointment | null>(null);
+  const [serverTime, setServerTime] = useState<Date>(new Date());
   const [outcomeModal, setOutcomeModal] = useState<Visit | null>(null);
   const [outcomeNotes, setOutcomeNotes] = useState('');
   const [repRating, setRepRating] = useState(0);
@@ -41,14 +41,18 @@ export function DoctorBookings() {
     setDoctorId(myDoc?.id || '');
     if (myDoc) {
       const allVisits = getVisits().filter(v => v.doctorId === myDoc.id);
-      setVisits(allVisits.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+      setVisits(allVisits.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')));
     }
   };
 
   useEffect(() => {
     loadVisits();
-    // Poll for live updates every 10 seconds
-    const interval = setInterval(loadVisits, 10000);
+    // Poll for live updates and server time
+    const interval = setInterval(() => {
+      loadVisits();
+      getServerTime().then(setServerTime);
+    }, 10000);
+    getServerTime().then(setServerTime);
     return () => clearInterval(interval);
   }, [userId]);
 
@@ -60,6 +64,26 @@ export function DoctorBookings() {
     if (isConfirming && visit.status === 'Pending') {
       if (visit.price) {
         processVisitPayment(visit.price, visit.doctorId);
+      }
+      
+      // Create Appointment record if Video Call
+      if (visit.visitType === 'Video') {
+        const start = new Date(`${visit.date}T${visit.time}:00`);
+        const end = new Date(start.getTime() + (visit.durationMinutes || 30) * 60000);
+        
+        const newAppointment: Appointment = {
+          id: generateId(),
+          doctorId: visit.doctorId,
+          doctorUserId: userId || '',
+          repId: visit.repId,
+          repUserId: visit.repUserId || '',
+          startTime: start.toISOString(),
+          endTime: end.toISOString(),
+          status: 'accepted',
+          meetingId: `mtg_${generateId().split('-')[0]}_${visit.id.split('-')[0]}`,
+          createdAt: new Date().toISOString()
+        };
+        saveAppointment(newAppointment);
       }
     } else if (isRejectingPending) {
       // Rejecting a pending visit: Refund the REP's locked budget
@@ -168,8 +192,8 @@ export function DoctorBookings() {
 
   return (
     <div className="space-y-6">
-      {meetingRoom && (
-        <JitsiMeeting roomName={meetingRoom} displayName="Doctor" onClose={() => setMeetingRoom(null)} />
+      {activeAppointment && (
+        <VideoCall appointment={activeAppointment} onClose={() => setActiveAppointment(null)} />
       )}
 
       {/* Outcome Notes Modal */}
@@ -317,11 +341,39 @@ export function DoctorBookings() {
                     )}
                     {visit.status === 'Confirmed' && (
                       <div className="flex gap-2">
-                        {visit.visitType === 'Video' && (
-                          <Button size="sm" onClick={() => setMeetingRoom(`lomixa_${visit.id}`)} className="gap-1 bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs">
-                            <Video className="h-3.5 w-3.5" /> {t('joinCall')}
-                          </Button>
-                        )}
+                        {visit.visitType === 'Video' && (() => {
+                          const appointment = getAppointments().find(a => 
+                             a.doctorId === visit.doctorId && 
+                             a.repId === visit.repId && 
+                             a.startTime.includes(visit.date)
+                          );
+                          
+                          if (!appointment) return null;
+                          
+                          const now = serverTime.getTime();
+                          const start = new Date(appointment.startTime).getTime();
+                          const end = new Date(appointment.endTime).getTime();
+                          const isNow = now >= start && now <= end;
+                          const isFuture = now < start;
+                          
+                          return (
+                            <div className="flex flex-col items-end gap-1">
+                              {isNow ? (
+                                <Button size="sm" onClick={() => setActiveAppointment(appointment)} className="gap-1 bg-[#39b596] hover:bg-emerald-500 text-white h-8 text-xs font-bold animate-pulse">
+                                  <Video className="h-3.5 w-3.5" /> {t('joinCall')}
+                                </Button>
+                              ) : isFuture ? (
+                                <span className="text-[10px] text-amber-500 font-bold bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 italic">
+                                  {t('callNotAvailableYet') || 'Call not available yet'}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-slate-500 font-bold bg-slate-500/10 px-2 py-1 rounded border border-slate-500/20 italic">
+                                  {t('appointmentEnded') || 'Appointment انتهت'}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                         <Button size="sm" variant="outline" onClick={() => { setOutcomeModal(visit); setOutcomeNotes(''); }} className="gap-1 h-8 text-xs dark:border-slate-600 dark:text-slate-300">
                           <CheckCircle2 className="h-3.5 w-3.5" /> {t('markDone')}
                         </Button>

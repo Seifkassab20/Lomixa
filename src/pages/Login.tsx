@@ -208,14 +208,18 @@ export function Login() {
       light: "bg-orange-500/10",
       border: "border-orange-500/30",
     },
-    {
-      id: "admin",
-      title: t("adminRole") || "Administration",
-      icon: Shield,
-      color: "bg-indigo-600",
-      light: "bg-indigo-600/10",
-      border: "border-indigo-600/30",
-    },
+    ...(showAdmin
+      ? [
+          {
+            id: "admin",
+            title: t("adminRole") || "Administration",
+            icon: Shield,
+            color: "bg-indigo-600",
+            light: "bg-indigo-600/10",
+            border: "border-indigo-600/30",
+          },
+        ]
+      : []),
   ];
 
   const toggleLanguage = () => {
