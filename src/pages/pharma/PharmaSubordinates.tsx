@@ -12,7 +12,7 @@ import { formatCurrency, getCurrencyInfo } from '@/lib/currency';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { createClient } from '@supabase/supabase-js';
-import { ARABIC_COUNTRY_CODES } from '@/lib/constants';
+import { ARABIC_COUNTRY_CODES, COUNTRIES, CITY_MAP, AREA_MAP } from '@/lib/constants';
 
 // Helper client that doesn't persist session so signing up a user doesn't log out the admin
 const createTempClient = () => {
@@ -29,7 +29,7 @@ export function PharmaSubordinates() {
   const [repVisitCounts, setRepVisitCounts] = useState<Record<string, number>>({});
   const [showForm, setShowForm] = useState(false);
   const [editingRep, setEditingRep] = useState<SalesRep | null>(null);
-  const [form, setForm] = useState({ name: '', email: '', phoneCode: '+966', phone: '', target: 25, password: '' });
+  const [form, setForm] = useState({ name: '', email: '', phoneCode: '+966', phone: '', target: 25, password: '', country: 'sa', cities: [] as string[], areas: [] as string[] });
   const [allocationRep, setAllocationRep] = useState<SalesRep | null>(null);
   const [allocationAmount, setAllocationAmount] = useState(10);
 
@@ -113,13 +113,19 @@ export function PharmaSubordinates() {
       balance: editingRep?.balance || 0,
       isActive: editingRep?.isActive ?? true,
       isVerified: true, // Pre-verified by pharma company
-      role: 'rep'
+      role: 'rep',
+      location: {
+        country: form.country,
+        city: form.cities[0] || "",
+        cities: form.cities,
+        areas: form.areas
+      }
     };
     saveSalesRep(rep);
     loadData();
     setShowForm(false);
     setEditingRep(null);
-    setForm({ name: '', email: '', phoneCode: '+966', phone: '', target: 25, password: '' });
+    setForm({ name: '', email: '', phoneCode: '+966', phone: '', target: 25, password: '', country: 'sa', cities: [], areas: [] });
     toast(editingRep ? t('repUpdated') || 'Representative updated successfully' : t('repAddedWithAccount') || 'Representative and account created successfully', 'success');
   };
 
@@ -137,7 +143,17 @@ export function PharmaSubordinates() {
       }
     }
 
-    setForm({ name: rep.name, email: rep.email, phoneCode: extractedCode, phone: extractedNumber, target: rep.target, password: '' });
+    setForm({ 
+      name: rep.name, 
+      email: rep.email, 
+      phoneCode: extractedCode, 
+      phone: extractedNumber, 
+      target: rep.target, 
+      password: '',
+      country: rep.location?.country || 'sa',
+      cities: rep.location?.cities || (rep.location?.city ? [rep.location.city] : []),
+      areas: rep.location?.areas || (rep.location?.area ? [rep.location.area] : [])
+    });
     setShowForm(true);
   };
 
@@ -274,6 +290,70 @@ export function PharmaSubordinates() {
                   <Input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} required placeholder="••••••••" className="mt-1 dark:bg-slate-800 dark:border-slate-600 dark:text-white" />
                 </div>
               )}
+
+              <div className="pt-4 border-t dark:border-slate-800 space-y-4">
+                <div>
+                   <Label className="text-[10px] uppercase font-black tracking-widest text-slate-500">Operating Country*</Label>
+                   <select 
+                      value={form.country} 
+                      onChange={e => setForm(f => ({ ...f, country: e.target.value, cities: [], areas: [] }))}
+                      className="w-full h-10 mt-1 rounded-lg bg-white dark:bg-slate-800 border dark:border-slate-600 text-xs font-bold outline-none"
+                   >
+                      {COUNTRIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                   </select>
+                </div>
+                
+                <div>
+                   <Label className="text-[10px] uppercase font-black tracking-widest text-slate-500">Operating Cities*</Label>
+                   <div className="flex flex-wrap gap-1 mt-2 max-h-32 overflow-y-auto p-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg border dark:border-slate-700">
+                      {CITY_MAP[form.country]?.map(city => (
+                        <button
+                          key={city}
+                          type="button"
+                          onClick={() => setForm(f => ({ 
+                            ...f, 
+                            cities: f.cities.includes(city) ? f.cities.filter(c => c !== city) : [...f.cities, city],
+                            areas: f.cities.includes(city) ? f.areas.filter(a => !(AREA_MAP[city] || []).includes(a)) : f.areas
+                          }))}
+                          className={cn(
+                            "px-2 py-1 rounded text-[10px] font-bold uppercase transition-all",
+                            form.cities.includes(city)
+                              ? "bg-emerald-500 text-white"
+                              : "bg-white dark:bg-slate-900 text-slate-500 border border-slate-200 dark:border-slate-700 hover:border-emerald-500/50"
+                          )}
+                        >
+                          {city}
+                        </button>
+                      ))}
+                   </div>
+                </div>
+
+                {form.cities.length > 0 && (
+                   <div className="animate-in slide-in-from-top-2">
+                      <Label className="text-[10px] uppercase font-black tracking-widest text-emerald-500">Target Areas (Districts)*</Label>
+                      <div className="flex flex-wrap gap-1 mt-2 max-h-32 overflow-y-auto p-2 bg-emerald-500/5 rounded-lg border border-emerald-500/20">
+                         {form.cities.flatMap(city => AREA_MAP[city] || []).filter((v, i, a) => a.indexOf(v) === i).map(area => (
+                            <button
+                               key={area}
+                               type="button"
+                               onClick={() => setForm(f => ({ 
+                                 ...f, 
+                                 areas: f.areas.includes(area) ? f.areas.filter(a => a !== area) : [...f.areas, area] 
+                               }))}
+                               className={cn(
+                                 "px-2 py-1 rounded text-[10px] font-bold uppercase transition-all",
+                                 form.areas.includes(area)
+                                   ? "bg-emerald-600 text-white"
+                                   : "bg-white dark:bg-slate-900/50 text-slate-500 border border-emerald-500/10 hover:border-emerald-500/30"
+                               )}
+                            >
+                               {area}
+                            </button>
+                         ))}
+                      </div>
+                   </div>
+                )}
+              </div>
               <div className="flex gap-3 pt-2">
                 <Button type="button" variant="outline" onClick={() => setShowForm(false)} className="flex-1 dark:border-slate-600 dark:text-slate-300">{t('cancel') || 'Cancel'}</Button>
                 <Button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white">{editingRep ? (t('update') || 'Update') : (t('add') || 'Add')} {t('rep') || 'Rep'}</Button>

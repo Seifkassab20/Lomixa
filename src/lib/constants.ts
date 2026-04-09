@@ -37,6 +37,16 @@ export const CITY_MAP: Record<string, string[]> = {
   ly: ['Tripoli', 'Benghazi', 'Misrata', 'Bayda'],
 };
 
+export const AREA_MAP: Record<string, string[]> = {
+  Riyadh: ['Olaya', 'Malaz', 'Diplomatic Quarter', 'Sulaimaniyah', 'Naseem', 'Rawdah'],
+  Jeddah: ['Balad', 'Rawdhah', 'Khalidiyah', 'Safa', 'Aziziyah', 'Salamah'],
+  Dammam: ['Al Danah', 'Al Faisaliyah', 'Al Zahra', 'Al Jamiah'],
+  Dubai: ['Downtown', 'Marina', 'Jumeirah', 'Deira', 'Bur Dubai', 'Business Bay'],
+  'Abu Dhabi': ['Khalidiya', 'Marryah Island', 'Reem Island', 'Musaffah'],
+  Cairo: ['Zamalek', 'Maadi', 'Heliopolis', 'Nasr City', 'New Cairo', 'Dokki'],
+  Alexandria: ['Smouha', 'Stanley', 'Montazah', 'Sidi Gaber'],
+};
+
 export const SPECIALTIES = [
   'Cardiology', 'Neurology', 'Pediatrics', 'Oncology',
   'Orthopedics', 'Dermatology', 'Psychiatry', 'General Practice',

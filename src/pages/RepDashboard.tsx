@@ -59,7 +59,80 @@ export function RepDashboard() {
     loadData();
   }, [loadData]);
 
-  if (subscribed === null) return null;
+  if (subscribed === null) {
+     return (
+        <div className="flex flex-col h-[60vh] items-center justify-center gap-4">
+           <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center animate-spin">
+              <div className="h-6 w-6 rounded-lg bg-emerald-500/20" />
+           </div>
+           <div className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500 animate-pulse italic">Synchronizing LOMIXA Grid...</div>
+        </div>
+     );
+  }
+
+  if (!subscribed) {
+     return (
+       <div className="max-w-4xl mx-auto py-12 space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="bg-slate-900 shadow-3xl border border-amber-500/20 rounded-[3.5rem] p-12 text-center space-y-8 relative overflow-hidden backdrop-blur-3xl group">
+             {/* Background Decoration */}
+             <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-[100px] -z-10 group-hover:bg-amber-500/10 transition-all duration-700"></div>
+             
+             <div className="relative mx-auto w-40 h-40">
+                <div className="absolute inset-0 bg-amber-500/20 rounded-full blur-3xl animate-pulse"></div>
+                <div className="relative w-40 h-40 rounded-[2.5rem] bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shadow-inner">
+                   <Lock className="w-20 h-20 text-amber-500" />
+                </div>
+             </div>
+
+             <div className="space-y-4 max-w-2xl mx-auto">
+                <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-amber-500/5 border border-amber-500/20 text-amber-500 text-[10px] font-black uppercase tracking-[0.3em]">
+                   <ShieldAlert className="w-4 h-4" />
+                   Access Restricted
+                </div>
+                <h2 className="text-5xl font-black italic tracking-tighter uppercase text-white leading-none">Professional <span className="text-amber-500">Subscription Required</span></h2>
+                <p className="text-slate-400 font-medium leading-relaxed italic text-lg">
+                   Your account does not have a 1-year professional license active. Access to the Sales Dashboard and doctor booking network is restricted.
+                </p>
+             </div>
+
+             {hasPendingRequest ? (
+                <div className="p-8 rounded-[2rem] bg-emerald-500/5 border border-emerald-500/20 max-w-xl mx-auto flex items-center gap-6">
+                   <Clock className="w-10 h-10 text-emerald-500 shrink-0" />
+                   <div className="text-left">
+                      <h4 className="text-sm font-black text-white uppercase italic tracking-widest">Subscription Audit Pending</h4>
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none mt-1">Your bundle request is awaiting administrative authority confirmation.</p>
+                   </div>
+                </div>
+             ) : (
+                <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+                   <Button 
+                      onClick={() => navigate('/rep-subscription')} 
+                      className="h-16 px-12 rounded-2xl bg-amber-600 hover:bg-amber-500 text-white font-black uppercase italic tracking-widest text-xs shadow-2xl shadow-amber-500/20 group"
+                   >
+                      Upgrade Account <Rocket className="w-4 h-4 ml-3 transition-transform group-hover:-translate-y-1 group-hover:translate-x-1" />
+                   </Button>
+                   <Button 
+                      variant="ghost" 
+                      onClick={() => navigate('/settings')} 
+                      className="h-16 px-12 rounded-2xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white font-black uppercase italic tracking-widest text-xs"
+                   >
+                      Manage Profile
+                   </Button>
+                </div>
+             )}
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 px-6">
+             {[{ l: 'Bookings', i: Calendar }, { l: 'Analytics', i: Target }, { l: 'Revenue', i: CreditCard }, { l: 'Network', i: Rocket }].map(({ l, i: Icon }) => (
+                <div key={l} className="p-6 bg-white/5 border border-white/5 rounded-3xl text-center space-y-3 opacity-40">
+                   <Icon className="w-8 h-8 text-slate-500 mx-auto" />
+                   <span className="block text-[8px] font-black uppercase tracking-widest text-slate-500 leading-none">{l}</span>
+                </div>
+             ))}
+          </div>
+       </div>
+     );
+  }
 
   const TYPE_ICONS = { 'In Person': MapPin, Video, Call: Phone, Text: Clock };
   const thisMonth = new Date().getMonth();

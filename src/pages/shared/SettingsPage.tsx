@@ -42,6 +42,7 @@ import {
   ARABIC_COUNTRY_CODES,
   COUNTRIES,
   CITY_MAP,
+  AREA_MAP,
   SPECIALTIES,
 } from "@/lib/constants";
 
@@ -57,6 +58,8 @@ export function SettingsPage() {
     organization: "",
     country: "sa",
     city: "",
+    cities: [] as string[],
+    areas: [] as string[],
     bio: "",
     email: "",
     avatar: "",
@@ -133,6 +136,14 @@ export function SettingsPage() {
           profile.city ||
           user?.user_metadata?.city ||
           "",
+        cities:
+          (entity?.location?.cities as string[]) ||
+          (entity?.location?.city ? [entity.location.city as string] : []) ||
+          [],
+        areas:
+          (entity?.location?.areas as string[]) ||
+          (entity?.location?.area ? [entity.location.area as string] : []) ||
+          [],
         bio: profile.bio || "",
         email: user?.email || "",
         avatar:
@@ -209,7 +220,7 @@ export function SettingsPage() {
           );
         }
 
-        saveSalesRep({
+         saveSalesRep({
           ...r,
           name: form.fullName,
           phone: finalData.phone,
@@ -218,6 +229,9 @@ export function SettingsPage() {
           location: {
             ...(r.location || {}),
             country: form.country,
+            city: form.cities[0] || "",
+            cities: form.cities,
+            areas: form.areas,
           },
         });
       }
@@ -246,6 +260,9 @@ export function SettingsPage() {
           location: {
             ...(d.location || {}),
             country: form.country,
+            city: form.cities[0] || "",
+            cities: form.cities,
+            areas: form.areas,
           },
           specialty: form.specialty || d.specialty,
         });
@@ -710,38 +727,105 @@ export function SettingsPage() {
                   <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">
-                  {t("city")} ({t("optional")})
-                </Label>
-                <div className="relative group">
-                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
-                  <select
-                    name="city"
-                    value={form.city}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, city: e.target.value }))
-                    }
-                    className="w-full h-12 pl-12 pr-10 rounded-xl bg-app-card border border-app-border text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none appearance-none"
-                  >
-                    <option value="">
-                      {t("selectCity") || "Select city..."}
-                    </option>
-                    {CITY_MAP[form.country]?.map((c) => (
-                      <option key={c} value={c}>
-                        {t(
-                          `city_${c
-                            .replace(/^city_/, "")
-                            .toLowerCase()
-                            .replace(/\s+/g, "_")}`,
-                          c.replace(/^city_/, ""),
+              {(role === 'rep' || role === 'doctor') ? (
+                <div className="space-y-3 col-span-2">
+                  <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">
+                    {t("territories") || "My Coverage Territories (Cities)"} *
+                  </Label>
+                  <div className="flex flex-wrap gap-2 p-4 rounded-2xl bg-app-card border dark:border-slate-800">
+                    {CITY_MAP[form.country]?.map(city => (
+                      <button
+                        key={city}
+                        type="button"
+                        onClick={() => {
+                          setForm(f => {
+                            const cities = f.cities.includes(city)
+                              ? f.cities.filter(c => c !== city)
+                              : [...f.cities, city];
+                            return { ...f, cities };
+                          });
+                        }}
+                        className={cn(
+                          "px-3 py-1.5 rounded-lg border text-[10px] font-bold uppercase transition-all",
+                          form.cities.includes(city)
+                            ? "bg-brand border-brand text-white shadow-lg shadow-brand/20"
+                            : "bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-brand/30"
                         )}
-                      </option>
+                      >
+                        {city}
+                      </button>
                     ))}
-                  </select>
-                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                  </div>
+
+                  {form.cities.length > 0 && (
+                    <div className="space-y-3 mt-4 animate-in slide-in-from-top-2 duration-300">
+                      <Label className="text-[10px] font-black uppercase text-brand ml-1">
+                        {t("targetedAreas") || "Specific Targeted Areas (Districts)"} *
+                      </Label>
+                      <div className="flex flex-wrap gap-2 p-4 rounded-2xl bg-brand/5 border border-brand/20">
+                        {form.cities.flatMap(city => AREA_MAP[city] || []).filter((v, i, a) => a.indexOf(v) === i).map(area => (
+                          <button
+                            key={area}
+                            type="button"
+                            onClick={() => {
+                              setForm(f => {
+                                const areas = f.areas.includes(area)
+                                  ? f.areas.filter(a => a !== area)
+                                  : [...f.areas, area];
+                                return { ...f, areas };
+                              });
+                            }}
+                            className={cn(
+                              "px-3 py-1.5 rounded-lg border text-[10px] font-bold uppercase transition-all",
+                              form.areas.includes(area)
+                                ? "bg-brand border-brand text-white shadow-lg shadow-brand/20"
+                                : "bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-brand/30"
+                            )}
+                          >
+                            {area}
+                          </button>
+                        ))}
+                        {(form.cities.flatMap(city => AREA_MAP[city] || []).length === 0) && (
+                          <p className="text-[10px] text-slate-400 italic px-2">No specific areas defined for your selected cities.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">
+                    {t("city")} ({t("optional")})
+                  </Label>
+                  <div className="relative group">
+                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                    <select
+                      name="city"
+                      value={form.city}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, city: e.target.value }))
+                      }
+                      className="w-full h-12 pl-12 pr-10 rounded-xl bg-app-card border border-app-border text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none appearance-none"
+                    >
+                      <option value="">
+                        {t("selectCity") || "Select city..."}
+                      </option>
+                      {CITY_MAP[form.country]?.map((c) => (
+                        <option key={c} value={c}>
+                          {t(
+                            `city_${c
+                              .replace(/^city_/, "")
+                              .toLowerCase()
+                              .replace(/\s+/g, "_")}`,
+                            c.replace(/^city_/, ""),
+                          )}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

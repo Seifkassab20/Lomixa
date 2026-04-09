@@ -1,9 +1,17 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { useTranslation } from 'react-i18next';
-import { Calendar, Stethoscope, Video, ArrowRight, ChevronRight, ChevronLeft, Globe } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { useTranslation } from "react-i18next";
+import {
+  Calendar,
+  Stethoscope,
+  Video,
+  ArrowRight,
+  ChevronRight,
+  ChevronLeft,
+  Globe,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 interface OnboardingProps {
   onComplete: () => void;
@@ -12,62 +20,62 @@ interface OnboardingProps {
 export function Onboarding({ onComplete }: OnboardingProps) {
   const { t, i18n } = useTranslation();
   const [currentSlide, setCurrentSlide] = useState(0);
-  const isRTL = i18n.language === 'ar';
+  const isRTL = i18n.language === "ar";
 
   const toggleLanguage = () => {
-    const newLang = i18n.language === 'en' ? 'ar' : 'en';
+    const newLang = i18n.language === "en" ? "ar" : "en";
     i18n.changeLanguage(newLang);
-    document.documentElement.dir = newLang === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.dir = newLang === "ar" ? "rtl" : "ltr";
     document.documentElement.lang = newLang;
-    localStorage.setItem('lomixa_lang', newLang);
+    localStorage.setItem("lomixa_lang", newLang);
   };
 
   const slides = [
     {
       id: 1,
       icon: null,
-      title: t('onboarding.slide1.title'),
-      subtitle: t('onboarding.slide1.subtitle'),
-      desc: t('onboarding.slide1.desc'),
-      logo: true
+      title: t("onboarding.slide1.title"),
+      subtitle: t("onboarding.slide1.subtitle"),
+      desc: t("onboarding.slide1.desc"),
+      logo: true,
     },
     {
       id: 2,
       icon: Calendar,
-      gradient: 'from-emerald-500 to-teal-600',
-      title: t('onboarding.slide2.title'),
-      subtitle: t('onboarding.slide2.subtitle'),
-      desc: t('onboarding.slide2.desc')
+      gradient: "from-emerald-500 to-teal-600",
+      title: t("onboarding.slide2.title"),
+      subtitle: t("onboarding.slide2.subtitle"),
+      desc: t("onboarding.slide2.desc"),
     },
     {
       id: 3,
       icon: Stethoscope,
-      gradient: 'from-[#0d7a5b] to-emerald-600',
-      title: t('onboarding.slide3.title'),
-      subtitle: t('onboarding.slide3.subtitle'),
-      desc: t('onboarding.slide3.desc')
+      gradient: "from-[#0d7a5b] to-emerald-600",
+      title: t("onboarding.slide3.title"),
+      subtitle: t("onboarding.slide3.subtitle"),
+      desc: t("onboarding.slide3.desc"),
     },
     {
       id: 4,
       icon: Video,
-      gradient: 'from-blue-500 to-indigo-600',
-      title: t('onboarding.slide4.title'),
-      subtitle: t('onboarding.slide4.subtitle'),
-      desc: t('onboarding.slide4.desc')
+      gradient: "from-blue-500 to-indigo-600",
+      title: t("onboarding.slide4.title"),
+      subtitle: t("onboarding.slide4.subtitle"),
+      desc: t("onboarding.slide4.desc"),
     },
     {
       id: 5,
       icon: ArrowRight,
-      gradient: 'from-emerald-600 to-teal-700',
-      title: t('onboarding.slide5.title'),
-      subtitle: t('onboarding.slide5.subtitle'),
-      desc: t('onboarding.slide5.desc')
-    }
+      gradient: "from-emerald-600 to-teal-700",
+      title: t("onboarding.slide5.title"),
+      subtitle: t("onboarding.slide5.subtitle"),
+      desc: t("onboarding.slide5.desc"),
+    },
   ];
 
   const handleNext = () => {
     if (currentSlide < slides.length - 1) {
-      setCurrentSlide(prev => prev + 1);
+      setCurrentSlide((prev) => prev + 1);
     } else {
       onComplete();
     }
@@ -77,27 +85,27 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
   const slideVariants = {
     enter: (direction: number) => ({
-      x: direction > 0 ? (isRTL ? -1000 : 1000) : (isRTL ? 1000 : -1000),
-      opacity: 0
+      x: direction > 0 ? (isRTL ? -1000 : 1000) : isRTL ? 1000 : -1000,
+      opacity: 0,
     }),
     center: {
       zIndex: 1,
       x: 0,
-      opacity: 1
+      opacity: 1,
     },
     exit: (direction: number) => ({
       zIndex: 0,
-      x: direction < 0 ? (isRTL ? -1000 : 1000) : (isRTL ? 1000 : -1000),
-      opacity: 0
-    })
+      x: direction < 0 ? (isRTL ? -1000 : 1000) : isRTL ? 1000 : -1000,
+      opacity: 0,
+    }),
   };
 
   const IconComponent = slides[currentSlide].icon;
 
   return (
-    <div 
+    <div
       className="fixed inset-0 z-[100] bg-[#050b14] overflow-hidden flex flex-col items-center select-none"
-      dir={isRTL ? 'rtl' : 'ltr'}
+      dir={isRTL ? "rtl" : "ltr"}
     >
       {/* Language Switcher */}
       <div className="fixed top-8 right-8 z-[110]">
@@ -109,7 +117,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         >
           <Globe className="w-4 h-4 text-emerald-500 group-hover:rotate-12 transition-transform" />
           <span className="text-sm font-black tracking-tighter uppercase italic text-white">
-            {i18n.language === 'en' ? 'عربي' : 'EN'}
+            {i18n.language === "en" ? "عربي" : "EN"}
           </span>
         </motion.button>
       </div>
@@ -129,7 +137,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             exit="exit"
             transition={{
               x: { type: "spring", stiffness: 300, damping: 30 },
-              opacity: { duration: 0.2 }
+              opacity: { duration: 0.2 },
             }}
             className="w-full flex flex-col items-center text-center space-y-8"
           >
@@ -137,15 +145,28 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             <div className="relative">
               {slides[currentSlide].logo ? (
                 <div className="w-[132px] h-[132px] bg-white rounded-[2.5rem] p-4 shadow-2xl shadow-emerald-500/20 transform hover:scale-105 transition-transform duration-500 overflow-hidden">
-                  <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
+                  <img
+                    src="/logo.svg"
+                    alt="Logo"
+                    className="w-full h-full object-contain"
+                  />
                 </div>
               ) : (
-                <div className={cn(
-                  "w-[132px] h-[132px] rounded-[2.5rem] shadow-2xl flex items-center justify-center p-8 bg-gradient-to-br",
-                  slides[currentSlide].gradient,
-                  "shadow-emerald-500/20"
-                )}>
-                  {IconComponent && <IconComponent className={cn("w-full h-full text-white", isRTL && currentSlide === 4 && "rotate-180")} />}
+                <div
+                  className={cn(
+                    "w-[132px] h-[132px] rounded-[2.5rem] shadow-2xl flex items-center justify-center p-8 bg-gradient-to-br",
+                    slides[currentSlide].gradient,
+                    "shadow-emerald-500/20",
+                  )}
+                >
+                  {IconComponent && (
+                    <IconComponent
+                      className={cn(
+                        "w-full h-full text-white",
+                        isRTL && currentSlide === 4 && "rotate-180",
+                      )}
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -175,7 +196,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
               onClick={() => setCurrentSlide(i)}
               className={cn(
                 "h-2 rounded-full transition-all duration-300",
-                currentSlide === i ? "w-8 bg-emerald-500 shadow-md shadow-emerald-500/40" : "w-2 bg-slate-800 hover:bg-slate-700"
+                currentSlide === i
+                  ? "w-8 bg-emerald-500 shadow-md shadow-emerald-500/40"
+                  : "w-2 bg-slate-800 hover:bg-slate-700",
               )}
             />
           ))}
@@ -188,8 +211,12 @@ export function Onboarding({ onComplete }: OnboardingProps) {
               onClick={onComplete}
               className="w-full h-16 rounded-2.5xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold text-lg flex items-center justify-center gap-3 shadow-xl shadow-emerald-900/40 transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
-              {t('getStarted')}
-              {isRTL ? <ChevronLeft className="w-6 h-6" /> : <ChevronRight className="w-6 h-6" />}
+              {t("getStarted")}
+              {isRTL ? (
+                <ChevronLeft className="w-6 h-6" />
+              ) : (
+                <ChevronRight className="w-6 h-6" />
+              )}
             </Button>
           ) : (
             <>
@@ -198,14 +225,18 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 onClick={handleSkip}
                 className="flex-1 h-14 rounded-2xl text-slate-500 hover:text-white hover:bg-white/5 transition-all text-sm font-bold"
               >
-                {t('skip')}
+                {t("skip")}
               </Button>
               <Button
                 onClick={handleNext}
                 className="flex-[2] h-14 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/30 transition-all hover:scale-[1.02]"
               >
-                {t('next')}
-                {isRTL ? <ChevronLeft className="w-5 h-5 flex-shrink-0" /> : <ChevronRight className="w-5 h-5 flex-shrink-0" />}
+                {t("next")}
+                {isRTL ? (
+                  <ChevronLeft className="w-5 h-5 flex-shrink-0" />
+                ) : (
+                  <ChevronRight className="w-5 h-5 flex-shrink-0" />
+                )}
               </Button>
             </>
           )}

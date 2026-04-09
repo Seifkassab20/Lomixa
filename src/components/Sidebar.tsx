@@ -84,7 +84,8 @@ export function Sidebar() {
             icon: ShieldCheck,
             badge:
               (getHospitals() || []).filter((h) => h && !h.isVerified).length +
-              (getPharmaCompanies() || []).filter((p) => p && !p.isVerified).length,
+              (getPharmaCompanies() || []).filter((p) => p && !p.isVerified)
+                .length,
           },
           {
             key: "bundles",
@@ -254,26 +255,36 @@ export function Sidebar() {
   const [remainingDays, setRemainingDays] = useState<number | null>(null);
 
   useEffect(() => {
-    if (role === 'rep' && userId) {
-      const { getSubscriptionRemainingDays, addNotification, getNotifications, generateId } = require('@/lib/store');
+    if (role === "rep" && userId) {
+      const {
+        getSubscriptionRemainingDays,
+        addNotification,
+        getNotifications,
+        generateId,
+      } = require("@/lib/store");
       const days = getSubscriptionRemainingDays(userId);
       setRemainingDays(days);
 
       if (days !== null && days <= 7) {
         // Trigger notification if not already sent today
         const notifs = getNotifications();
-        const todayStr = new Date().toISOString().split('T')[0];
-        const existing = notifs.find(n => n.userId === userId && n.type === 'subscription' && n.date.startsWith(todayStr));
-        
+        const todayStr = new Date().toISOString().split("T")[0];
+        const existing = notifs.find(
+          (n) =>
+            n.userId === userId &&
+            n.type === "subscription" &&
+            n.date.startsWith(todayStr),
+        );
+
         if (!existing) {
           addNotification({
             id: generateId(),
             userId: userId,
-            title: 'Critical Renewal Required',
+            title: "Critical Renewal Required",
             message: `Your professional bundle will expire in ${days} days. Please top up your balance and renew soon.`,
-            type: 'subscription',
+            type: "subscription",
             read: false,
-            date: new Date().toISOString()
+            date: new Date().toISOString(),
           });
         }
       }
@@ -305,7 +316,7 @@ export function Sidebar() {
       >
         <div className="h-8 w-8 rounded-full bg-white flex items-center justify-center shrink-0 border border-emerald-500/20 shadow-sm overflow-hidden">
           <img
-            src="/logo.png"
+            src="/logo.svg"
             alt="Logo"
             className="h-full w-full object-cover"
           />
@@ -352,7 +363,11 @@ export function Sidebar() {
                       isActive ? "text-brand" : "",
                     )}
                   />
-                  {!collapsed && <span className="truncate uppercase tracking-tighter italic">{link.name}</span>}
+                  {!collapsed && (
+                    <span className="truncate uppercase tracking-tighter italic">
+                      {link.name}
+                    </span>
+                  )}
                   {badge > 0 && (
                     <span
                       className={cn(
@@ -383,32 +398,39 @@ export function Sidebar() {
       </nav>
 
       {/* Subscription Footer for Rep */}
-      {!collapsed && role === 'rep' && remainingDays !== null && remainingDays <= 7 && (
-        <div className="p-4 mt-auto">
-          <div className="bg-amber-500/10 rounded-2xl p-4 border border-amber-500/20 space-y-3 shadow-[0_0_20px_rgba(245,158,11,0.1)]">
-             <div className="flex items-center justify-between">
-                <span className="text-[9px] font-black uppercase tracking-widest text-amber-600/60 font-bold">Bundle Expiring soon</span>
-             </div>
-             <div className="flex items-center gap-3">
+      {!collapsed &&
+        role === "rep" &&
+        remainingDays !== null &&
+        remainingDays <= 7 && (
+          <div className="p-4 mt-auto">
+            <div className="bg-amber-500/10 rounded-2xl p-4 border border-amber-500/20 space-y-3 shadow-[0_0_20px_rgba(245,158,11,0.1)]">
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-black uppercase tracking-widest text-amber-600/60 font-bold">
+                  Bundle Expiring soon
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
                 <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500">
-                   <Clock className="w-4 h-4" />
+                  <Clock className="w-4 h-4" />
                 </div>
                 <div>
-                   <div className="text-sm font-black italic text-amber-600 leading-none mb-1 uppercase tracking-tighter">
-                     {remainingDays} Days Left
-                   </div>
-                   <div className="text-[8px] font-black text-amber-600/50 uppercase tracking-widest font-bold">Critical Renewal</div>
+                  <div className="text-sm font-black italic text-amber-600 leading-none mb-1 uppercase tracking-tighter">
+                    {remainingDays} Days Left
+                  </div>
+                  <div className="text-[8px] font-black text-amber-600/50 uppercase tracking-widest font-bold">
+                    Critical Renewal
+                  </div>
                 </div>
-             </div>
-             <Link 
-               to="/rep-subscription"
-               className="flex items-center justify-center h-10 w-full rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-black uppercase tracking-widest italic transition-all shadow-lg shadow-amber-500/20"
-             >
+              </div>
+              <Link
+                to="/rep-subscription"
+                className="flex items-center justify-center h-10 w-full rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-black uppercase tracking-widest italic transition-all shadow-lg shadow-amber-500/20"
+              >
                 Renew Bundle
-             </Link>
+              </Link>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Default persistent info card if not expiring (Optional, but let's keep the dashboard cleanup by only showing when needed as requested) */}
 

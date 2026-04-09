@@ -1401,9 +1401,9 @@ export function isRepSubscribed(repIdOrUserId: string): boolean {
   // Fallback: search approved bundle requests for this user or their name
   const requests = getBundleRequests();
   const approvedRequest = requests.find(r => 
-    r.status === 'approved' && 
-    r.type === 'rep' &&
-    (r.pharmaId === repIdOrUserId || (rep && r.pharmaName.toUpperCase() === rep.name.toUpperCase()))
+     r.status === 'approved' && 
+     r.type === 'rep' &&
+     (r.pharmaId === repIdOrUserId || (rep?.name && r.pharmaName && r.pharmaName.toUpperCase() === rep.name.toUpperCase()))
   );
   
   return !!approvedRequest;
@@ -1426,15 +1426,15 @@ export function getSubscriptionRemainingDays(repIdOrUserId: string): number | nu
   // Fallback: If not synced to rep yet, find the approved request and infer days
   const requests = getBundleRequests();
   const req = requests.find(r => 
-    r.status === 'approved' && 
-    r.type === 'rep' &&
-    (r.pharmaId === repIdOrUserId || (rep && r.pharmaName.toUpperCase() === rep.name.toUpperCase()))
+     r.status === 'approved' && 
+     r.type === 'rep' &&
+     (r.pharmaId === repIdOrUserId || (rep?.name && r.pharmaName && r.pharmaName.toUpperCase() === rep.name.toUpperCase()))
   );
 
   if (req) {
     // If we have an approved request, it was for at least 1 month (30 days)
     // We can show the balance/months from the request as a temporary UI bridge
-    return req.balance * 30; 
+    return (req.balance || 1) * 30; 
   }
   
   return null;
@@ -1457,9 +1457,9 @@ export function getSubscriptionMaxDays(repIdOrUserId: string): number {
   // Fallback to check approved requests
   const requests = getBundleRequests();
   const req = requests.find(r => 
-    r.status === 'approved' && 
-    r.type === 'rep' &&
-    (r.pharmaId === repIdOrUserId || (rep && r.pharmaName.toUpperCase() === rep.name.toUpperCase()))
+     r.status === 'approved' && 
+     r.type === 'rep' &&
+     (r.pharmaId === repIdOrUserId || (rep?.name && r.pharmaName && r.pharmaName.toUpperCase() === rep.name.toUpperCase()))
   );
   
   if (req) {
@@ -1490,8 +1490,8 @@ export function processRepSubscription(
      // Last resort: find by bundle request pharmaName if possible
      const requests = getBundleRequests();
      const req = requests.find(r => r.pharmaId === repId || r.id === repId);
-     if (req) {
-        repIdx = reps.findIndex(r => r.name.toUpperCase() === req.pharmaName.toUpperCase());
+     if (req?.pharmaName) {
+        repIdx = reps.findIndex(r => r.name && r.name.toUpperCase() === req.pharmaName.toUpperCase());
      }
   }
 

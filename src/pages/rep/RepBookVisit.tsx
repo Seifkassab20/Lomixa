@@ -23,6 +23,7 @@ export function RepBookVisit() {
   const [search, setSearch] = useState('');
   const [specialtyFilter, setSpecialtyFilter] = useState('All');
   const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [areaFilter, setAreaFilter] = useState('All');
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<VisitType>('In Person');
@@ -69,8 +70,9 @@ export function RepBookVisit() {
 
     const hospitals = Array.from(new Set(territoryDoctors.map(d => d.hospitalName))).sort();
     const doctorNames = Array.from(new Set(territoryDoctors.map(d => d.name))).sort();
+    const areas = Array.from(new Set(territoryDoctors.flatMap(d => d.location?.areas || (d.location?.area ? [d.location.area] : [])))).filter(Boolean) as string[];
     
-    return { hospitals, doctorNames };
+    return { hospitals, doctorNames, areas: areas.sort() };
   }, [doctors, repData]);
 
   useEffect(() => {
@@ -99,15 +101,20 @@ export function RepBookVisit() {
     // Country must match (Default to match if doctor location is uninitialized)
     const matchCountry = !d.location?.country || d.location?.country === repCountry;
     
-    // City must match (Default to match if city is uninitialized)
-    const matchCity = !repCities.length || !d.location?.city || repCities.includes(d.location.city);
+    // City must match (Intersection check if both have multiple cities)
+    const doctorCities = d.location?.cities || (d.location?.city ? [d.location.city] : []);
+    const matchCity = !repCities.length || !doctorCities.length || repCities.some(rc => doctorCities.includes(rc));
     
     if (!matchCountry || !matchCity) return false;
 
 
-    const matchSearch = !search || d.name.toLowerCase().includes(search.toLowerCase()) || d.hospitalName.toLowerCase().includes(search.toLowerCase());
+    const doctorAreas = d.location?.areas || (d.location?.area ? [d.location.area] : []);
+    const matchSearch = !search || 
+      (d.name && d.name.toLowerCase().includes(search.toLowerCase())) || 
+      (d.hospitalName && d.hospitalName.toLowerCase().includes(search.toLowerCase()));
     const matchSpecialty = specialtyFilter === 'All' || d.specialty === specialtyFilter;
-    return matchSearch && matchSpecialty;
+    const matchArea = areaFilter === 'All' || doctorAreas.includes(areaFilter);
+    return matchSearch && matchSpecialty && matchArea;
   }).sort((a, b) => {
     // Prioritize target specialties (Recommendation system enhancement)
     const targetSpecs = repData?.targetSpecialties || [];
@@ -118,11 +125,13 @@ export function RepBookVisit() {
       if (!aMatchesSpec && bMatchesSpec) return 1;
     }
 
-    // Prioritize area matches (Nearest)
-    const repArea = repData?.location?.area || '';
-    if (repArea) {
-      const aMatchesArea = a.location?.area === repArea;
-      const bMatchesArea = b.location?.area === repArea;
+    // Prioritize area matches (Intersection)
+    const repAreas = repData?.location?.areas || [];
+    if (repAreas.length > 0) {
+      const aAreas = a.location?.areas || (a.location?.area ? [a.location.area] : []);
+      const bAreas = b.location?.areas || (b.location?.area ? [b.location.area] : []);
+      const aMatchesArea = repAreas.some(ra => aAreas.includes(ra));
+      const bMatchesArea = repAreas.some(ra => bAreas.includes(ra));
       if (aMatchesArea && !bMatchesArea) return -1;
       if (!aMatchesArea && bMatchesArea) return 1;
     }
@@ -135,7 +144,7 @@ export function RepBookVisit() {
   const aiRecommendations = React.useMemo(() => {
     if (search !== '' || specialtyFilter !== 'All') return [];
     
-    const repArea = repData?.location?.area || '';
+    const repAreas = repData?.location?.areas || [];
     const targetSpecs = repData?.targetSpecialties || [];
 
     return [...filtered]
@@ -149,10 +158,13 @@ export function RepBookVisit() {
            if (!aMatchesSpec && bMatchesSpec) return 1;
         }
 
-        // Priority 2: Match Rep's Area (Nearest)
-        if (repArea) {
-           const aMatchesArea = a.location?.area === repArea;
-           const bMatchesArea = b.location?.area === repArea;
+        // Priority 2: Match Rep's Areas (Intersection)
+        const repAreas = repData?.location?.areas || [];
+        if (repAreas.length > 0) {
+           const aAreas = a.location?.areas || (a.location?.area ? [a.location.area] : []);
+           const bAreas = b.location?.areas || (b.location?.area ? [b.location.area] : []);
+           const aMatchesArea = repAreas.some(ra => aAreas.includes(ra));
+           const bMatchesArea = repAreas.some(ra => bAreas.includes(ra));
            if (aMatchesArea && !bMatchesArea) return -1;
            if (!aMatchesArea && bMatchesArea) return 1;
         }
@@ -312,7 +324,22 @@ export function RepBookVisit() {
           <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
         </div>
 
-        <div className="relative w-full sm:w-auto min-w-[200px] group">
+        <div className="relative w-full sm:w-auto min-w-[180px] group">
+          <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
+          <select
+            value={areaFilter}
+            onChange={e => setAreaFilter(e.target.value)}
+            className="w-full h-14 pl-12 pr-12 rounded-2xl bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm font-bold appearance-none transition-all cursor-pointer dark:text-white"
+          >
+            <option value="All">{t('allAreas') || "All Areas"}</option>
+            {searchableOptions.areas.map(a => (
+              <option key={a} value={a}>{a}</option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+        </div>
+
+        <div className="relative w-full sm:w-auto min-w-[180px] group">
           <Stethoscope className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
           <select
             value={specialtyFilter}
