@@ -152,9 +152,11 @@ export function DoctorSchedule() {
   };
 
   const handleDelete = (id: string) => {
-    const updated = slots.filter(s => s.id !== id);
-    saveDoctorAvailability(doctorId, updated);
-    setSlots(updated);
+    if (confirm(t('confirmDeleteSlot') || 'Are you sure you want to delete this slot?')) {
+      const updated = slots.filter(s => s.id !== id);
+      saveDoctorAvailability(doctorId, updated);
+      setSlots(updated);
+    }
   };
 
   const today = new Date().toISOString().split('T')[0];

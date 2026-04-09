@@ -33,14 +33,14 @@ export function AboutUs() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <Link to="/login" className="flex items-center gap-3 group">
-              <div className="bg-white rounded-full p-1.5 w-10 h-10 transition-transform group-hover:scale-105">
+              <div className="bg-white rounded-xl p-1.5 w-10 h-10 transition-transform group-hover:scale-105 shadow-lg shadow-emerald-500/5">
                 <img
                   src="/logo.svg"
                   alt="Lomixa Logo"
                   className="w-full h-full object-contain"
                 />
               </div>
-              <span className="text-xl font-bold tracking-tight text-white">
+              <span className="text-xl font-black italic tracking-tighter uppercase text-white leading-none">
                 {t("appName")}
               </span>
             </Link>

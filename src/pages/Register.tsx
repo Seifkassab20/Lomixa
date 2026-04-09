@@ -621,15 +621,15 @@ export function Register() {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-4xl mx-auto mb-20 flex flex-col items-center gap-6"
       >
-        <Link to="/" className="flex flex-col items-center gap-4 group">
-          <div className="bg-white rounded-[2.5rem] p-3 w-20 h-20 shadow-2xl group-hover:scale-105 transition-transform hover:rotate-2">
+        <Link to="/" className="flex flex-col items-center gap-6 group">
+          <div className="bg-white rounded-[2rem] p-4 w-24 h-24 shadow-2xl transition-all group-hover:scale-105 group-hover:rotate-2">
             <img
               src="/logo.svg"
               alt="Logo"
               className="w-full h-full object-contain"
             />
           </div>
-          <span className="text-4xl font-black italic tracking-tighter uppercase text-white leading-none">
+          <span className="text-5xl font-black italic tracking-tighter uppercase text-white leading-none">
             {t("appName")}
           </span>
         </Link>

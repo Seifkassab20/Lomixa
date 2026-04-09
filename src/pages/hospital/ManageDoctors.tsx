@@ -158,9 +158,16 @@ export function ManageDoctors() {
   };
 
   const toggleActivation = (doc: Doctor) => {
-    const updated = { ...doc, isActive: !doc.isActive };
-    saveDoctor(updated);
-    refresh();
+    const action = doc.isActive ? 'deactivate' : 'activate';
+    const msg = doc.isActive 
+      ? (t('confirmDeactivateUser') || 'Are you sure you want to deactivate this user?')
+      : (t('confirmActivateUser') || 'Are you sure you want to activate this user?');
+      
+    if (confirm(msg)) {
+      const updated = { ...doc, isActive: !doc.isActive };
+      saveDoctor(updated);
+      refresh();
+    }
   };
 
   const handleApprove = (doc: Doctor) => {
@@ -170,7 +177,7 @@ export function ManageDoctors() {
   };
 
   const handleDelete = (id: string, name: string) => {
-    if (confirm(`${t('deleteDoctor') || 'Are you sure you want to remove'} ${name}? ${t('actionCannotBeUndone') || 'This action cannot be undone.'}`)) {
+    if (confirm(`${t('confirmDeleteUser') || 'Are you sure you want to delete this user?'} (${name})`)) {
       deleteDoctor(id);
       refresh();
     }

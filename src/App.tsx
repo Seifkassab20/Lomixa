@@ -91,11 +91,16 @@ export default function App() {
           <AuthProvider>
             <Suspense fallback={
               <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-[#050b14]">
-                <div className="flex flex-col items-center gap-4">
-                  <div className="h-10 w-10 rounded-xl bg-emerald-500 flex items-center justify-center animate-spin">
-                    <div className="h-5 w-5 rounded bg-white/50" />
+                <div className="flex flex-col items-center gap-6">
+                  <div className="h-16 w-16 rounded-[2rem] bg-white flex items-center justify-center border border-emerald-500/20 shadow-2xl shadow-emerald-500/10 p-2.5 animate-pulse transition-transform">
+                     <img src="/logo.svg" alt="Lomixa" className="h-full w-full object-contain" />
                   </div>
-                  <div className="text-sm font-bold text-gray-500 dark:text-slate-400 animate-pulse tracking-widest uppercase">Initializing...</div>
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="text-sm font-black text-gray-900 dark:text-white tracking-[0.3em] uppercase italic">Initializing...</div>
+                    <div className="h-1 w-24 bg-slate-800 rounded-full overflow-hidden">
+                       <div className="h-full bg-emerald-500 w-1/2 animate-[shimmer_2s_infinite_linear]" />
+                    </div>
+                  </div>
                 </div>
               </div>
             }>

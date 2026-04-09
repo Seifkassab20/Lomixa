@@ -158,10 +158,16 @@ export function PharmaSubordinates() {
   };
 
   const toggleActivation = (rep: SalesRep) => {
-    const updated = { ...rep, isActive: !rep.isActive };
-    saveSalesRep(updated);
-    loadData();
-    toast(updated.isActive ? t('repActivated') || 'Representative activated' : t('repDeactivated') || 'Representative deactivated', 'info');
+    const msg = rep.isActive 
+      ? (t('confirmDeactivateUser') || 'Are you sure you want to deactivate this user?')
+      : (t('confirmActivateUser') || 'Are you sure you want to activate this user?');
+
+    if (confirm(msg)) {
+      const updated = { ...rep, isActive: !rep.isActive };
+      saveSalesRep(updated);
+      loadData();
+      toast(updated.isActive ? t('repActivated') || 'Representative activated' : t('repDeactivated') || 'Representative deactivated', 'info');
+    }
   };
 
   const handleApprove = (rep: SalesRep) => {
@@ -172,7 +178,7 @@ export function PharmaSubordinates() {
   };
 
   const handleDelete = (id: string, name: string) => {
-    if (confirm(`${t('removeRepConfirm') || 'Are you sure you want to delete'} ${name}? ${t('actionCannotBeUndone') || 'This action cannot be undone.'}`)) {
+    if (confirm(`${t('confirmDeleteUser') || 'Are you sure you want to delete this user?'} (${name})`)) {
       deleteSalesRep(id);
       setReps(prev => prev.filter(r => r.id !== id));
       toast(t('repDeleted') || 'Representative removed permanently', 'success');

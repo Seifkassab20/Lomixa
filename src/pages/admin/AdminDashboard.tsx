@@ -242,16 +242,23 @@ export function AdminDashboard() {
   };
 
   const togglePharmaStatus = (pc: PharmaCompany, forceValue?: boolean) => {
-    const updated = {
-      ...pc,
-      isActive: forceValue !== undefined ? forceValue : !pc.isActive,
-    };
-    savePharmaCompany(updated);
-    refresh();
-    toast(
-      `${pc.name} ${updated.isActive ? "Activated" : "Deactivated"}`,
-      "info",
-    );
+    const isNowActive = forceValue !== undefined ? forceValue : !pc.isActive;
+    const msg = pc.isActive 
+      ? (t('confirmDeactivateUser') || 'Are you sure you want to deactivate this user?')
+      : (t('confirmActivateUser') || 'Are you sure you want to activate this user?');
+
+    if (confirm(msg)) {
+      const updated = {
+        ...pc,
+        isActive: isNowActive,
+      };
+      savePharmaCompany(updated);
+      refresh();
+      toast(
+        `${pc.name} ${updated.isActive ? "Activated" : "Deactivated"}`,
+        "info",
+      );
+    }
   };
 
   const handleApproveRequest = (req: BundleRequest) => {
@@ -702,9 +709,11 @@ export function AdminDashboard() {
                       variant="ghost"
                       className="h-16 w-16 rounded-3xl group-hover:bg-red-500/10 hover:text-red-500 text-slate-600 border border-slate-800 shrink-0"
                       onClick={() => {
-                        setCustomBundles(
-                          customBundles.filter((_, i) => i !== bIdx),
-                        );
+                        if (confirm(t('confirmDeleteBundle') || 'Are you sure you want to delete this bundle?')) {
+                          setCustomBundles(
+                            customBundles.filter((_, i) => i !== bIdx),
+                          );
+                        }
                       }}
                     >
                       <Trash2 className="w-6 h-6" />
@@ -1037,7 +1046,7 @@ export function AdminDashboard() {
                                 onClick={() => {
                                   if (
                                     confirm(
-                                      `Remove ${pc.name} and all its data?`,
+                                      `${t('confirmDeleteUser') || 'Are you sure you want to delete this user?'} (${pc.name})`
                                     )
                                   ) {
                                     deletePharma(pc.id);

@@ -55,7 +55,7 @@ export function RepMyVisits() {
   }, [userId]);
 
   const handleCancel = (visit: Visit) => {
-    if (!confirm(t('cancelVisitConfirm') || 'Cancel this visit booking?')) return;
+    if (!confirm(t('confirmCancelVisit') || 'Are you sure you want to cancel this visit?')) return;
     const updated = { ...visit, status: 'Cancelled' as VisitStatus, cancelledByRep: true };
     saveVisit(updated);
     setVisits(prev => prev.map(v => v.id === visit.id ? updated : v));

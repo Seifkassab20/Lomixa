@@ -314,16 +314,16 @@ export function Sidebar() {
           collapsed ? "px-4 justify-center" : "px-5 gap-3",
         )}
       >
-        <div className="h-8 w-8 rounded-full bg-white flex items-center justify-center shrink-0 border border-emerald-500/20 shadow-sm overflow-hidden">
+        <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center shrink-0 border border-emerald-500/20 shadow-lg shadow-emerald-500/5 p-1.5 transition-transform hover:scale-105">
           <img
             src="/logo.svg"
             alt="Logo"
-            className="h-full w-full object-cover"
+            className="h-full w-full object-contain"
           />
         </div>
         {!collapsed && (
           <div className="overflow-hidden">
-            <div className="text-sm font-bold text-gray-900 dark:text-white leading-tight whitespace-nowrap tracking-widest uppercase italic underline decoration-emerald-500/50 decoration-2 underline-offset-4">
+            <div className="text-lg font-black italic tracking-tighter uppercase text-gray-900 dark:text-white leading-none">
               {t("appName")}
             </div>
             <div className="text-[10px] text-gray-400 dark:text-slate-500 whitespace-nowrap">
