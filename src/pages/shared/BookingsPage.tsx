@@ -57,7 +57,7 @@ export function BookingsPage() {
       filtered = allVisits;
     }
 
-    setVisits(filtered.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+    setVisits(filtered.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')));
   }, [userId, role]);
 
   useEffect(() => {

@@ -1,17 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
-import { getVisits, getSalesReps, getPharmaCompanies, saveSalesRep, generateId } from '@/lib/store';
+import { getVisits, getSalesReps, saveSalesRep, useStoreListener, Appointment, getAppointments, getServerTime } from '@/lib/store';
 import { Calendar, CreditCard, Clock, Target, Video, Phone, MapPin, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { JitsiMeeting } from '@/components/JitsiMeeting';
+import { VideoCall } from '@/components/VideoCall';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '@/components/ui/Toast';
 import { formatCurrency } from '@/lib/currency';
-
 
 
 export function RepDashboard() {
@@ -19,31 +18,51 @@ export function RepDashboard() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
   const [visits, setVisits] = useState<ReturnType<typeof getVisits>>([]);
   const [balance, setBalance] = useState(0);
   const [country, setCountry] = useState('sa');
   const [showTopup, setShowTopup] = useState(false);
   const [topupAmount, setTopupAmount] = useState(500);
-  const [meetingRoom, setMeetingRoom] = useState<string | null>(null);
-  const [repInfo, setRepInfo] = useState({ name: '', pharmaId: '', pharmaName: '', target: 25 });
+  const [activeAppointment, setActiveAppointment] = useState<Appointment | null>(null);
+  const [serverTime, setServerTime] = useState<Date>(new Date());
+  const [repInfo, setRepInfo] = useState({ name: '', pharmaId: '', pharmaName: '', target: 25, id: '' });
 
-  const loadData = React.useCallback(() => {
+  const loadData = React.useCallback(async () => {
     const reps = getSalesReps();
     const myRep = reps.find(r => r.userId === userId);
     if (myRep) {
-       setRepInfo({ name: myRep.name, pharmaId: myRep.pharmaId, pharmaName: myRep.pharmaName, target: myRep.target });
+       setRepInfo({ id: myRep.id, name: myRep.name, pharmaId: myRep.pharmaId, pharmaName: myRep.pharmaName, target: myRep.target });
        const myVisits = getVisits().filter(v => v.repId === myRep!.id);
-       setVisits(myVisits.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+       setVisits(myVisits.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')));
        setBalance(myRep!.balance || 0);
        setCountry(myRep!.location?.country || 'sa');
     }
+    setLoading(false);
   }, [userId]);
+
+  useStoreListener(loadData);
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 10000);
+    const interval = setInterval(() => {
+       loadData();
+       getServerTime().then(setServerTime);
+    }, 10000);
+    getServerTime().then(setServerTime);
     return () => clearInterval(interval);
   }, [loadData]);
+
+  if (loading) {
+     return (
+        <div className="flex flex-col h-[60vh] items-center justify-center gap-4">
+           <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center animate-spin">
+              <div className="h-6 w-6 rounded-lg bg-emerald-500/20" />
+           </div>
+           <div className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500 animate-pulse italic">{t('synchronizingGrid')}</div>
+        </div>
+     );
+  }
 
   const TYPE_ICONS = { 'In Person': MapPin, Video, Call: Phone, Text: Clock };
   const thisMonth = new Date().getMonth();
@@ -64,25 +83,27 @@ export function RepDashboard() {
 
   return (
     <div className="space-y-6">
-      {meetingRoom && <JitsiMeeting roomName={meetingRoom} displayName={repInfo.name} onClose={() => setMeetingRoom(null)} />}
+      {activeAppointment && (
+        <VideoCall appointment={activeAppointment} onClose={() => setActiveAppointment(null)} />
+      )}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* KPI Grid Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: t('visitsThisMonth'), value: monthVisits, sub: `${t('target')}: ${repInfo.target}`, icon: Calendar, color: 'emerald' },
-          { label: t('myCredits') || 'My Balance', value: formatCurrency(balance, country), sub: t('availableForBookings'), icon: CreditCard, color: 'blue' },
+          { label: t('myCredits'), value: formatCurrency(balance, country), sub: t('availableForBookings'), icon: CreditCard, color: 'blue' },
           { label: t('pendingApprovals'), value: pendingVisits.length, sub: t('awaitingResponse'), icon: Clock, color: 'amber' },
           { label: t('confirmedVisits'), value: confirmedVisits.length, sub: t('readyToAttend'), icon: Target, color: 'purple' },
         ].map(({ label, value, sub, icon: Icon, color }) => (
-          <div key={label} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium text-gray-500 dark:text-slate-400">{label}</span>
-              <div className={`h-8 w-8 rounded-lg bg-${color}-100 dark:bg-${color}-500/20 flex items-center justify-center`}>
-                <Icon className={`h-4 w-4 text-${color}-600 dark:text-${color}-400`} />
+          <div key={label} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-2xl p-6 hover:shadow-xl transition-all">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{label}</span>
+              <div className={`h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500`}>
+                <Icon className="h-5 w-5" />
               </div>
             </div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">{value}</div>
-            <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">{sub}</div>
+            <div className="text-3xl font-black italic tracking-tighter text-gray-900 dark:text-white leading-none">{value}</div>
+            <div className="text-xs font-bold text-slate-500 mt-2 italic">{sub}</div>
           </div>
         ))}
       </div>
@@ -137,11 +158,28 @@ export function RepDashboard() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {visit.status === 'Confirmed' && visit.visitType === 'Video' && (
-                        <Button size="sm" onClick={() => setMeetingRoom(`lomixa_${visit.id}`)} className="h-7 text-xs gap-1 bg-blue-600 hover:bg-blue-700 text-white">
-                          <Video className="h-3 w-3" /> {t('join')}
-                        </Button>
-                      )}
+                      {visit.status === 'Confirmed' && visit.visitType === 'Video' && (() => {
+                          const appointment = getAppointments().find(a => 
+                             a.doctorId === visit.doctorId && 
+                             a.repId === visit.repId && 
+                             a.startTime.includes(visit.date)
+                          );
+                          
+                          if (!appointment) return null;
+                          
+                          const now = serverTime.getTime();
+                          const start = new Date(appointment.startTime).getTime();
+                          const end = new Date(appointment.endTime).getTime();
+                          const isNow = now >= start && now <= end;
+                          
+                          if (!isNow) return null;
+
+                          return (
+                            <Button size="sm" onClick={() => setActiveAppointment(appointment)} className="h-7 text-xs gap-1 bg-blue-600 hover:bg-blue-700 text-white animate-pulse">
+                              <Video className="h-3 w-3" /> {t('join')}
+                            </Button>
+                          );
+                      })()}
                       <span className={cn('text-xs font-medium', statusColors[visit.status])}>
                         {statusLabel[visit.status] || visit.status}
                       </span>
@@ -171,9 +209,9 @@ export function RepDashboard() {
 
           <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-xl p-5">
             <div className="flex items-center justify-between mb-2">
-               <div className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">{t('myCredits') || 'My Balance'}</div>
+               <div className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">{t('myCredits')}</div>
                <Button size="sm" variant="ghost" onClick={() => setShowTopup(true)} className="h-6 text-[10px] uppercase font-black tracking-widest text-emerald-600 hover:text-emerald-700 bg-emerald-500/10 h-7 rounded-lg">
-                  {t('topUp') || 'Add Funds'}
+                  {t('topUp')}
                </Button>
             </div>
              <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">{formatCurrency(balance, country)}</div>
@@ -184,7 +222,7 @@ export function RepDashboard() {
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
                <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 w-full max-w-md border dark:border-slate-800 shadow-3xl animate-in zoom-in-95">
                   <div className="flex items-center justify-between mb-8">
-                     <h2 className="text-2xl font-black italic uppercase tracking-tighter dark:text-white">{t('topUpBalance') || 'Top Up My Balance'}</h2>
+                     <h2 className="text-2xl font-black italic uppercase tracking-tighter dark:text-white">{t('topUpBalance')}</h2>
                      <button onClick={() => setShowTopup(false)} className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-white transition-colors">
                         <X className="h-5 w-5" />
                      </button>
@@ -192,7 +230,7 @@ export function RepDashboard() {
                   <div className="space-y-6">
                      <div className="space-y-2">
                         <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-4">
-                          Amount ({formatCurrency(0, country).split('0')[1].trim() || formatCurrency(0, country).split('٠')[1]?.trim() || 'Amount'})
+                          {t('amount')} ({formatCurrency(0, country).replace(/[0-9.,٠-٩]/g, '').trim()})
                         </Label>
                         <Input type="number" value={topupAmount} onChange={e => setTopupAmount(parseInt(e.target.value) || 0)} className="h-14 rounded-2xl bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-xl font-black italic px-6 focus:border-emerald-500" />
                      </div>
@@ -210,12 +248,12 @@ export function RepDashboard() {
                            saveSalesRep(updatedRep);
                            setBalance(updatedRep.balance);
                            setShowTopup(false);
-                           toast({ title: t('topupSuccess') || 'Balance updated successfully!', variant: 'success' });
+                           toast({ title: t('topupSuccess'), variant: 'success' });
                          }
                        }}
                        className="w-full h-16 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-widest italic"
                      >
-                        Confirm Payment
+                        {t('confirmPayment')}
                      </Button>
                   </div>
                </div>

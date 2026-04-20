@@ -48,7 +48,7 @@ export function DoctorDashboard() {
       setBalance(doc.balance || 0);
       setCountry(doc.location?.country || 'sa');
       const myVisits = getVisits().filter(v => v.doctorId === doc!.id);
-      setVisits(myVisits.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+      setVisits(myVisits.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')));
     }
   };
 

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Video, Phone, MapPin, MessageSquare, Clock, History, XCircle, FileText, CheckCircle2, Star, Plus, Trash2, Send } from 'lucide-react';
-import { getVisits, saveVisit, saveDoctor, getDoctors, getSalesReps, Visit, VisitStatus, pushNotification, saveRating, generateId, Rating } from '@/lib/store';
+import { getVisits, saveVisit, saveDoctor, getDoctors, getSalesReps, Visit, VisitStatus, pushNotification, saveRating, generateId, Rating, Appointment, getAppointments, getServerTime } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
-import { JitsiMeeting } from '@/components/JitsiMeeting';
+import { VideoCall } from '@/components/VideoCall';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,7 +23,8 @@ export function RepMyVisits() {
   const { t, i18n } = useTranslation();
   const [visits, setVisits] = useState<Visit[]>([]);
   const [filter, setFilter] = useState('All');
-  const [meetingRoom, setMeetingRoom] = useState<string | null>(null);
+  const [activeAppointment, setActiveAppointment] = useState<Appointment | null>(null);
+  const [serverTime, setServerTime] = useState<Date>(new Date());
   const [repId, setRepId] = useState('');
   
   // Report Modal State
@@ -44,18 +45,22 @@ export function RepMyVisits() {
     setRepId(myRep?.id || '');
     if (myRep) {
       const allVisits = getVisits().filter(v => v.repId === myRep.id);
-      setVisits(allVisits.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+      setVisits(allVisits.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')));
     }
   };
 
   useEffect(() => {
     loadVisits();
-    const interval = setInterval(loadVisits, 10000);
+    const interval = setInterval(() => {
+      loadVisits();
+      getServerTime().then(setServerTime);
+    }, 10000);
+    getServerTime().then(setServerTime);
     return () => clearInterval(interval);
   }, [userId]);
 
   const handleCancel = (visit: Visit) => {
-    if (!confirm(t('cancelVisitConfirm') || 'Cancel this visit booking?')) return;
+    if (!confirm(t('confirmCancelVisit') || 'Are you sure you want to cancel this visit?')) return;
     const updated = { ...visit, status: 'Cancelled' as VisitStatus, cancelledByRep: true };
     saveVisit(updated);
     setVisits(prev => prev.map(v => v.id === visit.id ? updated : v));
@@ -146,7 +151,9 @@ export function RepMyVisits() {
 
   return (
     <div className="space-y-6">
-      {meetingRoom && <JitsiMeeting roomName={meetingRoom} displayName={t('salesRep')} onClose={() => setMeetingRoom(null)} />}
+      {activeAppointment && (
+        <VideoCall appointment={activeAppointment} onClose={() => setActiveAppointment(null)} />
+      )}
 
       <div>
         <h1 className="text-2xl font-bold dark:text-white">{t('myVisits')}</h1>
@@ -204,7 +211,7 @@ export function RepMyVisits() {
                       <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 dark:text-slate-500">
                         <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{new Date(visit.date).toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-SA', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
                         <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{visit.time}</span>
-                        <span>{t(visit.visitType.toLowerCase().replace(' ', '')) || visit.visitType}</span>
+                        <span>{t(visit.visitType?.toLowerCase().replace(' ', '') || '') || visit.visitType}</span>
                       </div>
                       {visit.notes && (
                         <div className="mt-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 rounded-lg px-2.5 py-1.5 flex items-start gap-1.5 border dark:border-slate-700">
@@ -245,11 +252,39 @@ export function RepMyVisits() {
                         <Star className="h-3.5 w-3.5" /> Submit Report
                       </Button>
                     )}
-                    {visit.status === 'Confirmed' && visit.visitType === 'Video' && (
-                      <Button size="sm" onClick={() => setMeetingRoom(`lomixa_${visit.id}`)} className="gap-1 bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs">
-                        <Video className="h-3.5 w-3.5" /> {t('join') || 'Join'}
-                      </Button>
-                    )}
+                    {visit.status === 'Confirmed' && visit.visitType === 'Video' && (() => {
+                      const appointment = getAppointments().find(a => 
+                        a.doctorId === visit.doctorId && 
+                        a.repId === visit.repId && 
+                        a.startTime.includes(visit.date)
+                      );
+                      
+                      if (!appointment) return null;
+                      
+                      const now = serverTime.getTime();
+                      const start = new Date(appointment.startTime).getTime();
+                      const end = new Date(appointment.endTime).getTime();
+                      const isNow = now >= start && now <= end;
+                      const isFuture = now < start;
+                      
+                      return (
+                        <div className="flex flex-col items-end gap-1">
+                          {isNow ? (
+                            <Button size="sm" onClick={() => setActiveAppointment(appointment)} className="gap-1 bg-[#39b596] hover:bg-emerald-500 text-white h-8 text-xs font-bold animate-pulse">
+                              <Video className="h-3.5 w-3.5" /> {t('joinCall') || 'Join Call'}
+                            </Button>
+                          ) : isFuture ? (
+                            <span className="text-[10px] text-amber-500 font-bold bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 italic">
+                              {t('callNotAvailableYet') || 'Call not available yet'}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-500 font-bold bg-slate-500/10 px-2 py-1 rounded border border-slate-500/20 italic">
+                              {t('appointmentEnded') || 'Appointment انتهت'}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                     {visit.status === 'Pending' && (
                       <Button
                         size="sm"

@@ -9,8 +9,10 @@ interface AuthContextType {
   user: User | null;
   userId: string | null;
   role: Role;
+  emailVerified: boolean;
   loading: boolean;
   signOut: () => Promise<void>;
+  refreshVerificationStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -18,10 +20,27 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<Role>(null);
+  const [emailVerified, setEmailVerified] = useState<boolean>(true);
   const [loading, setLoading] = useState(true);
 
+  const fetchVerificationStatus = async (uid: string) => {
+    // Temporarily disabled verification feature
+    setEmailVerified(true);
+    /*
+    try {
+      const { data, error } = await supabase.functions.invoke('auth-tokens', {
+        body: { action: 'get_security_status', userId: uid }
+      });
+      if (!error && data?.success) {
+        setEmailVerified(data.verified);
+      }
+    } catch (err) {
+      console.error("Failed to fetch verification status:", err);
+    }
+    */
+  };
+
   useEffect(() => {
-    // If Supabase is not configured, immediately use demo mode
     if (!isSupabaseConfigured) {
       loadDemoSession();
       return;
@@ -34,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (userRole) {
           setRole(userRole);
           ensureUserEntityExists(session.user);
+          fetchVerificationStatus(session.user.id);
           setLoading(false);
         } else {
           loadDemoSession();
@@ -45,18 +65,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        const targetRole = localStorage.getItem('lomixa_target_role');
-        const userRole = session.user.user_metadata?.role as Role;
-        
-        // Match found or no target set - proceed
-        if (targetRole === userRole) {
-          localStorage.removeItem('lomixa_target_role');
-        }
-
         setUser(session.user);
+        const userRole = session.user.user_metadata?.role as Role;
         if (userRole) {
           setRole(userRole);
           ensureUserEntityExists(session.user);
+          fetchVerificationStatus(session.user.id);
           setLoading(false);
         } else {
           loadDemoSession();
@@ -72,15 +86,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadDemoSession = () => {
     const storedRole = localStorage.getItem('demo_role') as Role;
     const storedEmail = localStorage.getItem('demo_email') || 'demo@lomixa.sa';
-    const storedName = localStorage.getItem('demo_name') || storedEmail.split('@')[0];
-    const storedMobile = localStorage.getItem('demo_mobile') || '';
-    const storedOrg = localStorage.getItem('demo_org') || '';
     if (storedRole) {
       setRole(storedRole);
+      setEmailVerified(true);
       setUser({
         id: `demo_${storedRole}_user`,
         email: storedEmail,
-        user_metadata: { full_name: storedName, mobile: storedMobile, organization: storedOrg },
+        user_metadata: { full_name: storedEmail.split('@')[0] },
         app_metadata: {},
         aud: 'authenticated',
         created_at: new Date().toISOString(),
@@ -89,29 +101,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
   };
 
-    // This is no longer needed since role is in user_metadata, 
-    // but we keep the stub to avoid runtime crashes if called elsewhere
-    const fetchUserRole = async (userId: string) => {
-      setLoading(false);
-    };
-
   const signOut = async () => {
     if (isSupabaseConfigured) {
       await supabase.auth.signOut().catch(() => {});
     }
     localStorage.removeItem('demo_role');
     localStorage.removeItem('demo_email');
-    localStorage.removeItem('demo_name');
     setUser(null);
     setRole(null);
+    setEmailVerified(false);
+  };
+
+  const refreshVerificationStatus = async () => {
+    if (user?.id) {
+      await fetchVerificationStatus(user.id);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, userId: user?.id || null, role, loading, signOut }}>
+    <AuthContext.Provider value={{ user, userId: user?.id || null, role, emailVerified, loading, signOut, refreshVerificationStatus }}>
       {children}
     </AuthContext.Provider>
   );
 }
+
 
 export const useAuth = () => {
   const context = useContext(AuthContext);

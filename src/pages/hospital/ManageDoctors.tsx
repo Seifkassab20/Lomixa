@@ -13,7 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { createClient } from '@supabase/supabase-js';
 import { motion, AnimatePresence } from 'motion/react';
-import { ARABIC_COUNTRY_CODES, SPECIALTIES } from '@/lib/constants';
+import { ARABIC_COUNTRY_CODES, SPECIALTIES, COUNTRIES, CITY_MAP, AREA_MAP } from '@/lib/constants';
 
 // Helper client that doesn't persist session so signing up a user doesn't log out the admin
 const createTempClient = () => {
@@ -35,6 +35,7 @@ export function ManageDoctors() {
     title: 'dr',
     name: '', specialty: '', experienceYears: 0,
     phoneCode: '+966', phone: '', email: '', password: '',
+    country: 'sa', cities: [] as string[], areas: [] as string[]
   });
 
   const hospitals = getHospitals();
@@ -106,19 +107,24 @@ export function ManageDoctors() {
       email: form.email,
       hospitalId: myHospital?.id || 'default',
       hospitalName: myHospital?.name || 'Hospital',
-      location: existing?.location || editingDoc?.location || myHospital?.location || null,
       availability: existing?.availability || editingDoc?.availability || [],
       isActive: existing?.isActive ?? editingDoc?.isActive ?? true,
       balance: existing?.balance || 0,
       isVerified: true, // Hospital-added doctors are pre-verified
-      role: 'doctor'
+      role: 'doctor',
+      location: {
+        country: form.country,
+        city: form.cities[0] || "",
+        cities: form.cities,
+        areas: form.areas
+      }
     };
     
     saveDoctor(doc);
     refresh();
     setShowForm(false);
     setEditingDoc(null);
-    setForm({ title: 'dr', name: '', specialty: '', experienceYears: 0, phoneCode: '+966', phone: '', email: '', password: '' });
+    setForm({ title: 'dr', name: '', specialty: '', experienceYears: 0, phoneCode: '+966', phone: '', email: '', password: '', country: 'sa', cities: [], areas: [] });
   };
 
   const handleEdit = (doc: Doctor) => {
@@ -143,15 +149,25 @@ export function ManageDoctors() {
       phoneCode: extractedCode,
       phone: extractedNumber, 
       email: doc.email, 
-      password: '' 
+      password: '',
+      country: doc.location?.country || 'sa',
+      cities: doc.location?.cities || (doc.location?.city ? [doc.location.city] : []),
+      areas: doc.location?.areas || (doc.location?.area ? [doc.location.area] : [])
     });
     setShowForm(true);
   };
 
   const toggleActivation = (doc: Doctor) => {
-    const updated = { ...doc, isActive: !doc.isActive };
-    saveDoctor(updated);
-    refresh();
+    const action = doc.isActive ? 'deactivate' : 'activate';
+    const msg = doc.isActive 
+      ? (t('confirmDeactivateUser') || 'Are you sure you want to deactivate this user?')
+      : (t('confirmActivateUser') || 'Are you sure you want to activate this user?');
+      
+    if (confirm(msg)) {
+      const updated = { ...doc, isActive: !doc.isActive };
+      saveDoctor(updated);
+      refresh();
+    }
   };
 
   const handleApprove = (doc: Doctor) => {
@@ -161,7 +177,7 @@ export function ManageDoctors() {
   };
 
   const handleDelete = (id: string, name: string) => {
-    if (confirm(`${t('deleteDoctor') || 'Are you sure you want to remove'} ${name}? ${t('actionCannotBeUndone') || 'This action cannot be undone.'}`)) {
+    if (confirm(`${t('confirmDeleteUser') || 'Are you sure you want to delete this user?'} (${name})`)) {
       deleteDoctor(id);
       refresh();
     }
@@ -341,6 +357,72 @@ export function ManageDoctors() {
                       />
                     </div>
                   )}
+
+                  <div className="pt-8 border-t border-white/5 space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase text-slate-500 px-2 italic">Operating Country*</label>
+                        <select 
+                          value={form.country} 
+                          onChange={e => setForm(f => ({ ...f, country: e.target.value, cities: [], areas: [] }))}
+                          className="w-full h-14 rounded-2xl bg-black/40 border border-white/10 px-6 font-black text-white outline-none focus:border-emerald-500/50 transition-all appearance-none"
+                        >
+                          {COUNTRIES.map(c => <option key={c.id} value={c.id} className="bg-[#0c121d]">{c.name}</option>)}
+                        </select>
+                      </div>
+                      
+                      <div className="md:col-span-2 space-y-3">
+                        <label className="text-[10px] font-black uppercase text-slate-500 px-2 italic">Operating Cities*</label>
+                        <div className="flex flex-wrap gap-2 p-6 rounded-3xl bg-black/40 border border-white/10">
+                          {CITY_MAP[form.country]?.map(city => (
+                            <button
+                              key={city}
+                              type="button"
+                              onClick={() => setForm(f => ({ 
+                                ...f, 
+                                cities: f.cities.includes(city) ? f.cities.filter(c => c !== city) : [...f.cities, city],
+                                areas: f.cities.includes(city) ? f.areas.filter(a => !(AREA_MAP[city] || []).includes(a)) : f.areas
+                              }))}
+                              className={cn(
+                                "px-4 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all",
+                                form.cities.includes(city)
+                                  ? "bg-emerald-500 border-emerald-400 text-white"
+                                  : "bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-700"
+                              )}
+                            >
+                              {city}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {form.cities.length > 0 && (
+                        <div className="md:col-span-2 space-y-3 animate-in slide-in-from-top-2">
+                          <label className="text-[10px] font-black uppercase text-emerald-500 px-2 italic">Clinical Areas / Districts*</label>
+                          <div className="flex flex-wrap gap-2 p-6 rounded-3xl bg-emerald-500/5 border border-emerald-500/20">
+                            {form.cities.flatMap(city => AREA_MAP[city] || []).filter((v, i, a) => a.indexOf(v) === i).map(area => (
+                              <button
+                                key={area}
+                                type="button"
+                                onClick={() => setForm(f => ({ 
+                                  ...f, 
+                                  areas: f.areas.includes(area) ? f.areas.filter(a => a !== area) : [...f.areas, area] 
+                                }))}
+                                className={cn(
+                                  "px-4 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all",
+                                  form.areas.includes(area)
+                                    ? "bg-emerald-500 border-emerald-400 text-white"
+                                    : "bg-slate-900 border-slate-800 text-slate-500 hover:border-emerald-500/30"
+                                )}
+                              >
+                                {area}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
                   <div className="pt-6">
                     <button 

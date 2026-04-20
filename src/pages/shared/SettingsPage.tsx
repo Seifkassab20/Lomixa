@@ -12,7 +12,6 @@ import {
   saveHospital,
 } from "@/lib/store";
 import { convertCurrency, CountryCode } from "@/lib/currency";
-import { sendEmail, EmailTemplates } from "@/lib/email";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +42,7 @@ import {
   ARABIC_COUNTRY_CODES,
   COUNTRIES,
   CITY_MAP,
+  AREA_MAP,
   SPECIALTIES,
 } from "@/lib/constants";
 
@@ -58,6 +58,8 @@ export function SettingsPage() {
     organization: "",
     country: "sa",
     city: "",
+    cities: [] as string[],
+    areas: [] as string[],
     bio: "",
     email: "",
     avatar: "",
@@ -67,13 +69,8 @@ export function SettingsPage() {
     facilityType: "hospital" as "hospital" | "clinic",
   });
 
-  const [testApiKey, setTestApiKey] = useState("");
   const [saved, setSaved] = useState(false);
   const [verifyingEmail, setVerifyingEmail] = useState(false);
-  const [verifyingPhone, setVerifyingPhone] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpCode, setOtpCode] = useState("");
-  const [verifyingOtp, setVerifyingOtp] = useState(false);
   const { theme, preset, setTheme, setPreset } = useTheme();
   const { toast } = useToast();
 
@@ -135,6 +132,14 @@ export function SettingsPage() {
           profile.city ||
           user?.user_metadata?.city ||
           "",
+        cities:
+          (entity?.location?.cities as string[]) ||
+          (entity?.location?.city ? [entity.location.city as string] : []) ||
+          [],
+        areas:
+          (entity?.location?.areas as string[]) ||
+          (entity?.location?.area ? [entity.location.area as string] : []) ||
+          [],
         bio: profile.bio || "",
         email: user?.email || "",
         avatar:
@@ -211,7 +216,7 @@ export function SettingsPage() {
           );
         }
 
-        saveSalesRep({
+         saveSalesRep({
           ...r,
           name: form.fullName,
           phone: finalData.phone,
@@ -220,6 +225,9 @@ export function SettingsPage() {
           location: {
             ...(r.location || {}),
             country: form.country,
+            city: form.cities[0] || "",
+            cities: form.cities,
+            areas: form.areas,
           },
         });
       }
@@ -248,6 +256,9 @@ export function SettingsPage() {
           location: {
             ...(d.location || {}),
             country: form.country,
+            city: form.cities[0] || "",
+            cities: form.cities,
+            areas: form.areas,
           },
           specialty: form.specialty || d.specialty,
         });
@@ -293,50 +304,6 @@ export function SettingsPage() {
       toast(err.message, "error");
     } finally {
       setVerifyingEmail(false);
-    }
-  };
-
-  const handleVerifyPhone = async () => {
-    const fullPhone = `${form.phoneCode}${form.phone}`;
-    if (!form.phone) return;
-    setVerifyingPhone(true);
-    try {
-      if (isSupabaseConfigured) {
-        const { error } = await supabase.auth.updateUser({ phone: fullPhone });
-        if (error) throw error;
-        setOtpSent(true);
-      }
-      toast(
-        t("verificationSentPhone") || "Verification code sent to your mobile.",
-        "success",
-      );
-    } catch (err: any) {
-      toast(err.message, "error");
-    } finally {
-      setVerifyingPhone(false);
-    }
-  };
-
-  const handleConfirmOtp = async () => {
-    if (!otpCode) return;
-    setVerifyingOtp(true);
-    const fullPhone = `${form.phoneCode}${form.phone}`;
-    try {
-      if (isSupabaseConfigured) {
-        const { error } = await supabase.auth.verifyOtp({
-          phone: fullPhone,
-          token: otpCode,
-          type: "phone_change",
-        });
-        if (error) throw error;
-      }
-      setOtpSent(false);
-      setOtpCode("");
-      toast("Phone number verified successfully!", "success");
-    } catch (err: any) {
-      toast(err.message, "error");
-    } finally {
-      setVerifyingOtp(false);
     }
   };
 
@@ -486,25 +453,9 @@ export function SettingsPage() {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between ml-1">
-                  <Label className="text-[10px] font-black uppercase text-slate-500">
-                    {t("phoneNumber")}
-                  </Label>
-                  {user?.phone_confirmed_at ? (
-                    <span className="text-[9px] font-bold text-emerald-500 uppercase flex items-center gap-1">
-                      <CheckCircle2 className="w-2.5 h-2.5" /> Verified
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleVerifyPhone}
-                      disabled={verifyingPhone || !form.phone}
-                      className="text-[9px] font-bold text-amber-500 hover:text-amber-400 uppercase underline decoration-amber-500/20 underline-offset-2 transition-colors disabled:opacity-50"
-                    >
-                      {verifyingPhone ? "Sending..." : "Verify Now"}
-                    </button>
-                  )}
-                </div>
+                <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">
+                  {t("phoneNumber")}
+                </Label>
                 <div className="flex gap-2">
                   <div className="relative w-28 shrink-0 group">
                     <select
@@ -545,42 +496,9 @@ export function SettingsPage() {
                       placeholder="5XXXXXXX"
                     />
                   </div>
+                  </div>
                 </div>
               </div>
-
-              {otpSent && (
-                <div className="space-y-3 col-span-2 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl animate-in slide-in-from-top-2 duration-300">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-[10px] font-black uppercase text-emerald-600">
-                      Enter Verification Code
-                    </Label>
-                    <button
-                      onClick={() => setOtpSent(false)}
-                      className="text-[10px] font-bold text-slate-400 hover:text-slate-600"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value)}
-                      placeholder="123456"
-                      className="h-10 text-center tracking-[1em] font-black text-lg bg-white dark:bg-slate-900 border-emerald-500/30"
-                      maxLength={6}
-                    />
-                    <Button
-                      type="button"
-                      onClick={handleConfirmOtp}
-                      disabled={verifyingOtp || otpCode.length < 6}
-                      className="bg-emerald-600 hover:bg-emerald-700 h-10 px-6 rounded-xl"
-                    >
-                      {verifyingOtp ? "..." : "Verify"}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {showOrgField && (
@@ -712,38 +630,105 @@ export function SettingsPage() {
                   <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">
-                  {t("city")} ({t("optional")})
-                </Label>
-                <div className="relative group">
-                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
-                  <select
-                    name="city"
-                    value={form.city}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, city: e.target.value }))
-                    }
-                    className="w-full h-12 pl-12 pr-10 rounded-xl bg-app-card border border-app-border text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none appearance-none"
-                  >
-                    <option value="">
-                      {t("selectCity") || "Select city..."}
-                    </option>
-                    {CITY_MAP[form.country]?.map((c) => (
-                      <option key={c} value={c}>
-                        {t(
-                          `city_${c
-                            .replace(/^city_/, "")
-                            .toLowerCase()
-                            .replace(/\s+/g, "_")}`,
-                          c.replace(/^city_/, ""),
+              {(role === 'rep' || role === 'doctor') ? (
+                <div className="space-y-3 col-span-2">
+                  <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">
+                    {t("territories") || "My Coverage Territories (Cities)"} *
+                  </Label>
+                  <div className="flex flex-wrap gap-2 p-4 rounded-2xl bg-app-card border dark:border-slate-800">
+                    {CITY_MAP[form.country]?.map(city => (
+                      <button
+                        key={city}
+                        type="button"
+                        onClick={() => {
+                          setForm(f => {
+                            const cities = f.cities.includes(city)
+                              ? f.cities.filter(c => c !== city)
+                              : [...f.cities, city];
+                            return { ...f, cities };
+                          });
+                        }}
+                        className={cn(
+                          "px-3 py-1.5 rounded-lg border text-[10px] font-bold uppercase transition-all",
+                          form.cities.includes(city)
+                            ? "bg-brand border-brand text-white shadow-lg shadow-brand/20"
+                            : "bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-brand/30"
                         )}
-                      </option>
+                      >
+                        {city}
+                      </button>
                     ))}
-                  </select>
-                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                  </div>
+
+                  {form.cities.length > 0 && (
+                    <div className="space-y-3 mt-4 animate-in slide-in-from-top-2 duration-300">
+                      <Label className="text-[10px] font-black uppercase text-brand ml-1">
+                        {t("targetedAreas") || "Specific Targeted Areas (Districts)"} *
+                      </Label>
+                      <div className="flex flex-wrap gap-2 p-4 rounded-2xl bg-brand/5 border border-brand/20">
+                        {form.cities.flatMap(city => AREA_MAP[city] || []).filter((v, i, a) => a.indexOf(v) === i).map(area => (
+                          <button
+                            key={area}
+                            type="button"
+                            onClick={() => {
+                              setForm(f => {
+                                const areas = f.areas.includes(area)
+                                  ? f.areas.filter(a => a !== area)
+                                  : [...f.areas, area];
+                                return { ...f, areas };
+                              });
+                            }}
+                            className={cn(
+                              "px-3 py-1.5 rounded-lg border text-[10px] font-bold uppercase transition-all",
+                              form.areas.includes(area)
+                                ? "bg-brand border-brand text-white shadow-lg shadow-brand/20"
+                                : "bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-brand/30"
+                            )}
+                          >
+                            {area}
+                          </button>
+                        ))}
+                        {(form.cities.flatMap(city => AREA_MAP[city] || []).length === 0) && (
+                          <p className="text-[10px] text-slate-400 italic px-2">No specific areas defined for your selected cities.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">
+                    {t("city")} ({t("optional")})
+                  </Label>
+                  <div className="relative group">
+                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                    <select
+                      name="city"
+                      value={form.city}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, city: e.target.value }))
+                      }
+                      className="w-full h-12 pl-12 pr-10 rounded-xl bg-app-card border border-app-border text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none appearance-none"
+                    >
+                      <option value="">
+                        {t("selectCity") || "Select city..."}
+                      </option>
+                      {CITY_MAP[form.country]?.map((c) => (
+                        <option key={c} value={c}>
+                          {t(
+                            `city_${c
+                              .replace(/^city_/, "")
+                              .toLowerCase()
+                              .replace(/\s+/g, "_")}`,
+                            c.replace(/^city_/, ""),
+                          )}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -868,71 +853,7 @@ export function SettingsPage() {
               ))}
             </div>
           </div>
-        </div>
-
-        <div className="pt-8 border-t border-slate-100 dark:border-slate-800 space-y-4">
-          <div className="flex flex-col gap-4 p-6 rounded-3xl bg-indigo-500/5 border border-indigo-500/10">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 shrink-0">
-                <Mail className="h-6 w-6 text-indigo-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-black uppercase tracking-widest text-indigo-400">
-                  Communication Debugger
-                </h4>
-                <p className="text-xs text-slate-500 mt-1">
-                  Verify real-time email triggers for{" "}
-                  <strong>{form.email}</strong>
-                </p>
-              </div>
-              <Button
-                type="button"
-                onClick={async () => {
-                  const template = EmailTemplates.welcome(
-                    form.fullName || "User",
-                  );
-                  const result: any = await sendEmail(
-                    { to: form.email, ...template },
-                    testApiKey,
-                  );
-                  if (result.mode === "live") {
-                    toast(
-                      "Real-time test email dispatched successfully.",
-                      "success",
-                    );
-                  } else if (result.mode === "demo") {
-                    toast(
-                      "Demo Email Triggered! Check your browser console (F12) to see raw content.",
-                      "info",
-                    );
-                  } else {
-                    toast("Email trigger processed.", "success");
-                  }
-                }}
-                className="rounded-2xl bg-indigo-500 hover:bg-indigo-600 text-white font-bold h-12 px-6 shadow-lg shadow-indigo-500/20"
-              >
-                Send Test Email
-              </Button>
-            </div>
-
-            <div className="mt-2 space-y-2">
-              <Label className="text-[9px] font-black uppercase tracking-[0.2em] text-indigo-400/70 ml-1">
-                Testing API Key (Resend)
-              </Label>
-              <Input
-                placeholder="Add ur API Key"
-                value={testApiKey}
-                onChange={(e) => setTestApiKey(e.target.value)}
-                type="password"
-                className="h-12 rounded-xl bg-white dark:bg-slate-900 border-indigo-500/20 focus:border-indigo-500 font-mono text-xs"
-              />
-              <p className="text-[9px] text-slate-400 ml-1 italic">
-                For security, this key is only stored in memory for the current
-                session.
-              </p>
-            </div>
           </div>
-        </div>
 
         <div className="pt-8 border-t dark:border-slate-800 flex items-center justify-end gap-4">
           {saved && (

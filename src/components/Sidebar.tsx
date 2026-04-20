@@ -71,13 +71,20 @@ export function Sidebar() {
       case "admin":
         return [
           {
+            key: "dashboard",
+            name: t("dashboard"),
+            href: "/dashboard",
+            icon: LayoutDashboard,
+          },
+          {
             key: "verification",
             name: t("facilityVerificationDesk"),
             href: "/admin-control/verification",
             icon: ShieldCheck,
             badge:
-              getHospitals().filter((h) => !h.isVerified).length +
-              getPharmaCompanies().filter((p) => !p.isVerified).length,
+              (getHospitals() || []).filter((h) => h && !h.isVerified).length +
+              (getPharmaCompanies() || []).filter((p) => p && !p.isVerified)
+                .length,
           },
           {
             key: "bundles",
@@ -98,12 +105,6 @@ export function Sidebar() {
             name: "Income History",
             href: "/admin-control/income",
             icon: TrendingUp,
-          },
-          {
-            key: "activity",
-            name: "Ecosystem Activity",
-            href: "/admin-control/activity",
-            icon: Activity,
           },
           {
             key: "notifications",
@@ -245,8 +246,9 @@ export function Sidebar() {
   const links = getLinks();
   const displayRole = role === "hospital" && facilityType ? facilityType : role;
 
+
   const roleSubtitleKey: Record<string, string> = {
-    admin: "admin",
+    admin: "systemAdmin",
     pharma: "pharma",
     hospital: "hospital",
     doctor: "doctor",
@@ -268,16 +270,16 @@ export function Sidebar() {
           collapsed ? "px-4 justify-center" : "px-5 gap-3",
         )}
       >
-        <div className="h-8 w-8 rounded-full bg-white flex items-center justify-center shrink-0 border border-emerald-500/20 shadow-sm overflow-hidden">
+        <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center shrink-0 border border-emerald-500/20 shadow-lg shadow-emerald-500/5 p-1.5 transition-transform hover:scale-105">
           <img
-            src="/logo.png"
+            src="/logo.svg"
             alt="Logo"
-            className="h-full w-full object-cover"
+            className="h-full w-full object-contain"
           />
         </div>
         {!collapsed && (
           <div className="overflow-hidden">
-            <div className="text-sm font-bold text-gray-900 dark:text-white leading-tight whitespace-nowrap tracking-widest">
+            <div className="text-lg font-black italic tracking-tighter uppercase text-gray-900 dark:text-white leading-none">
               {t("appName")}
             </div>
             <div className="text-[10px] text-gray-400 dark:text-slate-500 whitespace-nowrap">
@@ -307,7 +309,7 @@ export function Sidebar() {
                     "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 relative group",
                     collapsed ? "justify-center" : "",
                     isActive
-                      ? "bg-brand-muted text-brand shadow-sm"
+                      ? "bg-brand-muted text-brand shadow-sm font-bold italic"
                       : "text-gray-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-gray-900 dark:hover:text-slate-200",
                   )}
                 >
@@ -317,7 +319,11 @@ export function Sidebar() {
                       isActive ? "text-brand" : "",
                     )}
                   />
-                  {!collapsed && <span className="truncate">{link.name}</span>}
+                  {!collapsed && (
+                    <span className="truncate uppercase tracking-tighter italic">
+                      {link.name}
+                    </span>
+                  )}
                   {badge > 0 && (
                     <span
                       className={cn(
@@ -346,6 +352,9 @@ export function Sidebar() {
           })}
         </ul>
       </nav>
+
+
+      {/* Default persistent info card if not expiring (Optional, but let's keep the dashboard cleanup by only showing when needed as requested) */}
 
       {/* Collapse toggle */}
       <button
