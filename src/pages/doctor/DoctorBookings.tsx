@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar, Video, Phone, MapPin, MessageSquare, CheckCircle2, XCircle, Clock, FileText, X, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
+import { emailService } from '@/lib/emailService';
 
 const STATUS_COLORS: Record<VisitStatus, string> = {
   Pending: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 border-amber-200 dark:border-amber-500/30',
@@ -56,7 +57,7 @@ export function DoctorBookings() {
     return () => clearInterval(interval);
   }, [userId]);
 
-  const handleAction = (visit: Visit, action: 'Confirmed' | 'Cancelled') => {
+  const handleAction = async (visit: Visit, action: 'Confirmed' | 'Cancelled') => {
     const isConfirming = action === 'Confirmed';
     const isRejectingPending = action === 'Cancelled' && visit.status === 'Pending';
 
@@ -114,6 +115,9 @@ export function DoctorBookings() {
     setVisits(prev => prev.map(v => v.id === visit.id ? updated : v));
 
     // Notify the REP
+    const repsList = getSalesReps();
+    const repObjDetailed = repsList.find(r => r.id === visit.repId);
+    
     if (visit.repUserId) {
       pushNotification({
         userId: visit.repUserId,
@@ -123,6 +127,21 @@ export function DoctorBookings() {
           : `Dr. ${visit.doctorName} was unable to accept your visit on ${new Date(visit.date).toLocaleDateString('en-SA', { month: 'short', day: 'numeric' })}. The budget has been refunded to your account.`,
         type: isConfirming ? 'confirmation' : 'cancellation',
       });
+      
+      // Send Real-time Email
+      if (repObjDetailed && repObjDetailed.email) {
+        try {
+          await emailService.sendAppointmentEmail(
+            repObjDetailed.email,
+            isConfirming ? 'Confirmed' : 'Rejected',
+            new Date(visit.date).toLocaleDateString(),
+            visit.time,
+            visit.visitType
+          );
+        } catch (e) {
+          console.error("Failed to send Rep confirmation email:", e);
+        }
+      }
     }
     // Also notify ourselves
     pushNotification({

@@ -695,7 +695,10 @@ export async function syncCloudData() {
 
     const slots = await supabase.from('availability_slots').select('*');
     if (slots.data && Date.now() - getLastMutationTime() > 10000) {
-      const slotsByDoc = slots.data.reduce((acc: any, row: any) => {
+      // Filter out past slots before saving locally
+      const validSlots = slots.data.filter((s: any) => !isDateTimePast(s.date, s.time));
+      
+      const slotsByDoc = validSlots.reduce((acc: any, row: any) => {
         if (!acc[row.doctor_id]) acc[row.doctor_id] = [];
         acc[row.doctor_id].push({
           id: row.id, date: row.date, time: row.time, appointmentType: row.appointment_type, duration: row.duration, is_booked: row.is_booked, price: row.price
@@ -703,11 +706,41 @@ export async function syncCloudData() {
         return acc;
       }, {});
       Object.keys(slotsByDoc).forEach(docId => save(`availability_${docId}`, slotsByDoc[docId]));
+
+      // Identify expired slots to delete from cloud
+      const expiredIds = slots.data
+        .filter((s: any) => isDateTimePast(s.date, s.time))
+        .map((s: any) => s.id);
+      
+      if (expiredIds.length > 0) {
+        console.log(`[Cleaner] Purging ${expiredIds.length} expired cloud slots...`);
+        supabase.from('availability_slots').delete().in('id', expiredIds).then();
+      }
     }
+
+    // Also purge expired appointments from cloud
+    if (appointments.data) {
+      const now = Date.now();
+      const expiredApptIds = appointments.data
+        .filter((a: any) => new Date(a.start_time).getTime() < now)
+        .map((a: any) => a.id);
+      
+      if (expiredApptIds.length > 0) {
+        console.log(`[Cleaner] Purging ${expiredApptIds.length} expired cloud appointments...`);
+        supabase.from('appointments').delete().in('id', expiredApptIds).then();
+      }
+    }
+
   } catch (err) {
     console.warn("Cloud sync failed:", err);
   }
 }
+
+// Global cleanup interval for local state
+setInterval(() => {
+  purgeExpiredSlots();
+  purgeExpiredAppointments();
+}, 300000); // Every 5 minutes
 
 setTimeout(syncCloudData, 1000);
 setInterval(syncCloudData, 60000);
@@ -1113,6 +1146,75 @@ export function getProfile(userId: string) { return load<Record<string, any>>(`p
 export function saveProfile(userId: string, profile: Record<string, any>) { 
   save(`profile_${userId}`, profile); 
   notifyMutation();
+}
+
+/**
+ * Checks if a given date and time is in the past.
+ */
+export function isDateTimePast(dateStr: string, timeStr: string): boolean {
+  try {
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    const date = new Date(dateStr);
+    date.setHours(hours, minutes, 0, 0);
+    return date.getTime() < Date.now();
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Purges expired availability slots for all doctors.
+ */
+export async function purgeExpiredSlots() {
+  const doctors = getDoctors();
+  let hasChanges = false;
+
+  for (const doc of doctors) {
+    const slots = getDoctorAvailability(doc.id);
+    const remaining = slots.filter(s => !isDateTimePast(s.date, s.time));
+    
+    if (remaining.length !== slots.length) {
+      save(`availability_${doc.id}`, remaining);
+      hasChanges = true;
+      
+      if (isSupabaseConfigured) {
+        // Find deleted IDs to purge from cloud
+        const remainingIds = remaining.map(r => r.id);
+        const deletedIds = slots.filter(s => !remainingIds.includes(s.id)).map(s => s.id);
+        if (deletedIds.length > 0) {
+          supabase.from('availability_slots').delete().in('id', deletedIds).then();
+        }
+      }
+    }
+  }
+
+  if (hasChanges) notifyMutation();
+}
+
+/**
+ * Purges expired appointments.
+ */
+export async function purgeExpiredAppointments() {
+  const appointments = getAppointments();
+  const now = Date.now();
+  const remaining = appointments.filter(a => {
+    try {
+      return new Date(a.startTime).getTime() > now;
+    } catch (e) { return true; }
+  });
+
+  if (remaining.length !== appointments.length) {
+    save('appointments', remaining);
+    notifyMutation();
+    
+    if (isSupabaseConfigured) {
+      const remainingIds = remaining.map(r => r.id);
+      const deletedIds = appointments.filter(a => !remainingIds.includes(a.id)).map(a => a.id);
+      if (deletedIds.length > 0) {
+        supabase.from('appointments').delete().in('id', deletedIds).then();
+      }
+    }
+  }
 }
 
 export function getDoctorAvailability(doctorId: string): AvailabilitySlot[] {

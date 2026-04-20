@@ -71,10 +71,6 @@ export function SettingsPage() {
 
   const [saved, setSaved] = useState(false);
   const [verifyingEmail, setVerifyingEmail] = useState(false);
-  const [verifyingPhone, setVerifyingPhone] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpCode, setOtpCode] = useState("");
-  const [verifyingOtp, setVerifyingOtp] = useState(false);
   const { theme, preset, setTheme, setPreset } = useTheme();
   const { toast } = useToast();
 
@@ -311,50 +307,6 @@ export function SettingsPage() {
     }
   };
 
-  const handleVerifyPhone = async () => {
-    const fullPhone = `${form.phoneCode}${form.phone}`;
-    if (!form.phone) return;
-    setVerifyingPhone(true);
-    try {
-      if (isSupabaseConfigured) {
-        const { error } = await supabase.auth.updateUser({ phone: fullPhone });
-        if (error) throw error;
-        setOtpSent(true);
-      }
-      toast(
-        t("verificationSentPhone") || "Verification code sent to your mobile.",
-        "success",
-      );
-    } catch (err: any) {
-      toast(err.message, "error");
-    } finally {
-      setVerifyingPhone(false);
-    }
-  };
-
-  const handleConfirmOtp = async () => {
-    if (!otpCode) return;
-    setVerifyingOtp(true);
-    const fullPhone = `${form.phoneCode}${form.phone}`;
-    try {
-      if (isSupabaseConfigured) {
-        const { error } = await supabase.auth.verifyOtp({
-          phone: fullPhone,
-          token: otpCode,
-          type: "phone_change",
-        });
-        if (error) throw error;
-      }
-      setOtpSent(false);
-      setOtpCode("");
-      toast("Phone number verified successfully!", "success");
-    } catch (err: any) {
-      toast(err.message, "error");
-    } finally {
-      setVerifyingOtp(false);
-    }
-  };
-
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -501,25 +453,9 @@ export function SettingsPage() {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between ml-1">
-                  <Label className="text-[10px] font-black uppercase text-slate-500">
-                    {t("phoneNumber")}
-                  </Label>
-                  {user?.phone_confirmed_at ? (
-                    <span className="text-[9px] font-bold text-emerald-500 uppercase flex items-center gap-1">
-                      <CheckCircle2 className="w-2.5 h-2.5" /> Verified
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleVerifyPhone}
-                      disabled={verifyingPhone || !form.phone}
-                      className="text-[9px] font-bold text-amber-500 hover:text-amber-400 uppercase underline decoration-amber-500/20 underline-offset-2 transition-colors disabled:opacity-50"
-                    >
-                      {verifyingPhone ? "Sending..." : "Verify Now"}
-                    </button>
-                  )}
-                </div>
+                <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">
+                  {t("phoneNumber")}
+                </Label>
                 <div className="flex gap-2">
                   <div className="relative w-28 shrink-0 group">
                     <select
@@ -560,42 +496,9 @@ export function SettingsPage() {
                       placeholder="5XXXXXXX"
                     />
                   </div>
+                  </div>
                 </div>
               </div>
-
-              {otpSent && (
-                <div className="space-y-3 col-span-2 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl animate-in slide-in-from-top-2 duration-300">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-[10px] font-black uppercase text-emerald-600">
-                      Enter Verification Code
-                    </Label>
-                    <button
-                      onClick={() => setOtpSent(false)}
-                      className="text-[10px] font-bold text-slate-400 hover:text-slate-600"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value)}
-                      placeholder="123456"
-                      className="h-10 text-center tracking-[1em] font-black text-lg bg-white dark:bg-slate-900 border-emerald-500/30"
-                      maxLength={6}
-                    />
-                    <Button
-                      type="button"
-                      onClick={handleConfirmOtp}
-                      disabled={verifyingOtp || otpCode.length < 6}
-                      className="bg-emerald-600 hover:bg-emerald-700 h-10 px-6 rounded-xl"
-                    >
-                      {verifyingOtp ? "..." : "Verify"}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {showOrgField && (

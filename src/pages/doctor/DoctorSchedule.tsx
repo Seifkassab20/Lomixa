@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { getDoctorAvailability, saveDoctorAvailability, getDoctors, generateId, AvailabilitySlot } from '@/lib/store';
+import { getDoctorAvailability, saveDoctorAvailability, getDoctors, generateId, AvailabilitySlot, isDateTimePast } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2, Calendar, Clock, Video, Phone, MapPin, MessageSquare, DollarSign } from 'lucide-react';
+import { Plus, Trash2, Calendar, Clock, Video, Phone, MapPin, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '@/lib/currency';
@@ -58,13 +58,16 @@ export function DoctorSchedule() {
     let currentMins = timeToMins(form.startTime);
     const limitMins = timeToMins(form.endTime);
     while (currentMins + form.duration <= limitMins) {
+      const timeStr = `${Math.floor(currentMins / 60).toString().padStart(2, '0')}:${(currentMins % 60).toString().padStart(2, '0')}`;
+      const isPast = isDateTimePast(form.date, timeStr);
+
       const overlaps = slots.some(s => {
         if (s.date !== form.date) return false;
         const exStartMins = timeToMins(s.time);
         const exEndMins = exStartMins + s.duration;
         return Math.max(currentMins, exStartMins) < Math.min(currentMins + form.duration, exEndMins);
       });
-      if (!overlaps) count++;
+      if (!overlaps && !isPast) count++;
       currentMins += form.duration;
     }
     return count;
@@ -74,6 +77,12 @@ export function DoctorSchedule() {
 
   const handleAdd = (mode: 'single' | 'all') => {
     if (numberOfSlots <= 0 || !form.date) return;
+    
+    // Past check
+    if (isDateTimePast(form.date, form.startTime)) {
+      alert(t('pastSlotError') || 'You cannot add a time slot in the past.');
+      return;
+    }
     
     if (mode === 'single') {
       const newStartMins = timeToMins(form.startTime);
@@ -160,7 +169,7 @@ export function DoctorSchedule() {
   };
 
   const today = new Date().toISOString().split('T')[0];
-  const upcoming = slots.filter(s => s.date >= today);
+  const upcoming = slots.filter(s => !isDateTimePast(s.date, s.time));
 
   return (
     <div className="space-y-8">
@@ -241,15 +250,14 @@ export function DoctorSchedule() {
               <div>
                 <Label className="text-slate-300 mb-2 block font-medium">{t('slotPrice') || 'Slot Price (SAR)'}</Label>
                 <div className="relative">
-                  <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                   <Input 
                     type="number" 
                     value={form.price} 
                     onChange={e => setForm(f => ({ ...f, price: Number(e.target.value) }))} 
-                    className="w-full bg-[#1c2636] border-slate-800 border focus:border-emerald-500 text-white pl-12 h-14 rounded-xl"
+                    className="w-full bg-[#1c2636] border-slate-800 border focus:border-emerald-500 text-white px-4 h-14 rounded-xl"
                   />
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none uppercase">
-                    {formatCurrency(0, country).replace(/[0-9.]/g, '').trim()}
+                    SAR
                   </div>
                 </div>
               </div>
@@ -365,7 +373,7 @@ export function DoctorSchedule() {
                           <span className="flex items-center gap-1"><Calendar className="h-3 w-3 text-slate-500" />{new Date(slot.date).toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-SA', { month: 'short', day: 'numeric' })}</span>
                           <span className="flex items-center gap-1"><Clock className="h-3 w-3 text-slate-500" />{slot.time}</span>
                           <span className="opacity-70 px-1.5 py-0.5 bg-slate-800 rounded text-[10px]">{slot.duration} {t('minutesLabel') || 'min'}</span>
-                          <span className="text-emerald-400 font-bold ml-1">{formatCurrency(slot.price || 0, country)}</span>
+                          <span className="text-emerald-400 font-bold ml-1">{slot.price || 0}</span>
                         </div>
                       </div>
                     </div>

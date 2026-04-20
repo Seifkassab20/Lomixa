@@ -16,6 +16,11 @@ const RoleSelection = lazy(() => import('./pages/RoleSelection').then(m => ({ de
 const AboutUs = lazy(() => import('./pages/AboutUs').then(m => ({ default: m.AboutUs })));
 const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions').then(m => ({ default: m.TermsAndConditions })));
 
+// Auth specific
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+
 // Portal specific
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 const PharmaSubordinates = lazy(() => import('./pages/pharma/PharmaSubordinates').then(m => ({ default: m.PharmaSubordinates })));
@@ -110,6 +115,9 @@ export default function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/register/:role" element={<Register />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/about" element={<AboutUs />} />
                 <Route path="/terms" element={<TermsAndConditions />} />
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   getDoctors, saveVisit, saveDoctor, getSalesReps, getPharmaCompanies, savePharmaCompany,
   generateId, Visit, VisitType, pushNotification, Doctor, SalesRep, saveSalesRep, saveDoctorAvailability, processVisitPayment,
-  getAdminBalance, saveAdminBalance, doctorAverageRating
+  getAdminBalance, saveAdminBalance, doctorAverageRating, isDateTimePast
 } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +14,7 @@ import { JitsiMeeting } from '@/components/JitsiMeeting';
 import { Search, Video, Phone, MapPin, MessageSquare, Calendar, Clock, CheckCircle2, CreditCard, X, FileText, Sparkles, Zap, ChevronDown, Stethoscope, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { sendEmail, EmailTemplates } from '@/lib/email';
+import { emailService } from '@/lib/emailService';
 
 import { SPECIALTIES } from '@/lib/constants';
 
@@ -138,7 +139,7 @@ export function RepBookVisit() {
     return 0;
   });
 
-  const availableSlots = selectedDoctor?.availability.filter(s => !s.isBooked && s.appointmentType === selectedType) || [];
+  const availableSlots = selectedDoctor?.availability.filter(s => !s.isBooked && s.appointmentType === selectedType && !isDateTimePast(s.date, s.time)) || [];
 
   // Lomixa Smart Matchmaker (AI Recommendation Engine)
   const aiRecommendations = React.useMemo(() => {
@@ -177,7 +178,7 @@ export function RepBookVisit() {
       .slice(0, 2);
   }, [filtered, search, specialtyFilter, repData?.location?.area, repData?.targetSpecialties]);
 
-  const handleBook = (mode: 'single' | 'all') => {
+  const handleBook = async (mode: 'single' | 'all') => {
     if (!selectedDoctor) return;
     
     const slotsToBook = mode === 'single' 
@@ -236,7 +237,7 @@ export function RepBookVisit() {
 
     // Update Rep Budget (Hold money)
     const reps = getSalesReps();
-    const myRep = reps.find(r => r.id === repData.id);
+    const myRep = repData ? reps.find(r => r.id === repData.id) : null;
     if (myRep) {
       saveSalesRep({ ...myRep, balance: Math.max((myRep.balance || 0) - totalPrice, 0) });
       setBalance(b => Math.max(b - totalPrice, 0));
@@ -255,14 +256,35 @@ export function RepBookVisit() {
       // Send Real-time Email to Doctor
       if (selectedDoctor.email) {
         const slot = slotsToBook[0];
-        const emailContent = EmailTemplates.bookingRequest(
-          selectedDoctor.name,
-          repData.name || user?.user_metadata?.full_name || 'Representative',
-          slot.date,
-          slot.time,
-          selectedType
-        );
-        sendEmail({ to: selectedDoctor.email, ...emailContent }).catch(console.error);
+        try {
+          await emailService.sendAppointmentEmail(
+            selectedDoctor.email,
+            'Requested',
+            new Date(slot.date).toLocaleDateString(),
+            slot.time,
+            selectedType
+          );
+        } catch (e) {
+          console.error("Failed to send booking request email:", e);
+        }
+      }
+      
+      // Notify Pharma
+      if (repData?.pharmaId) {
+        const pharmacos = getPharmaCompanies();
+        const pharmaObj = pharmacos.find(p => p.id === repData.pharmaId);
+        if (pharmaObj && pharmaObj.email) {
+          try {
+            const slot = slotsToBook[0];
+            await emailService.sendNotification(
+              pharmaObj.email,
+              'New Appointment Scheduled',
+              `Your representative ${repData.name} has scheduled an appointment with Dr. ${selectedDoctor.name} on ${new Date(slot.date).toLocaleDateString()}.`
+            );
+          } catch (e) {
+            console.error("Failed to notify Pharma Admin:", e);
+          }
+        }
       }
     }
 
@@ -309,14 +331,14 @@ export function RepBookVisit() {
             onChange={e => setSearch(e.target.value)}
             className="w-full h-14 pl-12 pr-12 rounded-2xl bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm font-bold appearance-none transition-all cursor-pointer dark:text-white"
           >
-            <option value="">{t('allDoctorsHospitals') || "All Doctors & Hospitals"}</option>
+            <option value="">{t('allDoctorsHospitals')}</option>
             {searchableOptions.hospitals.length > 0 && (
-              <optgroup label={t('hospitals') || 'Hospitals'}>
+              <optgroup label={t('hospitals')}>
                 {searchableOptions.hospitals.map(h => <option key={h} value={h}>{h}</option>)}
               </optgroup>
             )}
             {searchableOptions.doctorNames.length > 0 && (
-              <optgroup label={t('doctors') || 'Doctors'}>
+              <optgroup label={t('doctors')}>
                 {searchableOptions.doctorNames.map(name => <option key={name} value={name}>{name}</option>)}
               </optgroup>
             )}
@@ -331,7 +353,7 @@ export function RepBookVisit() {
             onChange={e => setAreaFilter(e.target.value)}
             className="w-full h-14 pl-12 pr-12 rounded-2xl bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm font-bold appearance-none transition-all cursor-pointer dark:text-white"
           >
-            <option value="All">{t('allAreas') || "All Areas"}</option>
+            <option value="All">{t('allAreas')}</option>
             {searchableOptions.areas.map(a => (
               <option key={a} value={a}>{a}</option>
             ))}
@@ -346,7 +368,7 @@ export function RepBookVisit() {
             onChange={e => setSpecialtyFilter(e.target.value)}
             className="w-full h-14 pl-12 pr-12 rounded-2xl bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm font-bold appearance-none transition-all cursor-pointer dark:text-white"
           >
-            <option value="All">{t('allSpecialties') || "All Specialties"}</option>
+            <option value="All">{t('allSpecialties')}</option>
             {SPECIALTIES.map(sp => (
               <option key={sp} value={sp}>
                 {(t(sp.toLowerCase().replace(' ', '')) || sp).replace('spec_', '')}
@@ -368,10 +390,10 @@ export function RepBookVisit() {
                   <Sparkles className="h-3.5 w-3.5 text-white" />
                 </div>
                 <h3 className="text-sm font-bold bg-clip-text text-transparent bg-gradient-to-r from-amber-600 to-orange-600 dark:from-amber-400 dark:to-orange-400">
-                  AI Smart Matchmaker
+                  {i18n.language === 'ar' ? 'مُطابق لوميكسا الذكي AI Smart Matchmaker' : 'AI Smart Matchmaker'}
                 </h3>
                 <span className="ml-auto text-xs font-medium text-amber-700/70 dark:text-amber-400/70 flex items-center gap-1">
-                  <Zap className="h-3 w-3" /> Recommended for you
+                  <Zap className="h-3 w-3" /> {i18n.language === 'ar' ? 'موصى به لك Recommended for you' : 'Recommended for you'}
                 </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 relative z-10">
@@ -418,7 +440,7 @@ export function RepBookVisit() {
           {filtered.length === 0 ? (
             <div className="bg-white dark:bg-slate-800/30 border dark:border-slate-700 rounded-xl p-12 text-center">
               <Search className="h-10 w-10 text-gray-200 dark:text-slate-700 mx-auto mb-3" />
-              <p className="text-sm text-gray-500 dark:text-slate-400">{t('noDoctorsFound') || 'No doctors found matching your criteria.'}</p>
+              <p className="text-sm text-gray-500 dark:text-slate-400">{t('noDoctorsFound')}</p>
             </div>
           ) : (
             filtered.map(doc => {
@@ -457,7 +479,7 @@ export function RepBookVisit() {
                         ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
                         : 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-slate-500'
                     )}>
-                      {freeSlots > 0 ? t('slotsOpen', { count: freeSlots }).replace('{{count}}', freeSlots.toString()) || `${freeSlots} slots open` : t('noSlots')}
+                      {freeSlots > 0 ? t('slotsOpen', { count: freeSlots }) : t('noSlots')}
                     </div>
                   </div>
                 </div>
@@ -506,7 +528,7 @@ export function RepBookVisit() {
                 <div className="text-xs font-semibold text-gray-600 dark:text-slate-400 uppercase tracking-wider mb-2">{t('availableSlots')}</div>
                 {availableSlots.length === 0 ? (
                   <div className="py-4 text-center text-xs text-gray-400 dark:text-slate-500 bg-gray-50 dark:bg-slate-800/50 rounded-lg">
-                    {t('noAvailableSlots') || "No available slots. Doctor hasn't set availability yet."}
+                    {t('noAvailableSlots')}
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-52 overflow-y-auto">
@@ -529,7 +551,7 @@ export function RepBookVisit() {
                           <Clock className="h-3.5 w-3.5 text-gray-400" />
                           <span>{slot.time}</span>
                           <span className="text-gray-400">{slot.duration}m</span>
-                          <span className="text-emerald-400 font-bold ml-1">{formatCurrency(slot.price || 150, country)}</span>
+                          <span className="text-emerald-400 font-bold ml-1">{slot.price || 150}</span>
                         </div>
                       </button>
                     ))}
@@ -537,14 +559,14 @@ export function RepBookVisit() {
                 )}
               </div>
 
-              <div>
+               <div>
                 <div className="text-xs font-semibold text-gray-600 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <FileText className="h-3 w-3" /> {t('preVisitNotes') || 'Pre-Visit Notes'} <span className="font-normal normal-case opacity-60">({t('optional')})</span>
+                  <FileText className="h-3 w-3" /> {t('preVisitNotes')} <span className="font-normal normal-case opacity-60">({t('optional')})</span>
                 </div>
                 <textarea
                   value={visitNotes}
                   onChange={e => setVisitNotes(e.target.value)}
-                  placeholder={t('addContextAgenda') || "Add context or agenda for this visit..."}
+                  placeholder={t('addContextAgenda')}
                   rows={2}
                   className="w-full rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-white px-3 py-2 text-xs placeholder:text-gray-400 dark:placeholder:text-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                 />
@@ -589,7 +611,7 @@ export function RepBookVisit() {
               <div className="h-12 w-12 rounded-xl bg-gray-100 dark:bg-slate-700 flex items-center justify-center mx-auto mb-3">
                 <MapPin className="h-6 w-6 text-gray-300 dark:text-slate-600" />
               </div>
-              <p className="text-sm text-gray-500 dark:text-slate-400">{t('selectDoctorPrompt') || 'Select a doctor from the list to start booking'}</p>
+              <p className="text-sm text-gray-500 dark:text-slate-400">{t('selectDoctorPrompt')}</p>
             </div>
           )}
         </div>

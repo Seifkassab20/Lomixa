@@ -6,6 +6,7 @@ import { HospitalDashboard } from './HospitalDashboard';
 import { DoctorDashboard } from './DoctorDashboard';
 import { RepDashboard } from './RepDashboard';
 import { AdminDashboard } from './admin/AdminDashboard';
+import { useTranslation } from 'react-i18next';
 
 export function Dashboard() {
   const { role: sessionRole, user, userId } = useAuth();
@@ -21,6 +22,7 @@ export function Dashboard() {
     return null;
   };
 
+  const { t } = useTranslation();
   const role = getResolvedRole();
 
   switch (role) {
@@ -38,7 +40,7 @@ export function Dashboard() {
       return (
         <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-[#050b14]">
           <div className="text-sm font-bold text-gray-500 dark:text-slate-400 animate-pulse tracking-widest uppercase">
-            Preparing your dashboard...
+            {t('preparingDashboard')}
           </div>
         </div>
       );

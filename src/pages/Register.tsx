@@ -56,6 +56,7 @@ import {
 } from "@/lib/store";
 
 import { sendEmail, EmailTemplates } from "@/lib/email";
+import { emailService } from "@/lib/emailService";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ARABIC_COUNTRY_CODES,
@@ -465,10 +466,13 @@ export function Register() {
           if (parentPharma && parentPharma.userId) {
             pushNotification({
               userId: parentPharma.userId,
-              title: "New Representative Registration",
-              message: `A new sales representative (${formData.firstName} ${formData.lastName}) has registered and is pending your verification.`,
+              title: t("newRepRegTitle"),
+              message: t("newRepRegMsg", { name: `${formData.firstName} ${formData.lastName}` }),
               type: "info",
             });
+            if (parentPharma.email) {
+              emailService.sendNotification(parentPharma.email, t("newRepRegTitle"), t("newRepRegMsg", { name: `${formData.firstName} ${formData.lastName}` })).catch(console.error);
+            }
           }
         }
       } else if (selectedRole === "pharma" || selectedRole === "hospital") {
@@ -522,10 +526,11 @@ export function Register() {
 
           pushNotification({
             userId: "admin",
-            title: "New Pharma Registration",
-            message: `A new pharmaceutical company "${formData.organizationName}" has requested to join the network.`,
+            title: t("newPharmaRegTitle"),
+            message: t("newPharmaRegMsg", { name: formData.organizationName }),
             type: "info",
           });
+          emailService.sendNotification('admin@lomixa.sa', t("newPharmaRegTitle"), t("newPharmaRegMsg", { name: formData.organizationName })).catch(console.error);
         } else {
           saveHospital(orgData as any);
         }
@@ -546,23 +551,29 @@ export function Register() {
 
       if (selectedRole === "rep" || selectedRole === "pharma") {
         toast(
-          "Profile submitted! Registration pending administrative verification.",
+          t("regPendingVerification"),
           "success",
         );
         setStep(3); // Show Success/Pending Screen
         window.scrollTo(0, 0);
         return; // Don't redirect immediately
       } else {
-        toast("Registration successful. Awaiting verification.", "success");
+        toast(t("registrationSuccessful"), "success");
       }
 
-      // Send Welcome Email (Real-time)
+      // Send Welcome Email (Real-time) - Temporarily disabled
+      /*
       const fullName =
         selectedRole === "doctor" || selectedRole === "rep"
           ? `${formData.firstName} ${formData.lastName}`
           : formData.organizationName;
-      const welcome = EmailTemplates.welcome(fullName);
-      sendEmail({ to: formData.email, ...welcome }).catch(console.error);
+      
+      try {
+        await emailService.generateAndSendToken('generate_verification', finalUserId, formData.email, fullName);
+      } catch (emailErr) {
+        console.error("Failed to send verification email:", emailErr);
+      }
+      */
 
       navigate("/login");
     } catch (err: any) {
@@ -864,7 +875,7 @@ export function Register() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                       <div className="space-y-3">
                         <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic">
-                          Country*
+                          {t("country")}*
                         </Label>
                         <select
                           name="country"

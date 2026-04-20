@@ -75,7 +75,7 @@ import { Select } from "@/components/ui/select";
 import { useToast } from "../../components/ui/Toast";
 
 export function AdminDashboard() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { toast } = useToast();
   const { tab: urlTab } = useParams();
   const navigate = useNavigate();
@@ -204,7 +204,7 @@ export function AdminDashboard() {
     setRejectingUser(null);
     setRejectionReason("");
     refresh();
-    toast("Registration rejected and purged from the grid.", "error");
+    toast(t('regRejected'), "error");
   };
 
   const handleAddCustomBundle = () => {
@@ -236,7 +236,7 @@ export function AdminDashboard() {
       pharmas[idx].customBundles = customBundles;
       savePharmaCompany(pharmas[idx]);
       refresh();
-      toast("Custom bundles applied for " + editingPharma.name, "success");
+      toast(t("customBundlesApplied", { name: editingPharma.name }), "success");
       setEditingPharma(null);
     }
   };
@@ -244,8 +244,8 @@ export function AdminDashboard() {
   const togglePharmaStatus = (pc: PharmaCompany, forceValue?: boolean) => {
     const isNowActive = forceValue !== undefined ? forceValue : !pc.isActive;
     const msg = pc.isActive 
-      ? (t('confirmDeactivateUser') || 'Are you sure you want to deactivate this user?')
-      : (t('confirmActivateUser') || 'Are you sure you want to activate this user?');
+      ? t('confirmDeactivateUser')
+      : t('confirmActivateUser');
 
     if (confirm(msg)) {
       const updated = {
@@ -285,7 +285,7 @@ export function AdminDashboard() {
         saveBundleRequest(updatedReq);
         refresh();
         syncCloudData(); // Trigger immediate cloud push
-        toast(`Subscription approved for ${req.pharmaName}`, "success");
+        toast(t("subscriptionApproved", { name: req.pharmaName }), "success");
         return;
       } else {
         console.warn(`[AdminDashboard] Rep ${req.pharmaId} not found in sales_reps list.`);
@@ -337,8 +337,8 @@ export function AdminDashboard() {
     if (pc.userId) {
       pushNotification({
         userId: pc.userId,
-        title: "Bundle Approved",
-        message: `Your request for ${req.bundleName} bundle has been approved. ${req.balance} SAR added to your balance.`,
+        title: t("bundleApprovedTitle"),
+        message: t("bundleApprovedMsg", { name: req.bundleName, amount: req.balance }),
         type: "info",
       });
       console.log(
@@ -348,14 +348,14 @@ export function AdminDashboard() {
 
     refresh();
     syncCloudData(); // Trigger immediate cloud cycle
-    toast("Bundle request approved and funded.", "success");
+    toast(t("bundleApprovedAndFunded"), "success");
   };
 
   const handleRejectRequest = (req: BundleRequest) => {
     const updatedReq = { ...req, status: "rejected" as const };
     saveBundleRequest(updatedReq);
     refresh();
-    toast("Bundle request rejected.", "error");
+    toast(t("bundleRejected"), "error");
   };
 
   const pendingRequests = requests.filter((r) => r.status === "pending");
@@ -442,7 +442,7 @@ export function AdminDashboard() {
   return (
     <div
       className="space-y-8 pb-12"
-      dir={t("appName") === "لوميكسا" ? "rtl" : "ltr"}
+      dir={i18n.language === "ar" ? "rtl" : "ltr"}
     >
       <div className="flex items-center justify-between border-b dark:border-slate-800 pb-8">
         <div className="flex items-center gap-8">
@@ -456,8 +456,8 @@ export function AdminDashboard() {
                     : activeTab === "pharma"
                       ? "pharmaEcosystemManagement"
                       : activeTab === "income"
-                        ? "Income History"
-                        : "Ecosystem Activity",
+                        ? "incomeHistory"
+                        : "dashboard",
               )}
             </h1>
             <p className="text-sm text-gray-500 dark:text-slate-400 mt-1 uppercase tracking-widest font-bold opacity-60">
@@ -652,9 +652,9 @@ export function AdminDashboard() {
                             className="h-12 bg-black/40 border-slate-800 rounded-xl"
                           />
                         </div>
-                        <div className="space-y-2">
+                         <div className="space-y-2">
                           <Label className="text-[10px] font-black uppercase text-slate-500 px-1">
-                            {t("balanceIncluded") || "Balance Included (SAR)"}
+                            {t("balanceIncluded")}
                           </Label>
                           <Input
                             type="number"
@@ -708,8 +708,8 @@ export function AdminDashboard() {
                     <Button
                       variant="ghost"
                       className="h-16 w-16 rounded-3xl group-hover:bg-red-500/10 hover:text-red-500 text-slate-600 border border-slate-800 shrink-0"
-                      onClick={() => {
-                        if (confirm(t('confirmDeleteBundle') || 'Are you sure you want to delete this bundle?')) {
+                       onClick={() => {
+                        if (confirm(t('confirmDeleteBundle'))) {
                           setCustomBundles(
                             customBundles.filter((_, i) => i !== bIdx),
                           );
@@ -763,11 +763,10 @@ export function AdminDashboard() {
               <div className="bg-blue-500/5 border border-blue-500/20 rounded-[3rem] p-16 text-center">
                 <Package className="w-16 h-16 text-blue-500/20 mx-auto mb-6" />
                 <h3 className="text-2xl font-black text-blue-500 uppercase italic tracking-tighter">
-                  No Pending Orders
+                  {t("noPendingOrders")}
                 </h3>
                 <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mt-2">
-                  All pharmaceutical credit acquisition requests have been
-                  processed
+                  {t("allBundleRequestsProcessed")}
                 </p>
               </div>
             ) : (

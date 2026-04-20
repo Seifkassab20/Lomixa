@@ -7,14 +7,16 @@ import { useTheme } from "./ThemeProvider";
 import { useNavigate } from "react-router-dom";
 import { getNotifications, getProfile } from "@/lib/store";
 import { useLayoutEffect } from "react";
+import { LogoutConfirmModal } from "./LogoutConfirmModal";
 
 export function Topbar() {
   const { user, signOut, role, userId } = useAuth();
   const { i18n, t } = useTranslation();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
-  const [notifCount, setNotifCount] = useState(0);
+   const [notifCount, setNotifCount] = useState(0);
   const [avatar, setAvatar] = useState<string | null>(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   useEffect(() => {
     const refresh = () => {
@@ -118,7 +120,7 @@ export function Topbar() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={signOut}
+            onClick={() => setShowLogoutConfirm(true)}
             className="h-8 w-8 p-0 text-gray-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400"
             title={t("signOut")}
           >
@@ -126,6 +128,15 @@ export function Topbar() {
           </Button>
         </div>
       </div>
+
+      <LogoutConfirmModal 
+        isOpen={showLogoutConfirm} 
+        onClose={() => setShowLogoutConfirm(false)} 
+        onConfirm={() => {
+          setShowLogoutConfirm(false);
+          signOut();
+        }}
+      />
     </header>
   );
 }

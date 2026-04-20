@@ -107,12 +107,6 @@ export function Sidebar() {
             icon: TrendingUp,
           },
           {
-            key: "activity",
-            name: "Ecosystem Activity",
-            href: "/admin-control/activity",
-            icon: Activity,
-          },
-          {
             key: "notifications",
             name: t("notifications"),
             href: "/notifications",

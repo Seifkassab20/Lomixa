@@ -81,7 +81,7 @@ export function Login() {
     setClickCount(nextCount);
     if (nextCount === 5) {
       setShowAdmin(true);
-      toast("Developer mode activated", "success");
+      toast(t("devModeActivated"), "success");
     }
   };
 
@@ -92,12 +92,12 @@ export function Login() {
 
     try {
       if (!selectedRole) {
-        toast("Please identify your role first.", "error");
-        throw new Error("Please select a role to continue.");
+        toast(t("identifyRoleFirst"), "error");
+        throw new Error(t("pleaseSelectRole"));
       }
       if (!email.trim() || !password.trim()) {
-        toast("Please enter both your email and security key.", "error");
-        throw new Error("Credential mismatch check failed.");
+        toast(t("enterCredentials"), "error");
+        throw new Error(t("credentialMismatch"));
       }
 
       if (!isSupabaseConfigured) {
@@ -141,14 +141,14 @@ export function Login() {
         if (!authorized) {
           await supabase.auth.signOut();
           throw new Error(
-            reason || "Account access suspended by administration.",
+            reason || t("accountSuspended"),
           );
         }
       }
 
       navigate("/", { replace: true });
     } catch (err: any) {
-      const msg = err.message || "Failed to login";
+      const msg = err.message || t("failedToLogin");
       setError(msg);
       toast(msg, "error");
     } finally {
@@ -166,7 +166,7 @@ export function Login() {
         });
         if (error) throw error;
       }
-      toast("Recovery link sent.", "success");
+      toast(t("recoveryLinkSent"), "success");
       setResetSent(true);
     } catch (err: any) {
       toast(err.message, "error");
@@ -391,7 +391,7 @@ export function Login() {
                             </Label>
                             <button
                               type="button"
-                              onClick={() => setIsResetMode(true)}
+                              onClick={() => navigate('/forgot-password')}
                               className="text-[10px] font-bold text-slate-500 hover:text-emerald-400 uppercase tracking-widest transition-colors font-sans"
                             >
                               {t("forgotPassword")}

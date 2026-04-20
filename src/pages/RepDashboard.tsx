@@ -59,7 +59,7 @@ export function RepDashboard() {
            <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center animate-spin">
               <div className="h-6 w-6 rounded-lg bg-emerald-500/20" />
            </div>
-           <div className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500 animate-pulse italic">Synchronizing LOMIXA Grid...</div>
+           <div className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500 animate-pulse italic">{t('synchronizingGrid')}</div>
         </div>
      );
   }
@@ -91,7 +91,7 @@ export function RepDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: t('visitsThisMonth'), value: monthVisits, sub: `${t('target')}: ${repInfo.target}`, icon: Calendar, color: 'emerald' },
-          { label: t('myCredits') || 'My Balance', value: formatCurrency(balance, country), sub: t('availableForBookings'), icon: CreditCard, color: 'blue' },
+          { label: t('myCredits'), value: formatCurrency(balance, country), sub: t('availableForBookings'), icon: CreditCard, color: 'blue' },
           { label: t('pendingApprovals'), value: pendingVisits.length, sub: t('awaitingResponse'), icon: Clock, color: 'amber' },
           { label: t('confirmedVisits'), value: confirmedVisits.length, sub: t('readyToAttend'), icon: Target, color: 'purple' },
         ].map(({ label, value, sub, icon: Icon, color }) => (
@@ -176,7 +176,7 @@ export function RepDashboard() {
 
                           return (
                             <Button size="sm" onClick={() => setActiveAppointment(appointment)} className="h-7 text-xs gap-1 bg-blue-600 hover:bg-blue-700 text-white animate-pulse">
-                              <Video className="h-3 w-3" /> {t('joinCall') || 'Join'}
+                              <Video className="h-3 w-3" /> {t('join')}
                             </Button>
                           );
                       })()}
@@ -209,9 +209,9 @@ export function RepDashboard() {
 
           <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-xl p-5">
             <div className="flex items-center justify-between mb-2">
-               <div className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">{t('myCredits') || 'My Balance'}</div>
+               <div className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">{t('myCredits')}</div>
                <Button size="sm" variant="ghost" onClick={() => setShowTopup(true)} className="h-6 text-[10px] uppercase font-black tracking-widest text-emerald-600 hover:text-emerald-700 bg-emerald-500/10 h-7 rounded-lg">
-                  {t('topUp') || 'Add Funds'}
+                  {t('topUp')}
                </Button>
             </div>
              <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">{formatCurrency(balance, country)}</div>
@@ -222,7 +222,7 @@ export function RepDashboard() {
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
                <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 w-full max-w-md border dark:border-slate-800 shadow-3xl animate-in zoom-in-95">
                   <div className="flex items-center justify-between mb-8">
-                     <h2 className="text-2xl font-black italic uppercase tracking-tighter dark:text-white">{t('topUpBalance') || 'Top Up My Balance'}</h2>
+                     <h2 className="text-2xl font-black italic uppercase tracking-tighter dark:text-white">{t('topUpBalance')}</h2>
                      <button onClick={() => setShowTopup(false)} className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-white transition-colors">
                         <X className="h-5 w-5" />
                      </button>
@@ -230,7 +230,7 @@ export function RepDashboard() {
                   <div className="space-y-6">
                      <div className="space-y-2">
                         <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-4">
-                          Amount ({formatCurrency(0, country).replace(/[0-9.,٠-٩]/g, '').trim() || 'Amount'})
+                          {t('amount')} ({formatCurrency(0, country).replace(/[0-9.,٠-٩]/g, '').trim()})
                         </Label>
                         <Input type="number" value={topupAmount} onChange={e => setTopupAmount(parseInt(e.target.value) || 0)} className="h-14 rounded-2xl bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-xl font-black italic px-6 focus:border-emerald-500" />
                      </div>
@@ -248,12 +248,12 @@ export function RepDashboard() {
                            saveSalesRep(updatedRep);
                            setBalance(updatedRep.balance);
                            setShowTopup(false);
-                           toast({ title: t('topupSuccess') || 'Balance updated successfully!', variant: 'success' });
+                           toast({ title: t('topupSuccess'), variant: 'success' });
                          }
                        }}
                        className="w-full h-16 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-widest italic"
                      >
-                        Confirm Payment
+                        {t('confirmPayment')}
                      </Button>
                   </div>
                </div>
