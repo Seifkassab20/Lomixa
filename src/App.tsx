@@ -1,3 +1,4 @@
+// Lomixa App - v1.0.1 - Deploy Trigger
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/auth';
