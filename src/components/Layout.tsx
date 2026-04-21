@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { emailService } from '@/lib/emailService';
 import { useToast } from './ui/Toast';
 import { LogoutConfirmModal } from './LogoutConfirmModal';
+import logo from '@/assets/logo.svg';
 
 export function Layout() {
   const { user, role, loading, userId, emailVerified, signOut, refreshVerificationStatus } = useAuth();
@@ -70,7 +71,7 @@ export function Layout() {
         {/* Loading UI as before */}
         <div className="flex flex-col items-center gap-6">
           <div className="h-16 w-16 rounded-[2rem] bg-white flex items-center justify-center border border-emerald-500/20 shadow-2xl shadow-emerald-500/10 p-2.5 animate-pulse transition-transform">
-             <img src="/logo.svg" alt="Lomixa" className="h-full w-full object-contain" />
+             <img src={logo} alt="Lomixa" className="h-full w-full object-contain" />
           </div>
           <div className="flex flex-col items-center gap-2">
             <div className="text-[10px] font-black text-gray-900 dark:text-white tracking-[0.3em] uppercase italic">{t('verifyingSecurity')}</div>
