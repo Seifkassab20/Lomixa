@@ -7,6 +7,8 @@ import { ToastProvider } from './components/ui/Toast';
 import { initializeRates } from './lib/currency';
 import { isUserAuthorized, syncCloudData } from './lib/store';
 
+import logo from './assets/logo.svg';
+
 // Lazy load pages for performance
 const Login = lazy(() => import('./pages/Login').then(m => ({ default: m.Login })));
 const Register = lazy(() => import('./pages/Register').then(m => ({ default: m.Register })));
@@ -98,7 +100,7 @@ export default function App() {
               <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-[#050b14]">
                 <div className="flex flex-col items-center gap-6">
                   <div className="h-16 w-16 rounded-[2rem] bg-white flex items-center justify-center border border-emerald-500/20 shadow-2xl shadow-emerald-500/10 p-2.5 animate-pulse transition-transform">
-                     <img src="/logo.svg" alt="Lomixa" className="h-full w-full object-contain" />
+                     <img src={logo} alt="Lomixa" className="h-full w-full object-contain" />
                   </div>
                   <div className="flex flex-col items-center gap-2">
                     <div className="text-sm font-black text-gray-900 dark:text-white tracking-[0.3em] uppercase italic">Initializing...</div>

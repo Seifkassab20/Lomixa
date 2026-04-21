@@ -65,6 +65,8 @@ import {
   SPECIALTIES,
 } from "@/lib/constants";
 import { REP_PLANS, getPriceForCountry } from "@/lib/plans";
+import logo from "@/assets/logo.svg";
+
 
 const DOCTOR_TITLES = [
   "Dr.",
@@ -635,7 +637,7 @@ export function Register() {
         <Link to="/" className="flex flex-col items-center gap-6 group">
           <div className="bg-white rounded-[2rem] p-4 w-24 h-24 shadow-2xl transition-all group-hover:scale-105 group-hover:rotate-2">
             <img
-              src="/logo.svg"
+              src={logo}
               alt="Logo"
               className="w-full h-full object-contain"
             />

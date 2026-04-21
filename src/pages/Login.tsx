@@ -28,6 +28,8 @@ import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/components/ui/Toast";
 import { motion, AnimatePresence } from "motion/react";
+import logo from "@/assets/logo.svg";
+
 
 export function Login() {
   const [email, setEmail] = useState("");
@@ -248,7 +250,7 @@ export function Login() {
         >
           <div className="bg-white rounded-2xl p-2 w-10 h-10 shadow-2xl shadow-emerald-500/10 transition-transform group-hover:scale-105">
             <img
-              src="/logo.svg"
+              src={logo}
               alt="Lomixa"
               className="w-full h-full object-contain"
             />
@@ -504,7 +506,7 @@ export function Login() {
             <div className="flex items-center gap-3 group">
               <div className="bg-white rounded-xl p-2 w-10 h-10 shadow-2xl transition-transform group-hover:scale-105">
                 <img
-                  src="/logo.svg"
+                  src={logo}
                   alt="Lomixa"
                   className="w-full h-full object-contain"
                 />

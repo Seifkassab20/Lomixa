@@ -30,6 +30,8 @@ import {
   getBundleRequests,
 } from "@/lib/store";
 
+import logo from "@/assets/logo.svg";
+
 export function Sidebar() {
   const { role, userId } = useAuth();
   const location = useLocation();
@@ -272,7 +274,7 @@ export function Sidebar() {
       >
         <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center shrink-0 border border-emerald-500/20 shadow-lg shadow-emerald-500/5 p-1.5 transition-transform hover:scale-105">
           <img
-            src="/logo.svg"
+            src={logo}
             alt="Logo"
             className="h-full w-full object-contain"
           />
