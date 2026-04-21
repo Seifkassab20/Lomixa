@@ -8,7 +8,7 @@ import { ToastProvider } from './components/ui/Toast';
 import { initializeRates } from './lib/currency';
 import { isUserAuthorized, syncCloudData } from './lib/store';
 
-import logo from './assets/logo.svg';
+import logo from '@/assets/logo.svg';
 
 // Lazy load pages for performance
 const Login = lazy(() => import('./pages/Login').then(m => ({ default: m.Login })));
