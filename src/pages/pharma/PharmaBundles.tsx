@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getPharmaBundles, getPharmaCompanies, savePharmaCompany, saveTransaction, generateId, pushNotification, saveBundleRequest, getBundleRequests, Bundle } from '@/lib/store';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -58,21 +59,18 @@ export function PharmaBundles() {
     setShowPayment(bundleId);
   };
 
-  const handleRequestApproval = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!showPayment) return;
-    setLoading(showPayment);
-
-    const bundle = bundles.find(b => b.id === showPayment);
-    const companies = getPharmaCompanies();
-    const mine = companies.find(c => c.userId === userId);
-
-    if (bundle && mine) {
-      // Convert USD units to local currency values for the actual request
-      const localBalance = Math.round(bundle.balance * currency.usdRate);
+  const handleMockPayment = async () => {
+    if (!showPayment || !mine) return;
+    
+    setLoading('payment');
+    try {
+      const bundle = bundles.find(b => b.id === showPayment);
+      if (!bundle) throw new Error('Bundle not found');
+      
       const localPrice = Math.round(bundle.price * currency.usdRate);
-
-      // Create request for Admin to review
+      const localBalance = Math.round(bundle.balance * currency.usdRate);
+      
+      // Submit Bundle Request for admin approval
       saveBundleRequest({
         id: generateId(),
         pharmaId: mine.id,
@@ -81,33 +79,31 @@ export function PharmaBundles() {
         bundleName: bundle.name,
         balance: localBalance,
         price: localPrice,
-        cardNumber: `**** **** **** ${cardNo.slice(-4)}`,
+        cardNumber: cardNo.slice(-4) || '0000',
         cardHolder: holder,
         status: 'pending',
         date: new Date().toISOString(),
+        type: 'pharma'
       });
 
-      toast('Bundle purchase request submitted. Awaiting Admin approval.', 'success');
-      
-      // Send Real-time Email to Admin
-      const adminEmail = 'admin@lomixa.sa'; // Standard network admin mailbox
-      const bundleEmail = EmailTemplates.bundleRequest(
-        mine.name,
-        bundle.name,
-        formatCurrency(localPrice, country)
-      );
-      sendEmail({ to: adminEmail, ...bundleEmail }).catch(console.error);
-      
-      // Cleanup
+      pushNotification(userId!, {
+        title: 'Bundle Request Submitted',
+        message: `Your request for ${bundle.name} is pending admin approval.`,
+        type: 'info',
+      });
+
+      toast(`Bundle request submitted successfully!`, 'success');
+      refresh();
       setShowPayment(null);
       setCardNo('');
       setHolder('');
       setExpiry('');
       setCvv('');
-      refresh();
+    } catch (err: any) {
+      toast(err.message || 'Payment processing failed', 'error');
+    } finally {
+      setLoading(null);
     }
-
-    setLoading(null);
   };
 
   return (
@@ -211,101 +207,82 @@ export function PharmaBundles() {
         })}
       </div>
 
-      {/* Payment Modal */}
       {showPayment && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-[#050b14]/80 backdrop-blur-xl" onClick={() => setShowPayment(null)}></div>
-          <div className="relative w-full max-w-lg bg-[#0f172a] border border-slate-800 rounded-[2.5rem] overflow-hidden shadow-2xl">
-            <div className="p-8 border-b border-slate-800 flex items-center justify-between">
-              <div>
-                <h3 className="text-xl font-bold text-white flex items-center gap-3 italic">
-                  <Lock className="w-5 h-5 text-emerald-500" /> Secure Acquisition
-                </h3>
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">LOMIXA Banking Interface</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-[2rem] w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-800 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                  <CreditCard className="h-5 w-5 text-emerald-500" />
+                </div>
+                <div>
+                  <h3 className="font-black uppercase tracking-tight text-slate-900 dark:text-white">Secure Payment</h3>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Test Mode Active</p>
+                </div>
               </div>
-              <Button size="icon" variant="ghost" className="rounded-2xl" onClick={() => setShowPayment(null)}>
-                <X className="w-5 h-5" />
-              </Button>
+              <button onClick={() => setShowPayment(null)} className="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
+                <X className="h-4 w-4" />
+              </button>
             </div>
             
-            <form onSubmit={handleRequestApproval} className="p-8 space-y-6">
-              <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-800/50">
-                 <div className="flex justify-between items-center mb-4 text-[10px] font-black uppercase tracking-widest text-slate-500">
-                    <span>Order Summary</span>
-                    <span>LOMIXA Marketplace</span>
-                 </div>
-                  <div className="flex justify-between items-end">
-                    <div className="text-white font-black italic">{bundles.find(b => b.id === showPayment)?.name} Plan</div>
-                    <div className="text-2xl font-black text-emerald-500 tracking-tighter">
-                      {formatCurrency(Math.round((bundles.find(b => b.id === showPayment)?.price || 0) * currency.usdRate), country)}
-                    </div>
-                  </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Cardholder Name</Label>
+            <div className="p-6 space-y-5">
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">Card Number</Label>
+                <div className="relative group">
+                  <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input 
-                    required 
-                    value={holder} 
-                    onChange={e => setHolder(e.target.value)}
-                    placeholder="CORPORATE ACCOUNT NAME" 
-                    className="h-14 rounded-2xl bg-slate-900 border-slate-800 text-white font-bold placeholder:opacity-20" 
+                    value={cardNo}
+                    onChange={e => setCardNo(e.target.value)}
+                    placeholder="0000 0000 0000 0000"
+                    className="pl-11 h-12 rounded-xl bg-slate-50 dark:bg-slate-800/50"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Card Number</Label>
-                  <div className="relative">
-                    <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-                    <Input 
-                      required 
-                      maxLength={16}
-                      value={cardNo}
-                      onChange={e => setCardNo(e.target.value)}
-                      placeholder="0000 0000 0000 0000" 
-                      className="h-14 rounded-2xl bg-slate-900 border-slate-800 text-white pl-12 font-bold placeholder:opacity-20" 
-                    />
-                  </div>
+              </div>
+              
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">Card Holder</Label>
+                <Input 
+                  value={holder}
+                  onChange={e => setHolder(e.target.value)}
+                  placeholder="John Doe"
+                  className="h-12 rounded-xl bg-slate-50 dark:bg-slate-800/50 px-4"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">Expiry</Label>
+                  <Input 
+                    value={expiry}
+                    onChange={e => setExpiry(e.target.value)}
+                    placeholder="MM/YY"
+                    className="h-12 rounded-xl bg-slate-50 dark:bg-slate-800/50 px-4 text-center"
+                  />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Exp Date</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">CVV</Label>
+                  <div className="relative group">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <Input 
-                      required 
-                      value={expiry}
-                      onChange={e => setExpiry(e.target.value)}
-                      placeholder="MM/YY" 
-                      className="h-14 rounded-2xl bg-slate-900 border-slate-800 text-white font-bold" 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">CVV</Label>
-                    <Input 
-                      required 
+                      type="password"
                       value={cvv}
                       onChange={e => setCvv(e.target.value)}
-                      type="password"
-                      maxLength={3}
-                      placeholder="•••" 
-                      className="h-14 rounded-2xl bg-slate-900 border-slate-800 text-white font-bold" 
+                      placeholder="•••"
+                      maxLength={4}
+                      className="pl-11 h-12 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-center tracking-widest"
                     />
                   </div>
                 </div>
               </div>
 
               <Button 
-                type="submit" 
-                disabled={loading !== null}
-                className="w-full h-16 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase italic tracking-widest rounded-3xl transition-all shadow-xl shadow-emerald-900/20"
+                onClick={handleMockPayment}
+                disabled={loading === 'payment' || !cardNo || !holder || !expiry || !cvv}
+                className="w-full h-14 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black uppercase tracking-widest italic shadow-xl shadow-emerald-500/20 transition-all"
               >
-                {loading ? 'Processing Protocol...' : 'Submit Request to Admin'}
+                {loading === 'payment' ? 'Processing...' : 'Confirm Payment'}
               </Button>
-              <div className="text-center">
-                <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest leading-relaxed">
-                  Your purchase will be processed and validated by the LOMIXA administration desk within 24 hours. Funds will be allocated upon manual validation.
-                </p>
-              </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
