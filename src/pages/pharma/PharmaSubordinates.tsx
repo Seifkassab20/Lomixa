@@ -470,7 +470,7 @@ export function PharmaSubordinates() {
                 <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl mb-4 border dark:border-slate-700">
                   <div>
                     <div className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">{t('availableCredits') || 'Available Balance'}</div>
-                    <div className="text-lg font-bold text-gray-900 dark:text-white leading-none mt-1">{rep.balance || 0} <span className="text-[10px] font-medium opacity-60">SAR</span></div>
+                    <div className="text-lg font-bold text-gray-900 dark:text-white leading-none mt-1">{rep.balance || 0} <span className="text-[10px] font-medium opacity-60">{getCurrencyInfo(myCompany?.location?.country).code}</span></div>
                   </div>
                   <Button size="sm" variant="outline" onClick={() => setAllocationRep(rep)} className="h-8 text-xs gap-1.5 border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10">
                     <Plus className="h-3 w-3" /> {t('giveFunds')}

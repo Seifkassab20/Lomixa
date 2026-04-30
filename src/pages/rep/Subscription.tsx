@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
 import { getSalesReps, saveBundleRequest, generateId, getSalesReps as getReps } from '@/lib/store';
 import { REP_PLANS, getPriceForCountry } from '@/lib/plans';
 import { formatCurrency, CountryCode } from '@/lib/currency';
@@ -16,7 +17,7 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
 export function RepSubscription() {
-  const { userId } = useAuth();
+  const { userId, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [country, setCountry] = useState<CountryCode>('sa');
@@ -51,60 +52,44 @@ export function RepSubscription() {
   }, [userId]);
 
   const handleOpenPayment = (plan: any) => {
-    const price = getPriceForCountry(plan.id, country);
-    if (balance < price) {
-      toast(`Insufficient balance. You need ${formatCurrency(price - balance, country)} more.`, "error");
-      return;
-    }
     setSelectedPlan(plan);
     setShowPayment(true);
   };
 
-  const handleSubmitRequest = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!repId || !selectedPlan) return;
-
+  const handleMockPayment = async () => {
+    if (!selectedPlan || !repId) return;
+    
     setLoading(true);
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
     try {
       const price = getPriceForCountry(selectedPlan.id, country);
       
-      // Deduct from balance
-      const reps = getSalesReps();
-      const myRep = reps.find(r => r.id === repId);
-      if (myRep) {
-        myRep.balance = (myRep.balance || 0) - price;
-        const { saveSalesRep } = require('@/lib/store');
-        saveSalesRep(myRep);
-        setBalance(myRep.balance);
-      }
-
       saveBundleRequest({
         id: generateId(),
         pharmaId: repId,
         pharmaName: repName,
         bundleId: selectedPlan.id,
         bundleName: selectedPlan.name,
-        balance: selectedPlan.durationMonths, // Duration for reps
+        balance: selectedPlan.durationMonths,
         price: price,
-        cardNumber: `WALLET_TRANSFER`,
-        cardHolder: repName,
+        cardNumber: paymentData.cardNo.slice(-4) || '0000',
+        cardHolder: paymentData.cardHolder,
         status: 'pending',
         date: new Date().toISOString(),
         type: 'rep'
       });
 
-      setIsSuccess(true);
+      toast('Subscription request submitted to admin for approval.', 'success');
       setShowPayment(false);
-      toast("Subscription request submitted. Balance deducted.", "success");
-    } catch (err) {
-      toast("Failed to submit request.", "error");
+      setPaymentData({ cardNo: '', cardHolder: '', cardExpiry: '', cardCvv: '' });
+      setIsSuccess(true);
+      setTimeout(() => setIsSuccess(false), 3000);
+    } catch (err: any) {
+      toast(err.message || 'Payment processing failed', 'error');
     } finally {
       setLoading(false);
     }
   };
+
 
   const getIcon = (id: string) => {
     switch (id) {
@@ -121,36 +106,7 @@ export function RepSubscription() {
     return null;
   };
 
-      <AnimatePresence>
-        {isSuccess && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="w-full max-w-lg bg-slate-900/90 border border-emerald-500/30 backdrop-blur-2xl rounded-[3rem] p-12 text-center space-y-8 shadow-[0_0_50px_rgba(16,185,129,0.1)]"
-            >
-              <div className="relative mx-auto w-32 h-32">
-                <div className="absolute inset-0 bg-emerald-500/20 rounded-full blur-2xl animate-pulse"></div>
-                <div className="relative w-32 h-32 rounded-[2.5rem] bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                   <Clock className="w-16 h-16 text-emerald-500" />
-                </div>
-              </div>
-              <div className="space-y-3">
-                <h2 className="text-3xl font-black italic tracking-tighter uppercase text-white leading-none">Subscription Pending</h2>
-                <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] bg-emerald-500/5 px-6 py-2 rounded-full inline-block border border-emerald-500/10">Status: Awaiting Audit Authority</p>
-              </div>
-              <p className="text-slate-400 font-medium leading-relaxed italic text-sm">
-                Your request for the <span className="text-white font-bold">{selectedPlan?.name}</span> plan is being processed. 
-                <span className="block mt-2 text-xs font-bold text-slate-500 uppercase tracking-widest">Access will be granted immediately upon admin approval.</span>
-              </p>
-              <Button onClick={() => navigate('/dashboard')} className="w-full h-16 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase italic tracking-widest text-xs shadow-2xl shadow-emerald-500/20 group">
-                 Continue to Portal <ArrowRight className="w-4 h-4 ml-3 transition-transform group-hover:translate-x-1" />
-              </Button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+
 
   return (
     <div className="min-h-screen bg-[#050b14] py-24 px-6 relative overflow-hidden">
@@ -297,132 +253,86 @@ export function RepSubscription() {
         </div>
       </div>
 
-      {/* Payment Modal */}
-      <AnimatePresence>
-        {showPayment && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-            <motion.div 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 1 }} 
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/80 backdrop-blur-xl"
-              onClick={() => setShowPayment(false)}
-            />
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full max-w-2xl bg-[#0f172a] border border-white/10 rounded-[3.5rem] shadow-4xl flex flex-col max-h-[90vh] overflow-hidden"
-            >
-              <div className="p-10 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
-                 <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 border border-emerald-500/20">
-                       <CreditCard className="w-6 h-6" />
-                    </div>
-                    <div>
-                       <h3 className="text-2xl font-black italic tracking-tighter uppercase text-white leading-none">Subscription Details</h3>
-                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-1 italic">Professional Billing Registration</p>
-                    </div>
-                 </div>
-                 <button onClick={() => setShowPayment(false)} className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-slate-500 hover:text-white hover:bg-white/10 transition-all">
-                    <X className="w-6 h-6" />
-                 </button>
-              </div>
-
-              <div className="p-12 overflow-y-auto space-y-12">
-                {/* Plan Summary */}
-                <div className="p-8 rounded-[2.5rem] bg-emerald-500/5 border border-emerald-500/10 flex items-center justify-between">
-                   <div className="flex items-center gap-6">
-                      <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 flex items-center justify-center text-emerald-500">
-                         {getIcon(selectedPlan?.id)}
-                      </div>
-                      <div>
-                         <h4 className="text-xl font-black text-white uppercase italic leading-none">{selectedPlan?.name}</h4>
-                         <p className="text-[10px] font-black text-emerald-500/60 uppercase tracking-widest mt-1 italic">{selectedPlan?.durationMonths} Months Full Network Access</p>
-                      </div>
-                   </div>
-                   <div className="text-3xl font-black text-white italic tracking-tighter">
-                      {formatCurrency(getPriceForCountry(selectedPlan?.id, country), country)}
-                   </div>
+      {showPayment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-[2rem] w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-800 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                  <CreditCard className="h-5 w-5 text-emerald-500" />
                 </div>
-
-                <form onSubmit={handleSubmitRequest} className="space-y-10">
-                  <div className="grid grid-cols-2 gap-8">
-                    <div className="col-span-2 space-y-4">
-                       <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-[0.2em] italic">CARDHOLDER NAME</Label>
-                       <Input 
-                        value={paymentData.cardHolder} 
-                        onChange={e => setPaymentData(p => ({ ...p, cardHolder: e.target.value }))}
-                        required 
-                        className="h-16 rounded-2xl bg-black/40 border-white/5 font-bold focus:border-emerald-500 transition-all text-sm uppercase tracking-widest" 
-                        placeholder={repName.toUpperCase()} 
-                      />
-                    </div>
-                    <div className="col-span-2 space-y-4">
-                       <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-[0.2em] italic">CARD NUMBER</Label>
-                       <Input 
-                        value={paymentData.cardNo} 
-                        onChange={e => setPaymentData(p => ({ ...p, cardNo: e.target.value }))}
-                        required 
-                        maxLength={16} 
-                        className="h-16 rounded-2xl bg-black/40 border-white/5 font-bold focus:border-emerald-500 transition-all text-lg tracking-[0.3em]" 
-                        placeholder="0000 0000 0000 0000" 
-                      />
-                    </div>
-                    <div className="space-y-4">
-                       <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-[0.2em] italic">EXP. DATE</Label>
-                       <Input 
-                        value={paymentData.cardExpiry} 
-                        onChange={e => setPaymentData(p => ({ ...p, cardExpiry: e.target.value }))}
-                        required 
-                        className="h-16 rounded-2xl bg-black/40 border-white/5 font-bold focus:border-emerald-500 text-center tracking-widest" 
-                        placeholder="MM/YY" 
-                      />
-                    </div>
-                    <div className="space-y-4">
-                       <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-[0.2em] italic">CVV CODE</Label>
-                       <Input 
-                        value={paymentData.cardCvv} 
-                        onChange={e => setPaymentData(p => ({ ...p, cardCvv: e.target.value }))}
-                        required 
-                        type="password" 
-                        maxLength={3} 
-                        className="h-16 rounded-2xl bg-black/40 border-white/5 font-bold focus:border-emerald-500 text-center tracking-[0.5em]" 
-                        placeholder="•••" 
-                      />
-                    </div>
-                  </div>
-
-                  <div className="p-8 rounded-[2rem] bg-indigo-500/10 border border-indigo-500/20 backdrop-blur-md flex items-start gap-4">
-                     <ShieldAlert className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
-                     <p className="text-[10px] font-black uppercase tracking-[0.1em] text-indigo-300 leading-relaxed italic">
-                        The bundle price will be deducted from your LOMIXA Wallet immediately. Access will be activated automatically once the Administrative Audit desk confirms your request.
-                     </p>
-                  </div>
-
-                  <Button 
-                    type="submit" 
-                    disabled={loading}
-                    className="w-full h-20 rounded-[2.5rem] bg-emerald-600 hover:bg-emerald-500 text-white font-black italic tracking-tighter text-xl shadow-2xl transition-all active:scale-[0.98] group"
-                  >
-                    {loading ? (
-                      <div className="flex items-center gap-3">
-                        <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                        <span className="uppercase tracking-widest text-sm font-black italic">Processing Request...</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center gap-4">
-                        <span className="uppercase tracking-widest text-sm font-black italic">Submit Subscription Request</span>
-                        <ArrowRight className="w-6 h-6 transition-transform group-hover:translate-x-2" />
-                      </div>
-                    )}
-                  </Button>
-                </form>
+                <div>
+                  <h3 className="font-black uppercase tracking-tight text-slate-900 dark:text-white">Secure Payment</h3>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Test Mode Active</p>
+                </div>
               </div>
-            </motion.div>
+              <button onClick={() => setShowPayment(false)} className="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-5">
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">Card Number</Label>
+                <div className="relative group">
+                  <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input 
+                    value={paymentData.cardNo}
+                    onChange={e => setPaymentData({ ...paymentData, cardNo: e.target.value })}
+                    placeholder="0000 0000 0000 0000"
+                    className="pl-11 h-12 rounded-xl bg-slate-50 dark:bg-slate-800/50"
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">Card Holder</Label>
+                <Input 
+                  value={paymentData.cardHolder}
+                  onChange={e => setPaymentData({ ...paymentData, cardHolder: e.target.value })}
+                  placeholder="John Doe"
+                  className="h-12 rounded-xl bg-slate-50 dark:bg-slate-800/50 px-4"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">Expiry</Label>
+                  <Input 
+                    value={paymentData.cardExpiry}
+                    onChange={e => setPaymentData({ ...paymentData, cardExpiry: e.target.value })}
+                    placeholder="MM/YY"
+                    className="h-12 rounded-xl bg-slate-50 dark:bg-slate-800/50 px-4 text-center"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase text-slate-500 ml-1">CVV</Label>
+                  <div className="relative group">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input 
+                      type="password"
+                      value={paymentData.cardCvv}
+                      onChange={e => setPaymentData({ ...paymentData, cardCvv: e.target.value })}
+                      placeholder="•••"
+                      maxLength={4}
+                      className="pl-11 h-12 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-center tracking-widest"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Button 
+                onClick={handleMockPayment}
+                disabled={loading || !paymentData.cardNo || !paymentData.cardHolder || !paymentData.cardExpiry || !paymentData.cardCvv}
+                className="w-full h-14 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black uppercase tracking-widest italic shadow-xl shadow-emerald-500/20 transition-all"
+              >
+                {loading ? 'Processing...' : 'Confirm Payment'}
+              </Button>
+            </div>
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
+
     </div>
   );
 }

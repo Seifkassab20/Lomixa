@@ -105,6 +105,7 @@ export interface PharmaCompany {
   location?: {
     country: string;
     city?: string;
+    cities?: string[];
     address?: string;
   };
   documents?: {

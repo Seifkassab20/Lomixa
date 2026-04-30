@@ -336,6 +336,9 @@ export function Register() {
       if (!selectedRole) throw new Error("Role selection missing.");
       if (!formData.password)
         throw new Error("A security key is strictly required.");
+      if (formData.cities.length === 0 && !formData.city) {
+        throw new Error("Please select at least one city.");
+      }
 
       const emailExists = await checkUserExistence("email", formData.email);
       if (emailExists) {
@@ -380,8 +383,8 @@ export function Register() {
         avatar: previewImage || "",
         location: {
           country: formData.country,
-          city: selectedRole === "rep" ? "" : formData.city,
-          cities: selectedRole === "rep" ? formData.cities : [],
+          city: formData.cities.length > 0 ? formData.cities[0] : formData.city,
+          cities: formData.cities.length > 0 ? formData.cities : (formData.city ? [formData.city] : []),
           area: formData.area,
           areas: formData.areas,
           address: formData.address,
@@ -897,20 +900,23 @@ export function Register() {
                         <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic">
                           {t("city")}*
                         </Label>
-                        <select
-                          name="city"
-                          value={formData.city}
-                          onChange={handleChange}
-                          required
-                          className="w-full h-14 rounded-2xl bg-black/40 border border-slate-800 px-4 text-sm font-bold text-white outline-none focus:border-emerald-500"
-                        >
-                          <option value="">{t("selectCity")}</option>
+                        <div className="flex flex-wrap gap-2 mt-1 max-h-48 overflow-y-auto p-4 bg-slate-900/50 rounded-2xl border border-slate-800">
                           {CITY_MAP[formData.country]?.map((city) => (
-                            <option key={city} value={city}>
+                            <button
+                              key={city}
+                              type="button"
+                              onClick={() => toggleCity(city)}
+                              className={cn(
+                                "px-3 py-2 rounded-xl text-[10px] font-bold uppercase transition-all",
+                                formData.cities.includes(city)
+                                  ? "bg-emerald-500 text-white"
+                                  : "bg-black/40 text-slate-500 border border-slate-800 hover:border-emerald-500/50"
+                              )}
+                            >
                               {city}
-                            </option>
+                            </button>
                           ))}
-                        </select>
+                        </div>
                       </div>
                     </div>
                   </div>
