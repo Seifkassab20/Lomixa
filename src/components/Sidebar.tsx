@@ -45,9 +45,14 @@ export function Sidebar() {
 
   useEffect(() => {
     const refresh = () => {
-      const n = getNotifications().filter(
-        (n) => !n.read && (!n.userId || n.userId === userId),
-      ).length;
+      const n = getNotifications().filter((notif) => {
+        if (!notif || notif.read) return false;
+        if (!notif.userId) return true;
+        if (userId && notif.userId === userId) return true;
+        if (notif.userId === 'admin' && role === 'admin') return true;
+        if (role === 'admin' && typeof notif.userId === 'string' && notif.userId.toLowerCase().includes('admin')) return true;
+        return false;
+      }).length;
       setNotifCount(n);
       if (role === "hospital" && userId) {
         const h = getHospitals().find((h) => h.userId === userId);
@@ -97,9 +102,9 @@ export function Sidebar() {
               .length,
           },
           {
-            key: "pharma",
-            name: t("pharmaEcosystemManagement"),
-            href: "/admin-control/pharma",
+            key: "ecosystem",
+            name: t("ecosystemManagement") || "Ecosystem Management",
+            href: "/admin-control/ecosystem",
             icon: Building2,
           },
           {
@@ -107,13 +112,6 @@ export function Sidebar() {
             name: "Income History",
             href: "/admin-control/income",
             icon: TrendingUp,
-          },
-          {
-            key: "notifications",
-            name: t("notifications"),
-            href: "/notifications",
-            icon: Bell,
-            badge: notifCount,
           },
           {
             key: "settings",

@@ -72,6 +72,10 @@ function InitialCheck() {
   if (authLoading || (user && authorized === null)) return null;
 
   if (user) {
+    if (!user.user_metadata?.role) {
+      console.log("[InitialCheck] Missing role, redirecting to select-role");
+      return <Navigate to="/select-role" replace />;
+    }
     if (authorized === false) return <Navigate to="/login" replace />;
     return <Navigate to="/dashboard" replace />;
   }

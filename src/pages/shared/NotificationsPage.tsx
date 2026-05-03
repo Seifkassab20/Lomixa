@@ -23,20 +23,37 @@ const TYPE_COLORS = {
 };
 
 export function NotificationsPage() {
-  const { userId } = useAuth();
+  const { userId, role } = useAuth();
   const { t, i18n } = useTranslation();
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   const refresh = () => {
-    const all = getNotifications().filter(n => !n.userId || n.userId === userId);
-    setNotifications(all);
+    try {
+      const all = getNotifications().filter(n => {
+        if (!n) return false;
+        // 1. System-wide notifications (no userId)
+        if (!n.userId) return true;
+        // 2. Notifications for this specific user ID
+        if (userId && n.userId === userId) return true;
+        // 3. Global admin notifications (Admin role only)
+        if (n.userId === 'admin' && role === 'admin') return true;
+        // 4. Fallback for admin role matching
+        if (role === 'admin' && typeof n.userId === 'string' && n.userId.toLowerCase().includes('admin')) return true;
+        
+        return false;
+      });
+      setNotifications(all);
+    } catch (err) {
+      console.error("Failed to filter notifications:", err);
+      setNotifications([]);
+    }
   };
 
   useEffect(() => {
     refresh();
     const interval = setInterval(refresh, 3000);
     return () => clearInterval(interval);
-  }, [userId]);
+  }, [userId, role]);
 
   const handleRead = (id: string) => {
     markNotificationRead(id);
@@ -86,13 +103,13 @@ export function NotificationsPage() {
                 )}
               >
                 <div className="flex items-start gap-3">
-                  <div className={cn('h-8 w-8 rounded-lg flex items-center justify-center shrink-0', TYPE_COLORS[n.type])}>
-                    <Icon className="h-4 w-4" />
+                  <div className={cn('h-8 w-8 rounded-lg flex items-center justify-center shrink-0', (TYPE_COLORS as any)[n.type] || 'text-slate-500 bg-slate-100')}>
+                    {Icon ? <Icon className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <h4 className={cn('text-sm font-semibold', n.read ? 'text-gray-700 dark:text-slate-300' : 'text-gray-900 dark:text-white')}>
-                        {t(n.title.toLowerCase().replace(/\s+/g, '')) || n.title}
+                        {n.title ? (t(n.title.toLowerCase().replace(/\s+/g, '')) || n.title) : 'Notification'}
                       </h4>
                       {!n.read && <div className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />}
                     </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link, useParams } from "react-router-dom";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -139,6 +140,7 @@ export function Register() {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
+  const { user } = useAuth();
   const isRTL = i18n.language === "ar";
 
   const toggleLanguage = () => {
@@ -223,6 +225,12 @@ export function Register() {
     // Also load hospitals for doctor selection
     setHospitals(getHospitals());
   }, [role]);
+
+  useEffect(() => {
+    if (user && user.email) {
+      setFormData((prev) => ({ ...prev, email: user.email || "" }));
+    }
+  }, [user]);
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -329,46 +337,68 @@ export function Register() {
     }
   };
 
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
       if (!selectedRole) throw new Error("Role selection missing.");
-      if (!formData.password)
+      if (!user && !formData.password)
         throw new Error("A security key is strictly required.");
       if (formData.cities.length === 0 && !formData.city) {
         throw new Error("Please select at least one city.");
       }
 
-      const emailExists = await checkUserExistence("email", formData.email);
-      if (emailExists) {
-        throw new Error(t("emailAlreadyExists"));
+      if (!user) {
+        const emailExists = await checkUserExistence("email", formData.email);
+        if (emailExists) {
+          throw new Error(t("emailAlreadyExists"));
+        }
       }
 
       let finalUserId = generateId();
+      let isEmailConfirmationRequired = false;
 
       if (isSupabaseConfigured) {
-        const { data: authData, error: authError } = await supabase.auth.signUp(
-          {
-            email: formData.email,
-            password: formData.password,
-            options: {
-              data: {
-                role: selectedRole,
-                full_name:
-                  selectedRole === "doctor" || selectedRole === "rep"
-                    ? `${formData.firstName} ${formData.lastName}`
-                    : formData.organizationName,
-                phone: `${formData.phoneCode}${formData.phone}`,
+        if (user) {
+          const { error: authError } = await supabase.auth.updateUser({
+            data: {
+              role: selectedRole,
+              full_name:
+                selectedRole === "doctor" || selectedRole === "rep"
+                  ? `${formData.firstName} ${formData.lastName}`
+                  : formData.organizationName,
+              phone: `${formData.phoneCode}${formData.phone}`,
+            }
+          });
+          if (authError) throw new Error(`Profile update failed: ${authError.message}`);
+          finalUserId = user.id;
+        } else {
+          const { data: authData, error: authError } = await supabase.auth.signUp(
+            {
+              email: formData.email,
+              password: formData.password,
+              options: {
+                data: {
+                  role: selectedRole,
+                  full_name:
+                    selectedRole === "doctor" || selectedRole === "rep"
+                      ? `${formData.firstName} ${formData.lastName}`
+                      : formData.organizationName,
+                  phone: `${formData.phoneCode}${formData.phone}`,
+                },
               },
             },
-          },
-        );
+          );
 
-        if (authError)
-          throw new Error(`Registration failed: ${authError.message}`);
-        if (authData?.user?.id) {
-          finalUserId = authData.user.id;
+          if (authError)
+            throw new Error(`Registration failed: ${authError.message}`);
+          if (authData?.user?.id) {
+            finalUserId = authData.user.id;
+            if (!authData.session) {
+              isEmailConfirmationRequired = true;
+            }
+          }
         }
       } else {
         // In demo mode, use a predictable ID that AuthProvider will generate
@@ -538,6 +568,12 @@ export function Register() {
           emailService.sendNotification('admin@lomixa.sa', t("newPharmaRegTitle"), t("newPharmaRegMsg", { name: formData.organizationName })).catch(console.error);
         } else {
           saveHospital(orgData as any);
+          pushNotification({
+            userId: "admin",
+            title: t("newHospitalRegTitle") || "New Hospital Registration",
+            message: t("newHospitalRegMsg", { name: formData.organizationName }) || `New hospital registration request from ${formData.organizationName}`,
+            type: "info",
+          });
         }
       } else if (selectedRole === "admin") {
         const { saveProfile } = await import("@/lib/store");
@@ -554,16 +590,19 @@ export function Register() {
         }
       }
 
+      if (isEmailConfirmationRequired) {
+        toast("Please check your email inbox to verify your account before logging in.", "success");
+      } else {
+        toast(t("registrationSuccessful"), "success");
+      }
+
       if (selectedRole === "rep" || selectedRole === "pharma") {
-        toast(
-          t("regPendingVerification"),
-          "success",
-        );
+        if (!isEmailConfirmationRequired) {
+           toast(t("regPendingVerification"), "success");
+        }
         setStep(3); // Show Success/Pending Screen
         window.scrollTo(0, 0);
         return; // Don't redirect immediately
-      } else {
-        toast(t("registrationSuccessful"), "success");
       }
 
       // Send Welcome Email (Real-time) - Temporarily disabled
@@ -683,6 +722,12 @@ export function Register() {
               {selectedRole === "pharma" && (
                 <Building2 className="w-10 h-10 text-white" />
               )}
+              {selectedRole === "hospital" && (
+                <Activity className="w-10 h-10 text-white" />
+              )}
+              {selectedRole === "doctor" && (
+                <Stethoscope className="w-10 h-10 text-white" />
+              )}
               {selectedRole === "admin" && (
                 <Shield className="w-10 h-10 text-white" />
               )}
@@ -768,7 +813,8 @@ export function Register() {
                   </div>
 
                   {/* BASIC INFO */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-10 border-t border-white/5">
+
+                  <div className={cn("grid grid-cols-1 md:grid-cols-2 gap-8", user ? "pt-10 border-t border-white/5" : "")}>
                     {selectedRole === "pharma" ||
                     selectedRole === "hospital" ||
                     selectedRole === "admin" ? (
@@ -845,34 +891,51 @@ export function Register() {
                         value={formData.email}
                         onChange={handleChange}
                         required
-                        className="h-14 rounded-2xl bg-black/40 border-slate-800 focus:border-emerald-500 font-bold"
+                        readOnly={!!user}
+                        className={cn("h-14 rounded-2xl bg-black/40 border-slate-800 focus:border-emerald-500 font-bold", user && "opacity-50 cursor-not-allowed")}
                       />
                     </div>
                     <div className="space-y-3">
                       <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic">
                         {t("phoneNumber")}
                       </Label>
-                      <Input
-                        name="phone"
-                        value={formData.phone}
-                        onChange={handleChange}
-                        className="h-14 rounded-2xl bg-black/40 border-slate-800 focus:border-emerald-500 font-bold"
-                        placeholder="5XXXXXXXX"
-                      />
+                      <div className="flex gap-2">
+                        <select
+                          name="phoneCode"
+                          value={formData.phoneCode}
+                          onChange={handleChange}
+                          className="w-32 h-14 rounded-2xl bg-black/40 border border-slate-800 px-3 text-sm font-bold text-white outline-none focus:border-emerald-500 transition-all"
+                        >
+                          {ARABIC_COUNTRY_CODES.map((c) => (
+                            <option key={c.code} value={c.code}>
+                              {c.flag} {c.code}
+                            </option>
+                          ))}
+                        </select>
+                        <Input
+                          name="phone"
+                          value={formData.phone}
+                          onChange={handleChange}
+                          className="flex-1 h-14 rounded-2xl bg-black/40 border-slate-800 focus:border-emerald-500 font-bold"
+                          placeholder="5XXXXXXXX"
+                        />
+                      </div>
                     </div>
-                    <div className="md:col-span-2 space-y-3">
-                      <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic">
-                        {t("securityKey")}*
-                      </Label>
-                      <Input
-                        type="password"
-                        name="password"
-                        value={formData.password}
-                        onChange={handleChange}
-                        required
-                        className="h-14 rounded-2xl bg-black/40 border-slate-800 focus:border-emerald-500 tracking-widest font-bold"
-                      />
-                    </div>
+                    {!user && (
+                      <div className="md:col-span-2 space-y-3">
+                        <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic">
+                          {t("securityKey")}*
+                        </Label>
+                        <Input
+                          type="password"
+                          name="password"
+                          value={formData.password}
+                          onChange={handleChange}
+                          required
+                          className="h-14 rounded-2xl bg-black/40 border-slate-800 focus:border-emerald-500 tracking-widest font-bold"
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* ROLE SPECIFIC & LOCATION */}

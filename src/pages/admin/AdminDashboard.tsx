@@ -89,7 +89,7 @@ export function AdminDashboard() {
   const [incomeFromFilter, setIncomeFromFilter] = useState("");
   const [incomeToFilter, setIncomeToFilter] = useState("");
   const [activeTab, setActiveTab] = useState<
-    "verification" | "bundles" | "pharma" | "activity" | "income"
+    "verification" | "bundles" | "ecosystem" | "activity" | "income"
   >((urlTab as any) || "activity");
 
   const [platformBalance, setPlatformBalance] = useState(0);
@@ -126,7 +126,8 @@ export function AdminDashboard() {
   };
 
   useEffect(() => {
-    if (urlTab) setActiveTab(urlTab as any);
+    if (urlTab === "pharma") setActiveTab("ecosystem");
+    else if (urlTab) setActiveTab(urlTab as any);
   }, [urlTab]);
 
   useEffect(() => {
@@ -142,7 +143,7 @@ export function AdminDashboard() {
     if (type === "hospital") {
       const h = hospitals.find((hosp) => hosp.id === id);
       if (h) {
-        saveHospital({ ...h, isVerified: true });
+        saveHospital({ ...h, isVerified: true, isActive: true, rejectionReason: "" });
         console.log(
           `[SIMULATED MAIL] To Hospital | ID: ${h.id} | Subject: Infrastructure Verified`,
         );
@@ -157,7 +158,7 @@ export function AdminDashboard() {
     } else if (type === "pharma") {
       const p = pharma.find((ph) => ph.id === id);
       if (p) {
-        savePharmaCompany({ ...p, isVerified: true });
+        savePharmaCompany({ ...p, isVerified: true, isActive: true, rejectionReason: "" });
         console.log(
           `[SIMULATED MAIL] To Pharma | ID: ${p.id} | Subject: Organization Verified`,
         );
@@ -172,6 +173,26 @@ export function AdminDashboard() {
     }
     refresh();
     toast(t("accessGrantedToast"), "success");
+  };
+
+  const toggleHospitalStatus = (h: Hospital, forceValue?: boolean) => {
+    const isNowActive = forceValue !== undefined ? forceValue : !h.isActive;
+    const msg = h.isActive 
+      ? t('confirmDeactivateUser')
+      : t('confirmActivateUser');
+
+    if (confirm(msg)) {
+      const updated = {
+        ...h,
+        isActive: isNowActive,
+      };
+      saveHospital(updated);
+      refresh();
+      toast(
+        `${h.name} ${updated.isActive ? "Activated" : "Deactivated"}`,
+        "info",
+      );
+    }
   };
 
   const initiateReject = (type: "hospital" | "pharma", id: string) => {
@@ -195,9 +216,6 @@ export function AdminDashboard() {
     if (type === "hospital") {
       deleteHospital(id);
     } else if (type === "pharma") {
-      getSalesReps()
-        .filter((r) => r.pharmaId === id)
-        .forEach((r) => deleteSalesRep(r.id));
       deletePharma(id);
     }
 
@@ -377,6 +395,10 @@ export function AdminDashboard() {
     (p) => !search || p.name.toLowerCase().includes(search.toLowerCase()),
   ), [uniquePharma, search]);
 
+  const filteredHospitals = useMemo(() => uniqueHospitals.filter(
+    (h) => !search || h.name.toLowerCase().includes(search.toLowerCase()),
+  ), [uniqueHospitals, search]);
+
   const filteredTransactions = useMemo(() => {
     return (transactions || []).filter((tx) => {
       if (!tx) return false;
@@ -453,8 +475,8 @@ export function AdminDashboard() {
                   ? "facilityVerificationDesk"
                   : activeTab === "bundles"
                     ? "pendingApprovalDesk"
-                    : activeTab === "pharma"
-                      ? "pharmaEcosystemManagement"
+                    : activeTab === "ecosystem"
+                      ? "ecosystemManagement"
                       : activeTab === "income"
                         ? "incomeHistory"
                         : "dashboard",
@@ -520,11 +542,23 @@ export function AdminDashboard() {
                     <h4 className="text-xl font-black text-gray-900 dark:text-white uppercase italic tracking-tighter mb-1">
                       {hosp.name}
                     </h4>
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">
                       {typeof hosp.location === "object"
                         ? `${hosp.location.city || ""}, ${hosp.location.country || ""}`
                         : hosp.location}
                     </p>
+
+                    {!hosp.isActive && (
+                      <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20">
+                        <div className="flex items-center gap-2 text-red-500 mb-1">
+                          <AlertCircle className="w-3 h-3" />
+                          <span className="text-[8px] font-black uppercase tracking-widest">Rejected</span>
+                        </div>
+                        <p className="text-[10px] text-red-400/80 font-bold italic line-clamp-2">
+                          {hosp.rejectionReason}
+                        </p>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-3 mt-auto">
                       <Button
@@ -562,9 +596,21 @@ export function AdminDashboard() {
                     <h4 className="text-xl font-black text-gray-900 dark:text-white uppercase italic tracking-tighter mb-1">
                       {p.name}
                     </h4>
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">
                       {t("pharmaEcosystemManagement")}
                     </p>
+
+                    {!p.isActive && (
+                      <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20">
+                        <div className="flex items-center gap-2 text-red-500 mb-1">
+                          <AlertCircle className="w-3 h-3" />
+                          <span className="text-[8px] font-black uppercase tracking-widest">Rejected</span>
+                        </div>
+                        <p className="text-[10px] text-red-400/80 font-bold italic line-clamp-2">
+                          {p.rejectionReason}
+                        </p>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-3 mt-auto">
                       <Button
@@ -843,8 +889,8 @@ export function AdminDashboard() {
           </section>
         )}
 
-        {/* --- TAB: NETWORK MANAGEMENT --- */}
-        {activeTab === "pharma" && (
+        {/* --- TAB: ECOSYSTEM MANAGEMENT --- */}
+        {activeTab === "ecosystem" && (
           <>
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -921,153 +967,184 @@ export function AdminDashboard() {
               ))}
             </div>
 
-            {/* Main Content Areas */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Pharma Management List */}
-              <div className="lg:col-span-2 space-y-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-xl font-bold dark:text-white flex items-center gap-2 uppercase tracking-tighter italic">
-                    <Package className="w-5 h-5 text-brand" />{" "}
-                    {t("pharmaEcosystemManagement")}
-                  </h3>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            {/* Ecosystem Units Grid */}
+            <div className="space-y-8">
+              <div className="flex flex-col md:flex-row gap-6 md:items-center justify-between bg-white dark:bg-slate-900 border dark:border-slate-800 p-8 rounded-[2.5rem] shadow-xl">
+                <div className="flex items-center gap-6 flex-1 max-w-2xl">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                     <Input
+                      placeholder={t("searchOrganization") || "Search organizations..."}
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      placeholder={t("searchConglomerates")}
-                      className="pl-9 w-64 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 border-none text-xs font-bold"
+                      className="pl-12 h-14 bg-slate-50 dark:bg-black/40 border-slate-200 dark:border-slate-800 rounded-2xl focus:border-brand/50 transition-all font-bold"
                     />
                   </div>
                 </div>
+                <div className="flex items-center gap-4">
+                   <div className="flex flex-col items-end">
+                      <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest leading-none mb-1">Grid Density</span>
+                      <span className="text-xl font-black italic tracking-tighter text-gray-900 dark:text-white uppercase">{uniquePharma.length + uniqueHospitals.length} Units</span>
+                   </div>
+                   <div className="h-12 w-[1px] bg-slate-200 dark:bg-slate-800 mx-2" />
+                   <div className="flex flex-col items-end">
+                      <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest leading-none mb-1">Verification Rate</span>
+                      <span className="text-xl font-black italic tracking-tighter text-brand uppercase">
+                        {Math.round(((uniquePharma.filter(p => p.isVerified).length + uniqueHospitals.filter(h => h.isVerified).length) / (uniquePharma.length + uniqueHospitals.length || 1)) * 100)}%
+                      </span>
+                   </div>
+                </div>
+              </div>
 
-                <div className="space-y-3">
-                  {filteredPharma.map((pc) => (
-                    <div
-                      key={pc.id}
-                      className={`bg-white dark:bg-slate-900/80 border dark:border-slate-800 rounded-[2rem] p-6 hover:shadow-2xl transition-all group border-l-4 ${
-                        pc.isActive
-                          ? "border-l-brand hover:shadow-brand/5"
-                          : "border-l-red-500 grayscale opacity-60 bg-slate-50 dark:bg-slate-900/40"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-5">
-                          <div className="h-14 w-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-brand font-black text-xl shadow-inner border dark:border-slate-700">
-                            {pc.name[0]}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-black text-lg text-gray-900 dark:text-white uppercase italic tracking-tighter">
-                                {pc.name}
-                              </h4>
-                              {pc.isActive ? (
-                                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand/10 border border-brand/20 text-brand text-[8px] font-black uppercase tracking-widest">
-                                  <ShieldCheck className="w-2.5 h-2.5" />{" "}
-                                  {t("establishedStatus")}
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-500 text-[8px] font-black uppercase tracking-widest">
-                                  <ShieldAlert className="w-2.5 h-2.5" />{" "}
-                                  {t("restrictedStatus")}
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-4 mt-2">
-                              <div className="flex flex-col">
-                                <span className="text-[8px] uppercase font-black text-slate-500 tracking-widest">
-                                  {t("networkLiquidity") || "Network Liquidity"}
-                                </span>
-                                <span className="text-sm font-bold text-brand">
-                                  {formatCurrency(
-                                    pc.balance || 0,
-                                    pc.location?.country || "sa",
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                {/* Pharma Section */}
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between px-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-purple-500/10 rounded-lg text-purple-500">
+                        <Building2 className="w-5 h-5" />
+                      </div>
+                      <h3 className="text-xl font-black uppercase italic tracking-tighter text-gray-900 dark:text-white">
+                        {t("pharmaceuticalGrid") || "Pharmaceutical Grid"}
+                      </h3>
+                    </div>
+                    <Badge className="bg-purple-500/10 text-purple-500 border-purple-500/20 font-black uppercase text-[10px] tracking-widest px-3">
+                      {filteredPharma.length} {t("activeUnits") || "Units"}
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-4">
+                    {filteredPharma.length === 0 ? (
+                      <div className="bg-slate-50 dark:bg-slate-900/40 border border-dashed border-slate-300 dark:border-slate-800 rounded-3xl p-12 text-center">
+                        <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">No pharmaceutical units found</p>
+                      </div>
+                    ) : (
+                      filteredPharma.map((pc) => (
+                        <div
+                          key={pc.id}
+                          className="bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-3xl p-6 hover:shadow-2xl transition-all group border-l-4 border-l-purple-500"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className="h-12 w-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-purple-500 font-black text-xl shadow-inner">
+                                {pc.name[0]}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-black text-sm text-gray-900 dark:text-white uppercase italic">
+                                    {pc.name}
+                                  </h4>
+                                  {!pc.isActive && (
+                                    <Badge variant="destructive" className="text-[8px] font-black uppercase tracking-widest h-4 px-1.5">
+                                      {t("inactive")}
+                                    </Badge>
                                   )}
-                                </span>
-                              </div>
-                              <div className="w-[1px] h-6 bg-slate-200 dark:bg-slate-800" />
-                              <div className="flex flex-col">
-                                <span className="text-[8px] uppercase font-black text-slate-500 tracking-widest">
-                                  {t("fieldPersonnel")}
-                                </span>
-                                <span className="text-sm font-bold text-slate-400">
-                                  {
-                                    getSalesReps().filter(
-                                      (r) => r.pharmaId === pc.id,
-                                    ).length
-                                  }{" "}
-                                  {t("activeReps")}
-                                </span>
+                                </div>
+                                <div className="flex items-center gap-3 mt-1">
+                                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                                    {formatCurrency(pc.balance || 0, pc.location?.country || "sa")}
+                                  </span>
+                                  <span className="text-slate-300 dark:text-slate-700">•</span>
+                                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                                    {getSalesReps().filter(r => r.pharmaId === pc.id).length} {t("reps")}
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-4">
-                          <div className="flex flex-col items-end gap-2">
                             <div className="flex items-center gap-2">
                               <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 rounded-lg border-blue-500/30 text-blue-500 text-[10px] font-black uppercase hover:bg-blue-500/10"
+                                size="icon"
+                                variant="ghost"
+                                className="h-10 w-10 rounded-xl text-blue-500 hover:bg-blue-500/10"
                                 onClick={() => {
                                   setEditingPharma(pc);
                                   setCustomBundles(getPharmaBundles(pc.id));
                                 }}
                               >
-                                <Package className="w-3 h-3 mr-1" />{" "}
-                                {t("editCustomBundles")}
+                                <Package className="w-4 h-4" />
                               </Button>
-                            </div>
-                            <div
-                              className={`flex items-center gap-3 px-4 py-2 rounded-xl border transition-all duration-300 shadow-sm ${
-                                pc.isActive
-                                  ? "bg-brand border-brand-dark text-white"
-                                  : "bg-red-500 border-red-600 text-white"
-                              }`}
-                            >
-                              <span className="text-[10px] font-black uppercase tracking-widest italic">
-                                {pc.isActive ? t("active") : t("inactive")}
-                              </span>
                               <Switch
                                 checked={pc.isActive}
-                                onCheckedChange={(val) =>
-                                  togglePharmaStatus(pc, val)
-                                }
-                                className="scale-90"
+                                onCheckedChange={(val) => togglePharmaStatus(pc, val)}
+                                className="scale-75"
                               />
                             </div>
-                            {!pc.isActive && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-10 w-10 rounded-xl text-red-500 hover:bg-red-500/10"
-                                onClick={() => {
-                                  if (
-                                    confirm(
-                                      `${t('confirmDeleteUser') || 'Are you sure you want to delete this user?'} (${pc.name})`
-                                    )
-                                  ) {
-                                    deletePharma(pc.id);
-                                    refresh();
-                                    toast(
-                                      `${pc.name} removed from the grid.`,
-                                      "error",
-                                    );
-                                  }
-                                }}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            )}
                           </div>
                         </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Hospitals Section */}
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between px-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500">
+                        <HospitalIcon className="w-5 h-5" />
                       </div>
+                      <h3 className="text-xl font-black uppercase italic tracking-tighter text-gray-900 dark:text-white">
+                        {t("healthcareGrid") || "Healthcare Grid"}
+                      </h3>
                     </div>
-                  ))}
+                    <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20 font-black uppercase text-[10px] tracking-widest px-3">
+                      {filteredHospitals.length} {t("activeUnits")}
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-4">
+                    {filteredHospitals.length === 0 ? (
+                      <div className="bg-slate-50 dark:bg-slate-900/40 border border-dashed border-slate-300 dark:border-slate-800 rounded-3xl p-12 text-center">
+                        <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">No healthcare units found</p>
+                      </div>
+                    ) : (
+                      filteredHospitals.map((hosp) => (
+                        <div
+                          key={hosp.id}
+                          className="bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-3xl p-6 hover:shadow-2xl transition-all group border-l-4 border-l-blue-500"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className="h-12 w-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-blue-500 font-black text-xl shadow-inner">
+                                {hosp.name[0]}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-black text-sm text-gray-900 dark:text-white uppercase italic">
+                                    {hosp.name}
+                                  </h4>
+                                  {!hosp.isActive && (
+                                    <Badge variant="destructive" className="text-[8px] font-black uppercase tracking-widest h-4 px-1.5">
+                                      {t("inactive")}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-3 mt-1">
+                                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                                    {hosp.type || 'Hospital'}
+                                  </span>
+                                  <span className="text-slate-300 dark:text-slate-700">•</span>
+                                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                                    {getDoctors().filter(d => d.hospitalId === hosp.id).length} {t("doctors")}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={hosp.isActive}
+                                onCheckedChange={(val) => toggleHospitalStatus(hosp, val)}
+                                className="scale-75"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
                 </div>
               </div>
             </div>
+          </div>
           </>
         )}
 
