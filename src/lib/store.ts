@@ -3,6 +3,15 @@ import { supabase, isSupabaseConfigured } from './supabase';
 
 export type Role = 'pharma' | 'hospital' | 'doctor' | 'rep' | 'admin' | null;
 
+export interface Location {
+  country: string;
+  city?: string;
+  cities?: string[];
+  area?: string;
+  areas?: string[];
+  address?: string;
+}
+
 export interface Doctor {
   id: string;
   name: string; // Combined
@@ -22,7 +31,8 @@ export interface Doctor {
   role?: string;
   availability: AvailabilitySlot[];
   avatar?: string;
-  location?: any;
+  location?: Location;
+  rejectionReason?: string;
 }
 
 export interface AvailabilitySlot {
@@ -53,13 +63,7 @@ export interface SalesRep {
   balance: number;
   role?: string;
   avatar?: string;
-  location?: {
-    country: string;
-    city?: string;
-    cities?: string[];
-    area?: string;
-    areas?: string[];
-  };
+  location?: Location;
   products?: any[];
   targetSpecialties?: string[];
   subscription?: {
@@ -68,12 +72,13 @@ export interface SalesRep {
     expiryDate: string;
     startDate: string;
   };
+  rejectionReason?: string;
 }
 
 export interface Hospital {
   id: string;
   name: string;
-  location: any;
+  location?: Location;
   userId?: string;
   isActive: boolean;
   isVerified: boolean;
@@ -88,6 +93,7 @@ export interface Hospital {
     vat: boolean;
   };
   balance?: number;
+  rejectionReason?: string;
 }
 
 
@@ -102,18 +108,14 @@ export interface PharmaCompany {
   email?: string;
   role?: string;
   avatar?: string;
-  location?: {
-    country: string;
-    city?: string;
-    cities?: string[];
-    address?: string;
-  };
+  location?: Location;
   documents?: {
     commercial: boolean;
     address: boolean;
     vat: boolean;
   };
   customBundles?: Bundle[];
+  rejectionReason?: string;
 }
 
 export type VisitStatus = 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled';
@@ -455,7 +457,8 @@ function mapDoctorToDB(d: Doctor) {
     balance: d.balance || 0,
     location: d.location ? JSON.stringify(d.location) : null,
     avatar: d.avatar,
-    title: d.title
+    title: d.title,
+    rejection_reason: d.rejectionReason
   };
 }
 
@@ -480,6 +483,7 @@ function mapDoctorFromDB(db: any): Doctor {
     avatar: db.avatar,
     location: location,
     availability: load(`availability_${db.id}`, []),
+    rejectionReason: db.rejection_reason
   };
 }
 
@@ -495,7 +499,8 @@ function mapHospitalToDB(h: Hospital) {
     phone: h.phone,
     email: h.email,
     avatar: h.avatar,
-    balance: h.balance || 0
+    balance: h.balance || 0,
+    rejection_reason: h.rejectionReason
   };
 }
 
@@ -516,7 +521,8 @@ function mapHospitalFromDB(db: any): Hospital {
     type: db.type || 'hospital',
     avatar: db.avatar,
     documents: docs,
-    balance: db.balance || 0
+    balance: db.balance || 0,
+    rejectionReason: db.rejection_reason
   };
 }
 
@@ -532,7 +538,8 @@ function mapPharmaToDB(p: PharmaCompany) {
     location: p.location ? JSON.stringify(p.location) : null,
     avatar: p.avatar,
     phone: p.phone,
-    email: p.email
+    email: p.email,
+    rejection_reason: p.rejectionReason
   };
   if (p.customBundles) data.custom_bundles = JSON.stringify(p.customBundles);
   return data;
@@ -551,7 +558,8 @@ function mapPharmaFromDB(db: any): PharmaCompany {
     customBundles: bundles,
     avatar: db.avatar,
     location: db.location ? (typeof db.location === 'string' ? JSON.parse(db.location) : db.location) : null,
-    documents: docs
+    documents: docs,
+    rejectionReason: db.rejection_reason
   };
 }
 
@@ -576,7 +584,8 @@ function mapRepToDB(r: SalesRep) {
     role_title: r.roleTitle,
     target_specialties: r.targetSpecialties ? JSON.stringify(r.targetSpecialties) : null,
     products: r.products ? JSON.stringify(r.products) : null,
-    subscription: r.subscription ? JSON.stringify(r.subscription) : null
+    subscription: r.subscription ? JSON.stringify(r.subscription) : null,
+    rejection_reason: r.rejectionReason
   };
 }
 
@@ -600,7 +609,8 @@ function mapRepFromDB(db: any): SalesRep {
     location: location,
     products: products,
     targetSpecialties: db.target_specialties ? JSON.parse(db.target_specialties) : [],
-    subscription: db.subscription ? (typeof db.subscription === 'string' ? JSON.parse(db.subscription) : db.subscription) : undefined
+    subscription: db.subscription ? (typeof db.subscription === 'string' ? JSON.parse(db.subscription) : db.subscription) : undefined,
+    rejectionReason: db.rejection_reason
   };
 }
 
@@ -1295,6 +1305,16 @@ export function saveBundleRequest(req: BundleRequest) {
       status: req.status, type: req.type || 'pharma'
     }).then(({error}) => error && console.error("Bundle Request Cloud Push Failed:", error));
   }
+
+  // Notify Admin for new requests
+  if (req.status === 'pending') {
+    pushNotification({
+      userId: 'admin',
+      title: 'New Bundle Request',
+      message: `${req.pharmaName} has requested the ${req.bundleName} bundle.`,
+      type: 'info'
+    });
+  }
 }
 
 export async function isUserAuthorized(uid?: string, role?: string): Promise<boolean> {
@@ -1341,6 +1361,7 @@ export async function getAuthorizationDetails(uid: string, role: string): Promis
     let verified = false;
     let active = false;
     let found = false;
+    let rejectionReason = "";
 
     const checkLocal = () => {
       let entity: any;
@@ -1356,14 +1377,16 @@ export async function getAuthorizationDetails(uid: string, role: string): Promis
       found = true;
       verified = !!localEntity.isVerified;
       active = localEntity.isActive !== false;
+      rejectionReason = localEntity.rejectionReason || '';
     } 
 
     if (isSupabaseConfigured && (!localEntity || !verified)) {
-      const { data, error } = await supabase.from(table[role]).select('is_verified, is_active').eq('user_id', uid).single();
+      const { data, error } = await supabase.from(table[role]).select('is_verified, is_active, rejection_reason').eq('user_id', uid).single();
       if (!error && data) {
         found = true;
         verified = data.is_verified === null ? true : !!data.is_verified;
         active = data.is_active === null ? true : data.is_active !== false;
+        rejectionReason = data.rejection_reason || '';
       }
     }
 
@@ -1394,8 +1417,8 @@ export async function getAuthorizationDetails(uid: string, role: string): Promis
       }
       return { authorized: false, reason: `Your ${role} account is currently PENDING. It requires administrative approval before login is permitted.` };
     }
-    if (!verified && !active) return { authorized: false, reason: `Your ${role} account registration has been REJECTED.` };
-    if (verified && !active) return { authorized: false, reason: `Your ${role} account is INACTIVE. Please contact LOMIXA administration or your parent organization for assistance.` };
+    if (!verified && !active) return { authorized: false, reason: rejectionReason || `Your ${role} account registration has been REJECTED.` };
+    if (verified && !active) return { authorized: false, reason: rejectionReason || `Your ${role} account is INACTIVE. Please contact LOMIXA administration or your parent organization for assistance.` };
     
     return { authorized: true };
   } catch (err) {
@@ -1502,7 +1525,7 @@ export async function ensureUserEntityExists(user: any) {
           id: user.id,
           userId: user.id,
           name: m.organization || 'Clinic/Hospital',
-          location: 'Regional Center',
+          location: { country: 'sa', address: 'Regional Center' },
           type: 'clinic',
           isActive: true,
           isVerified: false

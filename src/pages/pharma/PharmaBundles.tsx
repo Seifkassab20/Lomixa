@@ -86,7 +86,8 @@ export function PharmaBundles() {
         type: 'pharma'
       });
 
-      pushNotification(userId!, {
+      pushNotification({
+        userId: userId!,
         title: 'Bundle Request Submitted',
         message: `Your request for ${bundle.name} is pending admin approval.`,
         type: 'info',
