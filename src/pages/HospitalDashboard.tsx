@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { getVisits, getDoctors, getHospitals, saveHospital, saveDoctor, generateId, Hospital } from '@/lib/store';
-import { Stethoscope, Calendar, Activity, Users, ArrowRight, DollarSign } from 'lucide-react';
+import { Stethoscope, Calendar, Activity, Users, ArrowRight, DollarSign, Plus } from 'lucide-react';
 import { formatCurrency } from '@/lib/currency';
 
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 
 
@@ -102,6 +103,9 @@ export function HospitalDashboard() {
               <h3 className="font-semibold dark:text-white">{t('doctorsOverview')}</h3>
               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter italic">{t('clinicalStaffDirectory')}</p>
             </div>
+            <Button onClick={() => navigate('/doctors?add=true')} size="sm" className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white border border-emerald-500/20 text-[10px] font-black uppercase tracking-widest px-3 h-8">
+              <Plus className="w-3 h-3 mr-1" /> {t('add')}
+            </Button>
           </div>
           {doctors.length === 0 ? (
             <div className="py-8 text-center text-sm text-gray-400 dark:text-slate-500">{t('noDoctorsAdded')}</div>

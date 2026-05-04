@@ -1249,13 +1249,21 @@ export function saveDoctorAvailability(doctorId: string, slots: AvailabilitySlot
 }
 
 export async function checkUserExistence(type: 'email' | 'phone', value: string): Promise<boolean> {
+  const cleanValue = value.trim().toLowerCase();
   if (!isSupabaseConfigured) {
     const tables: any[] = [getDoctors(), getSalesReps(), getHospitals(), getPharmaCompanies()];
-    return tables.some(table => table.some((item: any) => item[type] === value));
+    return tables.some(table => table.some((item: any) => 
+      (item[type] || '').toString().toLowerCase() === cleanValue
+    ));
   }
   const tables = ['doctors', 'sales_reps', 'hospitals', 'pharma_companies'];
   try {
-    const results = await Promise.all(tables.map(table => supabase.from(table).select('id').eq(type, value).limit(1)));
+    // For emails, we want case-insensitive check. Supabase .eq is case-sensitive for some types.
+    // Better to use .ilike or just accept .eq if the DB is configured for CITEXT (common in Supabase)
+    // But to be safe across all roles:
+    const results = await Promise.all(tables.map(table => 
+      supabase.from(table).select('id').ilike(type, cleanValue).limit(1)
+    ));
     return results.some(r => r.data && r.data.length > 0);
   } catch (err) { return false; }
 }

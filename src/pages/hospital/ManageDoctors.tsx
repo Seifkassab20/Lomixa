@@ -13,6 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { createClient } from '@supabase/supabase-js';
 import { motion, AnimatePresence } from 'motion/react';
+import { useToast } from '@/components/ui/Toast';
 import { ARABIC_COUNTRY_CODES, SPECIALTIES, COUNTRIES, CITY_MAP, AREA_MAP } from '@/lib/constants';
 
 // Helper client that doesn't persist session so signing up a user doesn't log out the admin
@@ -27,6 +28,7 @@ const DOCTOR_TITLES = ['dr', 'prof', 'assoc', 'asst', 'consultant', 'specialist'
 export function ManageDoctors() {
   const { userId } = useAuth();
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingDoc, setEditingDoc] = useState<Doctor | null>(null);
@@ -48,12 +50,34 @@ export function ManageDoctors() {
 
   useEffect(() => { refresh(); }, [myHospital?.id]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('add') === 'true') {
+      setShowForm(true);
+      setEditingDoc(null);
+      setForm({ title: 'dr', name: '', specialty: '', experienceYears: 0, phoneCode: '+966', phone: '', email: '', password: '', country: 'sa', cities: [], areas: [] });
+      // Clear the param
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const fullPhone = `${form.phoneCode}${form.phone}`;
-    const emailExists = await checkUserExistence('email', form.email);
-    if (emailExists && (!editingDoc || form.email !== editingDoc.email)) {
-      alert(t('emailAlreadyExists'));
+    const emailExistsGlobal = await checkUserExistence('email', form.email);
+    const emailExistsLocal = getDoctors().some(d => d.email.toLowerCase() === form.email.toLowerCase().trim() && (!editingDoc || d.id !== editingDoc.id));
+    const emailExists = emailExistsGlobal || emailExistsLocal;
+
+    const phoneExistsGlobal = await checkUserExistence('phone', fullPhone);
+    const phoneExistsLocal = getDoctors().some(d => d.phone === fullPhone && (!editingDoc || d.id !== editingDoc.id));
+    const phoneExists = phoneExistsGlobal || phoneExistsLocal;
+
+    if (emailExists && (!editingDoc || form.email.toLowerCase().trim() !== editingDoc.email.toLowerCase())) {
+      toast(t('emailAlreadyExists'), 'error');
+      return;
+    }
+    if (phoneExists && (!editingDoc || fullPhone !== editingDoc.phone)) {
+      toast(t('phoneAlreadyExists'), 'error');
       return;
     }
 
@@ -81,7 +105,7 @@ export function ManageDoctors() {
       });
       
       if (error) {
-        alert(`${t('errorCreatingAccount') || 'Error creating account'}: ${error.message}`);
+        toast(`${t('errorCreatingAccount') || 'Error creating account'}: ${error.message}`, 'error');
         return;
       }
       
@@ -183,7 +207,7 @@ export function ManageDoctors() {
     }
   };
 
-  const filtered = doctors.filter(d => !search || d.name.toLowerCase().includes(search.toLowerCase()) || d.specialty.toLowerCase().includes(search.toLowerCase()));
+  const filtered = doctors.filter(d => !search || d.name?.toLowerCase().includes(search.toLowerCase()) || d.specialty?.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div className="space-y-6">
@@ -192,7 +216,7 @@ export function ManageDoctors() {
           <h1 className="text-2xl font-bold dark:text-white">{t('manageDoctors')}</h1>
           <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">{t('addDoctors')}</p>
         </div>
-        <Button onClick={() => { setShowForm(true); setEditingDoc(null); setForm({ title: 'dr', name: '', specialty: '', experienceYears: 0, phoneCode: '+966', phone: '', email: '', password: '' }); }} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
+        <Button onClick={() => { setShowForm(true); setEditingDoc(null); setForm({ title: 'dr', name: '', specialty: '', experienceYears: 0, phoneCode: '+966', phone: '', email: '', password: '', country: 'sa', cities: [], areas: [] }); }} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
           <Plus className="h-4 w-4" /> {t('addDoctor')}
         </Button>
       </div>

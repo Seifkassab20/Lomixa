@@ -351,9 +351,11 @@ export function Register() {
 
       if (!user) {
         const emailExists = await checkUserExistence("email", formData.email);
-        if (emailExists) {
-          throw new Error(t("emailAlreadyExists"));
-        }
+        if (emailExists) throw new Error(t("emailAlreadyExists"));
+        
+        const fullPhone = `${formData.phoneCode}${formData.phone}`;
+        const phoneExists = await checkUserExistence("phone", fullPhone);
+        if (phoneExists) throw new Error(t("phoneAlreadyExists"));
       }
 
       let finalUserId = generateId();
@@ -836,24 +838,45 @@ export function Register() {
                     ) : (
                       <>
                         {selectedRole === "doctor" && (
-                          <div className="md:col-span-2 space-y-3">
-                            <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic">
-                              Title
-                            </Label>
-                            <select
-                              name="title"
-                              value={formData.title}
-                              onChange={handleChange}
-                              className="w-full h-14 rounded-2xl bg-black/40 border border-slate-800 px-4 text-sm font-bold text-white outline-none focus:border-emerald-500"
-                            >
-                              <option value="">{t("selectTitle")}</option>
-                              {DOCTOR_TITLES.map((tit) => (
-                                <option key={tit} value={tit}>
-                                  {tit}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
+                          <>
+                            <div className="space-y-3">
+                              <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic">
+                                Title
+                              </Label>
+                              <select
+                                name="title"
+                                value={formData.title}
+                                onChange={handleChange}
+                                className="w-full h-14 rounded-2xl bg-black/40 border border-slate-800 px-4 text-sm font-bold text-white outline-none focus:border-emerald-500"
+                              >
+                                <option value="">{t("selectTitle")}</option>
+                                {DOCTOR_TITLES.map((tit) => (
+                                  <option key={tit} value={tit}>
+                                    {tit}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="space-y-3">
+                              <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic">
+                                {t("specialty")}*
+                              </Label>
+                              <select
+                                name="specialty"
+                                value={formData.specialty}
+                                onChange={handleChange}
+                                required
+                                className="w-full h-14 rounded-2xl bg-black/40 border border-slate-800 px-4 text-sm font-bold text-white outline-none focus:border-emerald-500"
+                              >
+                                <option value="">{t("selectSpecialty")}</option>
+                                {SPECIALTIES.map((spec) => (
+                                  <option key={spec} value={spec}>
+                                    {t(`spec_${spec}`) || spec}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </>
                         )}
                         <div className="space-y-3">
                           <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic">

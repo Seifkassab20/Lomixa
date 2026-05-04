@@ -43,6 +43,9 @@ flowchart TD
     Slots -- Creates --> Visit{Pending Visit}
     Visit -- Notifies --> Doctor
 
+    %% Validation Layer
+    System{Uniqueness Check} -- Case-insensitive Email/Phone --> Pharma & Hospital & Rep & Doctor
+    
     %% Visit Lifecycle
     Doctor -- Accepts/Rejects --> Visit
     Visit -- Status Updates --> Rep
@@ -71,6 +74,7 @@ flowchart TD
     classDef action fill:#8b5cf6,stroke:#6d28d9,color:#fff;
     classDef feedback fill:#ec4899,stroke:#be185d,color:#fff;
     classDef db fill:#64748b,stroke:#475569,color:#fff;
+    classDef security fill:#ef4444,stroke:#b91c1c,color:#fff;
 
     class Admin admin;
     class Pharma pharma;
@@ -80,6 +84,7 @@ flowchart TD
     class Visit,Slots action;
     class Reports,Rating,Notify feedback;
     class Credits,Analytics,Outcome db;
+    class System security;
 ```
 
 ---
@@ -98,10 +103,12 @@ flowchart TD
 
 ### 🏥 Hospital & Clinic Portal
 - **Facility Branding**: Dedicated paths for "Hospital" vs "Clinic" identity with immutable role designations to ensure organizational integrity.
-- **Clinical Roster Setup**: Independently rapidly onboard staff Doctors as 'Pre-Verified' network participants.
+- **Accelerated Onboarding**: Direct "Add Doctor" shortcut from the dashboard to rapidly expand the clinical roster.
+- **Clinical Roster Setup**: Independently rapidly onboard staff Doctors as 'Pre-Verified' network participants with mandatory specialty mapping.
 - **Engagement Surveillance**: Track clinical staff interaction metrics via comprehensive analytics endpoints.
 
 ### 🩺 Doctor Hub
+- **Professional Identity**: Doctors register with mandatory specialty selection (e.g., Cardiology, Neurology) to ensure accurate matching.
 - **Availability Matrix**: Fine-tune daily/weekly booking slots precisely defining audience windows.
 - **Direct Connectivity**: Accept or decline inbound visits; engage via In-Person routing, Video Tele-conferencing, or Phone.
 - **Peer Accountability**: Rate representative professional conduct and provide structured clinical feedback.
@@ -166,7 +173,7 @@ flowchart TD
 ## 🧪 Security & Quality Verification
 
 - [x] **Role Access Isolation**: A 'Doctor' strictly cannot navigate or fetch endpoints belonging to a 'Pharma'.
-- [x] **Authentication Constraints**: Enforced "one email per role" uniqueness across the global network.
+- [x] **Universal Uniqueness**: Enforced case-insensitive "one email per system" and "one phone per system" uniqueness across the global network.
 - [x] **Row Level Security (RLS)**: Data mutations are restricted purely to authorized hierarchy paths.
 - [x] **State Cohesion**: Prevention of overwrite collisions when merging local storage with cloud states.
 - [x] **Bilingual Completeness**: Interface transitions cleanly between English and Arabic including layout direction and iconography.
