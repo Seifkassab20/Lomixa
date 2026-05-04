@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/lib/auth';
 import { getVisits, getSalesReps, getPharmaCompanies, getDoctors, getNotifications, savePharmaCompany, generateId } from '@/lib/store';
-import { Users, Activity, CreditCard, Calendar as CalendarIcon, Video, Phone, MapPin, MessageSquare, TrendingUp, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Users, Activity, CreditCard, Calendar as CalendarIcon, Video, Phone, MapPin, MessageSquare, TrendingUp, AlertTriangle, ArrowRight, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -178,14 +178,21 @@ export function PharmaDashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
-          { label: t('manageRepresentatives') || 'Manage Representatives', href: '/subordinates', icon: Users },
-          { label: t('allBookings'), href: '/bookings', icon: CalendarIcon },
-        ].map(({ label, href, icon: Icon }) => (
-          <button key={label} onClick={() => navigate(href)} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-6 flex items-center justify-between hover:border-emerald-500/50 hover:shadow-md transition-all group">
+          { label: t('addRep') || 'Add Representative', href: '/subordinates?add=true', icon: Plus, color: 'emerald' },
+          { label: t('manageRepresentatives') || 'Manage Representatives', href: '/subordinates', icon: Users, color: 'slate' },
+          { label: t('allBookings'), href: '/bookings', icon: CalendarIcon, color: 'slate' },
+        ].map(({ label, href, icon: Icon, color }) => (
+          <button key={label} onClick={() => navigate(href)} className={cn(
+            "bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-6 flex items-center justify-between hover:shadow-md transition-all group",
+            color === 'emerald' ? "hover:border-emerald-500/50 bg-emerald-500/5" : "hover:border-emerald-500/50"
+          )}>
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
+              <div className={cn(
+                "h-12 w-12 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform",
+                color === 'emerald' ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20" : "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              )}>
                 <Icon className="h-6 w-6" />
               </div>
               <span className="text-sm font-bold text-gray-700 dark:text-slate-300 uppercase tracking-widest">{label}</span>

@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { createClient } from '@supabase/supabase-js';
 import { motion, AnimatePresence } from 'motion/react';
 import { useToast } from '@/components/ui/Toast';
+import { ActionConfirmModal } from '@/components/ui/ActionConfirmModal';
 import { ARABIC_COUNTRY_CODES, SPECIALTIES, COUNTRIES, CITY_MAP, AREA_MAP } from '@/lib/constants';
 
 // Helper client that doesn't persist session so signing up a user doesn't log out the admin
@@ -38,6 +39,19 @@ export function ManageDoctors() {
     name: '', specialty: '', experienceYears: 0,
     phoneCode: '+966', phone: '', email: '', password: '',
     country: 'sa', cities: [] as string[], areas: [] as string[]
+  });
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant: 'danger' | 'warning' | 'info' | 'success';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    variant: 'info'
   });
 
   const hospitals = getHospitals();
@@ -187,24 +201,39 @@ export function ManageDoctors() {
       ? (t('confirmDeactivateUser') || 'Are you sure you want to deactivate this user?')
       : (t('confirmActivateUser') || 'Are you sure you want to activate this user?');
       
-    if (confirm(msg)) {
-      const updated = { ...doc, isActive: !doc.isActive };
-      saveDoctor(updated);
-      refresh();
-    }
+    setConfirmConfig({
+      isOpen: true,
+      title: doc.isActive ? (t('deactivateAccount') || 'Deactivate Account') : (t('activateAccount') || 'Activate Account'),
+      message: msg,
+      variant: doc.isActive ? 'warning' : 'success',
+      onConfirm: () => {
+        const updated = { ...doc, isActive: !doc.isActive };
+        saveDoctor(updated);
+        refresh();
+        toast(updated.isActive ? t('accountActivated') || 'Account Activated' : t('accountDeactivated') || 'Account Deactivated', 'success');
+      }
+    });
   };
 
   const handleApprove = (doc: Doctor) => {
     const updated = { ...doc, isVerified: true, isActive: true };
     saveDoctor(updated);
     refresh();
+    toast(t('accountApproved') || 'Account Approved', 'success');
   };
 
   const handleDelete = (id: string, name: string) => {
-    if (confirm(`${t('confirmDeleteUser') || 'Are you sure you want to delete this user?'} (${name})`)) {
-      deleteDoctor(id);
-      refresh();
-    }
+    setConfirmConfig({
+      isOpen: true,
+      title: t('deleteAccount') || 'Delete Account',
+      message: `${t('confirmDeleteUser') || 'Are you sure you want to delete this user?'} (${name})`,
+      variant: 'danger',
+      onConfirm: () => {
+        deleteDoctor(id);
+        refresh();
+        toast(t('accountDeleted') || 'Account Deleted', 'success');
+      }
+    });
   };
 
   const filtered = doctors.filter(d => !search || d.name?.toLowerCase().includes(search.toLowerCase()) || d.specialty?.toLowerCase().includes(search.toLowerCase()));
@@ -545,6 +574,15 @@ export function ManageDoctors() {
           ))}
         </div>
       )}
+      {/* Confirm Modal */}
+      <ActionConfirmModal
+        isOpen={confirmConfig.isOpen}
+        onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmConfig.onConfirm}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        variant={confirmConfig.variant}
+      />
     </div>
   );
 }
