@@ -122,7 +122,7 @@ export function HospitalDashboard() {
                         {doc.name}
                         {!doc.isActive && <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />}
                       </div>
-                      <div className="text-[10px] text-gray-500 dark:text-slate-400 font-bold uppercase tracking-widest">{t(`spec_${doc.specialty}`) || doc.specialty}</div>
+                      <div className="text-[10px] text-gray-500 dark:text-slate-400 font-bold uppercase tracking-widest">{t(`spec_${doc.specialty}`) === `spec_${doc.specialty}` ? doc.specialty : t(`spec_${doc.specialty}`)}</div>
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2">

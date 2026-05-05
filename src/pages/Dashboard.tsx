@@ -8,8 +8,10 @@ import { RepDashboard } from './RepDashboard';
 import { AdminDashboard } from './admin/AdminDashboard';
 import { useTranslation } from 'react-i18next';
 
+import { PendingScreen } from '@/components/PendingScreen';
+
 export function Dashboard() {
-  const { role: sessionRole, user, userId } = useAuth();
+  const { role: sessionRole, user, userId, isPending, signOut } = useAuth();
   
   // Try to resolve role: Session -> Profile store -> Admin email fallback
   const getResolvedRole = () => {

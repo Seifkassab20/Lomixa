@@ -92,7 +92,11 @@ export function NotificationsPage() {
       ) : (
         <div className="space-y-2">
           {notifications.map(n => {
-            const Icon = TYPE_ICONS[n.type];
+            if (!n || !n.id) return null;
+            const Icon = TYPE_ICONS[n.type as keyof typeof TYPE_ICONS] || Bell;
+            const dateObj = n.createdAt ? new Date(n.createdAt) : new Date();
+            const isValidDate = !isNaN(dateObj.getTime());
+
             return (
               <div
                 key={n.id}
@@ -104,18 +108,20 @@ export function NotificationsPage() {
               >
                 <div className="flex items-start gap-3">
                   <div className={cn('h-8 w-8 rounded-lg flex items-center justify-center shrink-0', (TYPE_COLORS as any)[n.type] || 'text-slate-500 bg-slate-100')}>
-                    {Icon ? <Icon className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
+                    <Icon className="h-4 w-4" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <h4 className={cn('text-sm font-semibold', n.read ? 'text-gray-700 dark:text-slate-300' : 'text-gray-900 dark:text-white')}>
-                        {n.title ? (t(n.title.toLowerCase().replace(/\s+/g, '')) || n.title) : 'Notification'}
+                        {typeof n.title === 'string' ? (t(n.title.toLowerCase().replace(/\s+/g, '')) || n.title) : (t('notification') || 'Notification')}
                       </h4>
                       {!n.read && <div className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />}
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5 leading-relaxed">{n.message}</p>
+                    <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5 leading-relaxed">{n.message || ''}</p>
                     <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-1">
-                      {new Date(n.createdAt).toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-SA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      {isValidDate 
+                        ? dateObj.toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-SA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                        : ''}
                     </p>
                   </div>
                 </div>

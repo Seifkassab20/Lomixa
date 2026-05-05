@@ -666,31 +666,53 @@ export async function syncCloudData() {
       supabase.from('appointments').select('*'),
     ]);
 
-    // Only skip merging local-to-cloud push if mutation was VERY recent (within 2s)
-    // This allows background cloud-to-local sync to be more aggressive
-    // Increase safety window to 5s to prevent race conditions during cloud pull/push
-    if (Date.now() - getLastMutationTime() < 5000) return;
+    // Only skip merging local-to-cloud push if mutation was VERY recent
+    // Increase safety window to 10s to prevent race conditions during cloud pull/push
+    if (Date.now() - getLastMutationTime() < 10000) return;
 
 
+
+    const recentMutation = Date.now() - getLastMutationTime() < 10000;
+
+    const pharmaMap = new Map((pharma.data || []).map(p => [p.id, p.name]));
+    const hospitalMap = new Map((hospitals.data || []).map(h => [h.id, h.name]));
 
     if (hospitals.data) {
-      const merged = mergeData(getHospitals(), hospitals.data.map(mapHospitalFromDB), ['balance']);
+      // Profile fields are local-first — never let cloud downgrade an edited entity
+      const merged = mergeData(getHospitals(), hospitals.data.map(mapHospitalFromDB), ['balance', 'isVerified', 'isActive', 'name', 'phone', 'location', 'avatar']);
       save('hospitals', merged);
     }
     if (doctors.data) {
-      const merged = mergeData(getDoctors(), doctors.data.map(mapDoctorFromDB), ['balance']);
+      const dbDoctors = doctors.data.map(dbDoc => {
+        const freshHospitalName = hospitalMap.get(dbDoc.hospital_id);
+        if (freshHospitalName) dbDoc.hospital_name = freshHospitalName;
+        return mapDoctorFromDB(dbDoc);
+      });
+      const merged = mergeData(getDoctors(), dbDoctors, ['balance', 'isVerified', 'isActive', 'name', 'phone', 'location', 'avatar', 'title', 'specialty', 'experienceYears']);
       save('doctors', merged);
     }
     if (reps.data) {
-      const merged = mergeData(getSalesReps(), reps.data.map(mapRepFromDB), ['balance', 'target', 'visitsThisMonth']);
+      const dbReps = reps.data.map(dbRep => {
+        const freshPharmaName = pharmaMap.get(dbRep.pharma_id);
+        if (freshPharmaName) dbRep.pharma_name = freshPharmaName;
+        return mapRepFromDB(dbRep);
+      });
+      const merged = mergeData(getSalesReps(), dbReps, ['balance', 'target', 'visitsThisMonth', 'isVerified', 'isActive', 'name', 'phone', 'location', 'avatar', 'firstName', 'lastName', 'roleTitle']);
       save('sales_reps', merged);
     }
     if (pharma.data) {
-      const merged = mergeData(getPharmaCompanies(), pharma.data.map(mapPharmaFromDB), ['balance']);
+      const merged = mergeData(getPharmaCompanies(), pharma.data.map(mapPharmaFromDB), ['balance', 'isVerified', 'isActive', 'name', 'phone', 'location', 'avatar']);
       save('pharma_companies', merged);
     }
     if (visits.data) {
-      const merged = mergeData(getVisits(), visits.data.map(mapVisitFromDB), ['status', 'price', 'outcomeNotes']);
+      const dbVisits = visits.data.map(dbVisit => {
+        const freshPharmaName = pharmaMap.get(dbVisit.pharma_id);
+        if (freshPharmaName) dbVisit.pharma_name = freshPharmaName;
+        const freshHospitalName = hospitalMap.get(dbVisit.hospital_id);
+        if (freshHospitalName) dbVisit.hospital_name = freshHospitalName;
+        return mapVisitFromDB(dbVisit);
+      });
+      const merged = mergeData(getVisits(), dbVisits, ['status', 'price', 'outcomeNotes']);
       save('visits', merged);
     }
     if (notifications.data) {
@@ -881,8 +903,36 @@ export function getPharmaCompanies(): PharmaCompany[] {
 export function savePharmaCompany(company: PharmaCompany) {
   const list = getPharmaCompanies();
   const idx = list.findIndex(c => c.id === company.id);
+  const oldName = idx >= 0 ? list[idx].name : null;
+  
   if (idx >= 0) list[idx] = company; else list.push(company);
   save('pharma_companies', list);
+  
+  // Cascade name change to reps and visits if name changed
+  if (oldName && oldName !== company.name) {
+    const reps = getSalesReps();
+    const affectedReps = reps.filter(r => r.pharmaId === company.id);
+    if (affectedReps.length > 0) {
+      affectedReps.forEach(r => r.pharmaName = company.name);
+      save('sales_reps', reps);
+      // Background sync will eventually push these to cloud
+    }
+
+    const visits = getVisits();
+    const affectedVisits = visits.filter(v => v.pharmaId === company.id);
+    if (affectedVisits.length > 0) {
+      affectedVisits.forEach(v => v.pharmaName = company.name);
+      save('visits', visits);
+    }
+
+    const bundleReqs = getBundleRequests();
+    const affectedBundles = bundleReqs.filter(b => b.pharmaId === company.id);
+    if (affectedBundles.length > 0) {
+      affectedBundles.forEach(b => b.pharmaName = company.name);
+      save('bundle_requests', bundleReqs);
+    }
+  }
+
   notifyMutation();
   if (isSupabaseConfigured) {
     supabase.from('pharma_companies').upsert(mapPharmaToDB(company)).then(({error}) => error && console.error("Pharma Cloud Push Failed:", error));
@@ -1355,21 +1405,17 @@ export async function isUserAuthorized(uid?: string, role?: string): Promise<boo
   } catch (err) { return false; }
 }
 
-export async function getAuthorizationDetails(uid: string, role: string): Promise<{ authorized: boolean; reason?: string }> {
+export async function getAuthorizationDetails(uid: string, role: string): Promise<{ authorized: boolean; isPending?: boolean; reason?: string }> {
   try {
-    if (role === 'admin') return { authorized: true };
-    
-    // Administrative super-user bypass
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user?.email === 'admin@gmail.com') return { authorized: true };
-    
-    const table: Record<string, string> = { doctor: 'doctors', rep: 'sales_reps', pharma: 'pharma_companies', hospital: 'hospitals' };
-    if (!role || !table[role]) return { authorized: false, reason: 'Invalid role configuration.' };
+    if (!uid || !role) return { authorized: false };
 
-    let verified = false;
-    let active = false;
+    const table: Record<string, string> = { doctor: 'doctors', rep: 'sales_reps', pharma: 'pharma_companies', hospital: 'hospitals' };
+    if (!table[role]) return { authorized: false };
+
     let found = false;
-    let rejectionReason = "";
+    let verified = false;
+    let active = true;
+    let rejectionReason = '';
 
     const checkLocal = () => {
       let entity: any;
@@ -1388,50 +1434,53 @@ export async function getAuthorizationDetails(uid: string, role: string): Promis
       rejectionReason = localEntity.rejectionReason || '';
     } 
 
+    // ALWAYS check cloud if local says not verified or not found
     if (isSupabaseConfigured && (!localEntity || !verified)) {
-      const { data, error } = await supabase.from(table[role]).select('is_verified, is_active, rejection_reason').eq('user_id', uid).single();
+      const { data, error } = await supabase
+        .from(table[role])
+        .select('is_verified, is_active, rejection_reason')
+        .eq('user_id', uid)
+        .maybeSingle();
+
       if (!error && data) {
         found = true;
-        verified = data.is_verified === null ? true : !!data.is_verified;
-        active = data.is_active === null ? true : data.is_active !== false;
+        const cloudVerified = data.is_verified === true || data.is_verified === null;
+        const cloudActive = data.is_active !== false;
+        // Take the most permissive value: if local OR cloud says verified, treat as verified.
+        // This prevents a stale cloud record from downgrading an admin-approved local entity.
+        verified = verified || cloudVerified;
+        active = active && cloudActive;
         rejectionReason = data.rejection_reason || '';
+        
+        // SYNC: If cloud says we are verified, update local storage immediately
+        if (cloudVerified && localEntity && !localEntity.isVerified) {
+          if (role === 'pharma') savePharmaCompany({ ...localEntity, isVerified: true, isActive: cloudActive });
+          else if (role === 'hospital') saveHospital({ ...localEntity, isVerified: true, isActive: cloudActive });
+          else if (role === 'doctor') saveDoctor({ ...localEntity, isVerified: true, isActive: cloudActive });
+          else if (role === 'rep') saveSalesRep({ ...localEntity, isVerified: true, isActive: cloudActive });
+        }
       }
     }
 
-    if (!found) return { authorized: false, reason: 'Account record not found in the grid database. It may have been rejected or deleted.' };
+    if (!found) return { authorized: false };
+    if (!active) return { authorized: false, reason: rejectionReason || 'Account deactivated' };
     
-    // Strict Status Logic Enforcement:
-    if (!verified && active) {
-      if (role === 'pharma') {
-        pushNotification({
-          userId: 'admin',
-          title: 'Pending Pharma Connection',
-          message: 'An unverified Pharmaceutical company attempted to login. Please review their application in the Verification Desk.',
-          type: 'info'
-        });
-      } else if (role === 'rep') {
-        const rep = getSalesReps().find(r => r.userId === uid);
-        if (rep && rep.pharmaId) {
-          const parentPharma = getPharmaCompanies().find(p => p.id === rep.pharmaId);
-          if (parentPharma && parentPharma.userId) {
-            pushNotification({
-              userId: parentPharma.userId,
-              title: 'Pending Representative Connection',
-              message: `An unverified sales representative (${rep.name}) from your organization attempted to login. Please review their application.`,
-              type: 'info'
-            });
-          }
-        }
-      }
-      return { authorized: false, reason: `Your ${role} account is currently PENDING. It requires administrative approval before login is permitted.` };
+    if (!verified) {
+      return { authorized: true, isPending: true, reason: rejectionReason };
     }
-    if (!verified && !active) return { authorized: false, reason: rejectionReason || `Your ${role} account registration has been REJECTED.` };
-    if (verified && !active) return { authorized: false, reason: rejectionReason || `Your ${role} account is INACTIVE. Please contact LOMIXA administration or your parent organization for assistance.` };
-    
+
     return { authorized: true };
   } catch (err) {
-    return { authorized: false, reason: 'A system error occurred during security clearance.' };
+    console.error("Authorization check failed:", err);
+    return { authorized: true }; 
   }
+}
+
+export function deleteUserEntity(userId: string, role: string) {
+  if (role === 'pharma') deletePharma(userId);
+  else if (role === 'hospital') deleteHospital(userId);
+  else if (role === 'doctor') deleteDoctor(userId);
+  else if (role === 'rep') deleteSalesRep(userId);
 }
 
 export function getPharmaBundles(pharmaId: string): Bundle[] {
@@ -1486,32 +1535,35 @@ export async function ensureUserEntityExists(user: any) {
     if ((error && error.code === 'PGRST116') || !data) {
       const m = user.user_metadata;
       if (role === 'doctor' && m) {
+        const existingDoctor = getDoctors().find(d => d.userId === user.id);
         saveDoctor({
+          ...existingDoctor,
           id: user.id,
           userId: user.id,
-          name: m.full_name || user.email?.split('@')[0] || 'Doctor',
-          title: m.title || 'dr',
-          specialty: m.specialty || '',
-          experienceYears: isNaN(parseInt(m.experience_years)) ? 0 : parseInt(m.experience_years),
-          hospitalId: m.hospital_id || 'default',
-          hospitalName: m.hospital_name || 'Hospital',
-          phone: m.phone || '',
-          email: user.email || '',
-          isVerified: true,  // Pre-verified since only clinics can assign this metadata securely
-          isActive: true,
+          name: existingDoctor?.name || m.full_name || user.email?.split('@')[0] || 'Doctor',
+          title: existingDoctor?.title || m.title || 'dr',
+          specialty: existingDoctor?.specialty || m.specialty || '',
+          experienceYears: existingDoctor?.experienceYears ?? (isNaN(parseInt(m.experience_years)) ? 0 : parseInt(m.experience_years)),
+          hospitalId: existingDoctor?.hospitalId || m.hospital_id || 'default',
+          hospitalName: existingDoctor?.hospitalName || m.hospital_name || 'Hospital',
+          phone: existingDoctor?.phone || m.phone || '',
+          email: existingDoctor?.email || user.email || '',
+          isVerified: existingDoctor?.isVerified ?? true,
+          isActive: existingDoctor?.isActive ?? true,
           role: 'doctor',
-          availability: []
+          availability: existingDoctor?.availability || []
         });
       } else if (role === 'rep' && m) {
         const existingRep = getSalesReps().find(r => r.userId === user.id);
         saveSalesRep({
+          ...existingRep,
           id: user.id,
           userId: user.id,
-          name: m.full_name || user.email?.split('@')[0] || 'Rep',
-          phone: m.phone || '',
-          email: user.email || '',
-          pharmaId: m.pharma_id || 'default',
-          pharmaName: m.pharma_name || 'Pharma',
+          name: existingRep?.name || m.full_name || user.email?.split('@')[0] || 'Rep',
+          phone: existingRep?.phone || m.phone || '',
+          email: existingRep?.email || user.email || '',
+          pharmaId: existingRep?.pharmaId || m.pharma_id || 'default',
+          pharmaName: existingRep?.pharmaName || m.pharma_name || 'Pharma',
           target: existingRep?.target ?? (isNaN(parseInt(m.target)) ? 25 : parseInt(m.target)),
           visitsThisMonth: existingRep?.visitsThisMonth || 0,
           balance: existingRep?.balance || 0,
@@ -1520,23 +1572,27 @@ export async function ensureUserEntityExists(user: any) {
           role: 'rep'
         });
       } else if (role === 'pharma' && m) {
+        const existingPharma = getPharmaCompanies().find(p => p.userId === user.id);
         savePharmaCompany({
+          ...existingPharma,
           id: user.id,
           userId: user.id,
-          name: m.organization || user.email?.split('@')[1]?.split('.')[0] || 'Pharma',
-          balance: 5000,
-          isActive: true,
-          isVerified: false
+          name: existingPharma?.name || m.organization || user.email?.split('@')[1]?.split('.')[0] || 'Pharma',
+          balance: existingPharma?.balance ?? 5000,
+          isActive: existingPharma?.isActive ?? true,
+          isVerified: existingPharma?.isVerified ?? false
         });
       } else if (role === 'hospital' && m) {
+        const existingHospital = getHospitals().find(h => h.userId === user.id);
         saveHospital({
+          ...existingHospital,
           id: user.id,
           userId: user.id,
-          name: m.organization || 'Clinic/Hospital',
-          location: { country: 'sa', address: 'Regional Center' },
-          type: 'clinic',
-          isActive: true,
-          isVerified: false
+          name: existingHospital?.name || m.organization || 'Clinic/Hospital',
+          location: existingHospital?.location || { country: 'sa', address: 'Regional Center' },
+          type: existingHospital?.type || 'clinic',
+          isActive: existingHospital?.isActive ?? true,
+          isVerified: existingHospital?.isVerified ?? false
         });
       }
       return;
@@ -1545,18 +1601,20 @@ export async function ensureUserEntityExists(user: any) {
     if (error) return;
 
     // Sync cloud data to local state with conflict resolution (Local-First)
+    // IMPORTANT: isVerified and isActive are included as fallback keys so that
+    // a locally-approved entity is never downgraded by a stale cloud record.
     if (role === 'pharma') {
       const cloud = mapPharmaFromDB(data);
-      savePharmaCompany(mergeData(getPharmaCompanies(), [cloud], ['balance']).find(p => p.id === cloud.id) || cloud);
+      savePharmaCompany(mergeData(getPharmaCompanies(), [cloud], ['balance', 'isVerified', 'isActive']).find(p => p.id === cloud.id) || cloud);
     } else if (role === 'hospital') {
       const cloud = mapHospitalFromDB(data);
-      saveHospital(mergeData(getHospitals(), [cloud], ['balance']).find(h => h.id === cloud.id) || cloud);
+      saveHospital(mergeData(getHospitals(), [cloud], ['balance', 'isVerified', 'isActive']).find(h => h.id === cloud.id) || cloud);
     } else if (role === 'doctor') {
       const cloud = mapDoctorFromDB(data);
-      saveDoctor(mergeData(getDoctors(), [cloud], ['balance', 'availability']).find(d => d.id === cloud.id) || cloud);
+      saveDoctor(mergeData(getDoctors(), [cloud], ['balance', 'availability', 'isVerified', 'isActive']).find(d => d.id === cloud.id) || cloud);
     } else if (role === 'rep') {
       const cloud = mapRepFromDB(data);
-      saveSalesRep(mergeData(getSalesReps(), [cloud], ['balance', 'target', 'visitsThisMonth']).find(r => r.id === cloud.id) || cloud);
+      saveSalesRep(mergeData(getSalesReps(), [cloud], ['balance', 'target', 'visitsThisMonth', 'isVerified', 'isActive']).find(r => r.id === cloud.id) || cloud);
     }
     
     notifyMutation();

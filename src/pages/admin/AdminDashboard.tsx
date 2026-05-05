@@ -62,6 +62,8 @@ import {
   Trash2,
   Save,
   RotateCcw,
+  Mail,
+  Phone,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { Badge } from "@/components/ui/badge";
@@ -72,6 +74,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Select } from "@/components/ui/select";
 
+import { ActionConfirmModal } from "../../components/ui/ActionConfirmModal";
 import { useToast } from "../../components/ui/Toast";
 
 export function AdminDashboard() {
@@ -112,6 +115,13 @@ export function AdminDashboard() {
   const [pageSize, setPageSize] = useState(20);
   const [page, setPage] = useState(1);
   const [isInitializing, setIsInitializing] = useState(true);
+
+  // Status Toggle Modal State
+  const [statusToggleEntity, setStatusToggleEntity] = useState<{
+    type: 'hospital' | 'pharma';
+    entity: Hospital | PharmaCompany;
+    targetValue: boolean;
+  } | null>(null);
 
   const refresh = () => {
     try {
@@ -177,22 +187,28 @@ export function AdminDashboard() {
 
   const toggleHospitalStatus = (h: Hospital, forceValue?: boolean) => {
     const isNowActive = forceValue !== undefined ? forceValue : !h.isActive;
-    const msg = h.isActive 
-      ? t('confirmDeactivateUser')
-      : t('confirmActivateUser');
+    setStatusToggleEntity({
+      type: 'hospital',
+      entity: h,
+      targetValue: isNowActive
+    });
+  };
 
-    if (confirm(msg)) {
-      const updated = {
-        ...h,
-        isActive: isNowActive,
-      };
-      saveHospital(updated);
-      refresh();
-      toast(
-        `${h.name} ${updated.isActive ? "Activated" : "Deactivated"}`,
-        "info",
-      );
-    }
+  const confirmToggleHospital = () => {
+    if (!statusToggleEntity || statusToggleEntity.type !== 'hospital') return;
+    const { entity: h, targetValue: isNowActive } = statusToggleEntity;
+    
+    const updated = {
+      ...h as Hospital,
+      isActive: isNowActive,
+    };
+    saveHospital(updated);
+    refresh();
+    toast(
+      `${h.name} ${updated.isActive ? "Activated" : "Deactivated"}`,
+      "info",
+    );
+    setStatusToggleEntity(null);
   };
 
   const initiateReject = (type: "hospital" | "pharma", id: string) => {
@@ -261,22 +277,28 @@ export function AdminDashboard() {
 
   const togglePharmaStatus = (pc: PharmaCompany, forceValue?: boolean) => {
     const isNowActive = forceValue !== undefined ? forceValue : !pc.isActive;
-    const msg = pc.isActive 
-      ? t('confirmDeactivateUser')
-      : t('confirmActivateUser');
+    setStatusToggleEntity({
+      type: 'pharma',
+      entity: pc,
+      targetValue: isNowActive
+    });
+  };
 
-    if (confirm(msg)) {
-      const updated = {
-        ...pc,
-        isActive: isNowActive,
-      };
-      savePharmaCompany(updated);
-      refresh();
-      toast(
-        `${pc.name} ${updated.isActive ? "Activated" : "Deactivated"}`,
-        "info",
-      );
-    }
+  const confirmTogglePharma = () => {
+    if (!statusToggleEntity || statusToggleEntity.type !== 'pharma') return;
+    const { entity: pc, targetValue: isNowActive } = statusToggleEntity;
+
+    const updated = {
+      ...pc as PharmaCompany,
+      isActive: isNowActive,
+    };
+    savePharmaCompany(updated);
+    refresh();
+    toast(
+      `${pc.name} ${updated.isActive ? "Activated" : "Deactivated"}`,
+      "info",
+    );
+    setStatusToggleEntity(null);
   };
 
   const handleApproveRequest = (req: BundleRequest) => {
@@ -548,6 +570,35 @@ export function AdminDashboard() {
                         : hosp.location}
                     </p>
 
+                    <div className="space-y-3 mb-6">
+                      <div className="flex items-center gap-3 text-slate-400">
+                        <Mail className="w-3.5 h-3.5" />
+                        <span className="text-[10px] font-bold">{hosp.email || "N/A"}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-slate-400">
+                        <Phone className="w-3.5 h-3.5" />
+                        <span className="text-[10px] font-bold">{hosp.phone || "N/A"}</span>
+                      </div>
+                      
+                      {/* Document Checklist */}
+                      <div className="pt-3 border-t border-white/5 flex flex-wrap gap-2">
+                        {[
+                          { label: "COMM", active: hosp.documents?.commercial },
+                          { label: "ADDR", active: hosp.documents?.address },
+                          { label: "VAT", active: hosp.documents?.vat }
+                        ].map(doc => (
+                          <span key={doc.label} className={cn(
+                            "px-2 py-1 rounded-lg text-[8px] font-black border transition-colors",
+                            doc.active 
+                              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" 
+                              : "bg-slate-800/50 border-slate-700 text-slate-600"
+                          )}>
+                            {doc.label} {doc.active ? "✓" : "✗"}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
                     {!hosp.isActive && (
                       <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20">
                         <div className="flex items-center gap-2 text-red-500 mb-1">
@@ -599,6 +650,35 @@ export function AdminDashboard() {
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">
                       {t("pharmaEcosystemManagement")}
                     </p>
+
+                    <div className="space-y-3 mb-6">
+                      <div className="flex items-center gap-3 text-slate-400">
+                        <Mail className="w-3.5 h-3.5" />
+                        <span className="text-[10px] font-bold">{p.email || "N/A"}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-slate-400">
+                        <Phone className="w-3.5 h-3.5" />
+                        <span className="text-[10px] font-bold">{p.phone || "N/A"}</span>
+                      </div>
+                      
+                      {/* Document Checklist */}
+                      <div className="pt-3 border-t border-white/5 flex flex-wrap gap-2">
+                        {[
+                          { label: "COMM", active: p.documents?.commercial },
+                          { label: "ADDR", active: p.documents?.address },
+                          { label: "VAT", active: p.documents?.vat }
+                        ].map(doc => (
+                          <span key={doc.label} className={cn(
+                            "px-2 py-1 rounded-lg text-[8px] font-black border transition-colors",
+                            doc.active 
+                              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" 
+                              : "bg-slate-800/50 border-slate-700 text-slate-600"
+                          )}>
+                            {doc.label} {doc.active ? "✓" : "✗"}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
 
                     {!p.isActive && (
                       <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20">
@@ -1032,7 +1112,7 @@ export function AdminDashboard() {
                               <div>
                                 <div className="flex items-center gap-2">
                                   <h4 className="font-black text-sm text-gray-900 dark:text-white uppercase italic">
-                                    {pc.name}
+                                    {pc.name || t("pharmaCompany")}
                                   </h4>
                                   {!pc.isActive && (
                                     <Badge variant="destructive" className="text-[8px] font-black uppercase tracking-widest h-4 px-1.5">
@@ -1040,14 +1120,24 @@ export function AdminDashboard() {
                                     </Badge>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-3 mt-1">
-                                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                                    {formatCurrency(pc.balance || 0, pc.location?.country || "sa")}
-                                  </span>
-                                  <span className="text-slate-300 dark:text-slate-700">•</span>
-                                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                                    {getSalesReps().filter(r => r.pharmaId === pc.id).length} {t("reps")}
-                                  </span>
+                                <div className="flex flex-col gap-1 mt-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[8px] font-black bg-purple-500/10 text-purple-500 px-1.5 py-0.5 rounded uppercase tracking-widest">
+                                      {t("pharmaCompany")}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                                      {pc.location?.city || pc.location?.country || "Global Operations"}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-[10px] font-bold text-brand uppercase tracking-widest">
+                                      {formatCurrency(pc.balance || 0, pc.location?.country || "sa")}
+                                    </span>
+                                    <span className="text-slate-300 dark:text-slate-700">•</span>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                      {getSalesReps().filter(r => r.pharmaId === pc.id).length} {t("reps")}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -1428,6 +1518,20 @@ export function AdminDashboard() {
         )}
       </div>{" "}
       {/* End of min-w-0 */}
+      {/* --- STATUS TOGGLE MODAL --- */}
+      <ActionConfirmModal
+        isOpen={!!statusToggleEntity}
+        onClose={() => setStatusToggleEntity(null)}
+        onConfirm={() => {
+          if (statusToggleEntity?.type === 'hospital') confirmToggleHospital();
+          else confirmTogglePharma();
+        }}
+        variant={statusToggleEntity?.targetValue ? "success" : "danger"}
+        title={statusToggleEntity?.targetValue ? t("confirmActivateUser") : t("confirmDeactivateUser")}
+        message={t("actionCannotBeUndone")}
+        confirmText={statusToggleEntity?.targetValue ? t("activate") : t("deactivate")}
+      />
+
       {/* --- REJECTION REASON MODAL --- */}
       <AnimatePresence>
         {rejectingUser && (

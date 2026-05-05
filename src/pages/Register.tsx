@@ -51,9 +51,9 @@ import {
   getHospitals,
   generateId,
   pushNotification,
-  checkUserExistence,
   getBundles,
   saveBundleRequest,
+  useStoreListener,
 } from "@/lib/store";
 
 import { sendEmail, EmailTemplates } from "@/lib/email";
@@ -66,6 +66,7 @@ import {
   SPECIALTIES,
 } from "@/lib/constants";
 import { REP_PLANS, getPriceForCountry } from "@/lib/plans";
+import { getCurrencyInfo } from "@/lib/currency";
 import logo from "@/assets/logo.svg";
 
 
@@ -140,7 +141,7 @@ export function Register() {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isPending, signOut } = useAuth();
   const isRTL = i18n.language === "ar";
 
   const toggleLanguage = () => {
@@ -221,10 +222,18 @@ export function Register() {
       const actualRole = role === "subordinate" ? "rep" : role;
       setSelectedRole(actualRole);
     }
-    setExistingPharmaCompanies(getPharmaCompanies());
-    // Also load hospitals for doctor selection
-    setHospitals(getHospitals());
   }, [role]);
+
+  // Use store listener to keep dropdowns fresh with cloud sync
+  useStoreListener(() => {
+    setExistingPharmaCompanies(getPharmaCompanies());
+    setHospitals(getHospitals());
+  });
+
+  useEffect(() => {
+    setExistingPharmaCompanies(getPharmaCompanies());
+    setHospitals(getHospitals());
+  }, []);
 
   useEffect(() => {
     if (user && user.email) {
@@ -349,6 +358,7 @@ export function Register() {
         throw new Error("Please select at least one city.");
       }
 
+      // Skip existence checks if the user is already logged in (they are updating their own record)
       if (!user) {
         const emailExists = await checkUserExistence("email", formData.email);
         if (emailExists) throw new Error(t("emailAlreadyExists"));
@@ -363,7 +373,13 @@ export function Register() {
 
       if (isSupabaseConfigured) {
         if (user) {
-          const { error: authError } = await supabase.auth.updateUser({
+          const oldRole = user.user_metadata?.role;
+          if (oldRole && oldRole !== selectedRole) {
+            const { deleteUserEntity } = await import('@/lib/store');
+            deleteUserEntity(user.id, oldRole);
+          }
+
+          const updatePayload: any = {
             data: {
               role: selectedRole,
               full_name:
@@ -372,7 +388,14 @@ export function Register() {
                   : formData.organizationName,
               phone: `${formData.phoneCode}${formData.phone}`,
             }
-          });
+          };
+
+          if (formData.email !== user.email) {
+            updatePayload.email = formData.email;
+            isEmailConfirmationRequired = true;
+          }
+
+          const { error: authError } = await supabase.auth.updateUser(updatePayload);
           if (authError) throw new Error(`Profile update failed: ${authError.message}`);
           finalUserId = user.id;
         } else {
@@ -453,10 +476,10 @@ export function Register() {
           lastName: formData.lastName,
           roleTitle: formData.roleTitle,
           pharmaId: formData.pharmaId || "temp_pharma",
-          pharmaName: formData.pharmaId
-            ? existingPharmaCompanies.find((p) => p.id === formData.pharmaId)
-                ?.name
-            : formData.newPharmaName,
+          pharmaName: formData.pharmaId === "other"
+            ? formData.newPharmaName
+            : existingPharmaCompanies.find((p) => p.id === formData.pharmaId)
+                ?.name,
           products: formData.products,
           target: 100,
           visitsThisMonth: 0,
@@ -820,20 +843,55 @@ export function Register() {
                     {selectedRole === "pharma" ||
                     selectedRole === "hospital" ||
                     selectedRole === "admin" ? (
-                      <div className="md:col-span-2 space-y-3">
-                        <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic">
-                          {selectedRole === "admin"
-                            ? "Administrative Title"
-                            : t("orgName")}
-                          *
-                        </Label>
-                        <Input
-                          name="organizationName"
-                          value={formData.organizationName}
-                          onChange={handleChange}
-                          required
-                          className="h-14 rounded-2xl bg-black/40 border-slate-800 font-bold focus:border-emerald-500"
-                        />
+                      <div className="md:col-span-2 space-y-6">
+                        {selectedRole === "hospital" && (
+                          <div className="space-y-3">
+                            <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic">
+                              Facility Type*
+                            </Label>
+                            <div className="grid grid-cols-2 gap-4">
+                              <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ ...prev, hospitalType: 'hospital' }))}
+                                className={cn(
+                                  "p-4 rounded-2xl border transition-all text-sm font-bold uppercase tracking-widest",
+                                  formData.hospitalType === 'hospital'
+                                    ? "bg-emerald-500/20 border-emerald-500 text-emerald-400"
+                                    : "bg-black/40 border-slate-800 text-slate-500 hover:border-slate-700"
+                                )}
+                              >
+                                {t('hospital')}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ ...prev, hospitalType: 'clinic' }))}
+                                className={cn(
+                                  "p-4 rounded-2xl border transition-all text-sm font-bold uppercase tracking-widest",
+                                  formData.hospitalType === 'clinic'
+                                    ? "bg-emerald-500/20 border-emerald-500 text-emerald-400"
+                                    : "bg-black/40 border-slate-800 text-slate-500 hover:border-slate-700"
+                                )}
+                              >
+                                {t('clinic')}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        <div className="space-y-3">
+                          <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic">
+                            {selectedRole === "admin"
+                              ? "Administrative Title"
+                              : t("orgName")}
+                            *
+                          </Label>
+                          <Input
+                            name="organizationName"
+                            value={formData.organizationName}
+                            onChange={handleChange}
+                            required
+                            className="h-14 rounded-2xl bg-black/40 border-slate-800 font-bold focus:border-emerald-500"
+                          />
+                        </div>
                       </div>
                     ) : (
                       <>
@@ -871,7 +929,66 @@ export function Register() {
                                 <option value="">{t("selectSpecialty")}</option>
                                 {SPECIALTIES.map((spec) => (
                                   <option key={spec} value={spec}>
-                                    {t(`spec_${spec}`) || spec}
+                                    {t(`spec_${spec}`) === `spec_${spec}` ? spec : t(`spec_${spec}`)}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </>
+                        )}
+                        {selectedRole === "rep" && (
+                          <>
+                            <div className="space-y-3">
+                              <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic">
+                                {t("pharmaCompany")}*
+                              </Label>
+                              <select
+                                name="pharmaId"
+                                value={formData.pharmaId}
+                                onChange={handleChange}
+                                required
+                                className="w-full h-14 rounded-2xl bg-black/40 border border-slate-800 px-4 text-sm font-bold text-white outline-none focus:border-emerald-500 transition-all"
+                              >
+                                <option value="">{t("selectExistingCompany") || "Select Existing Company"}</option>
+                                {existingPharmaCompanies
+                                  .filter(p => p.isActive && p.isVerified)
+                                  .map((pharma) => (
+                                    <option key={pharma.id} value={pharma.id}>
+                                      {pharma.name}
+                                    </option>
+                                  ))}
+                                <option value="other">{t("otherCreateNew") || "Other (Create New)"}</option>
+                              </select>
+                            </div>
+                            {formData.pharmaId === "other" && (
+                              <div className="space-y-3">
+                                <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic">
+                                  {t("newPharmaName") || "Company Name"}*
+                                </Label>
+                                <Input
+                                  name="newPharmaName"
+                                  value={formData.newPharmaName}
+                                  onChange={handleChange}
+                                  required
+                                  className="h-14 rounded-2xl bg-black/40 border-slate-800 font-bold focus:border-emerald-500"
+                                />
+                              </div>
+                            )}
+                            <div className="space-y-3">
+                              <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic">
+                                {t("professionalRole") || "Professional Role"}*
+                              </Label>
+                              <select
+                                name="roleTitle"
+                                value={formData.roleTitle}
+                                onChange={handleChange}
+                                required
+                                className="w-full h-14 rounded-2xl bg-black/40 border border-slate-800 px-4 text-sm font-bold text-white outline-none focus:border-emerald-500 transition-all"
+                              >
+                                <option value="">{t("selectRole")}</option>
+                                {REP_ROLES.map((role) => (
+                                  <option key={role} value={role}>
+                                    {role}
                                   </option>
                                 ))}
                               </select>
@@ -905,17 +1022,33 @@ export function Register() {
                       </>
                     )}
                     <div className="space-y-3">
-                      <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic">
-                        {t("email")}*
-                      </Label>
+                      <div className="flex justify-between items-center px-2">
+                        <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest italic">
+                          {t("email")}*
+                        </Label>
+                        {user && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              signOut().then(() => window.location.href = '/select-role');
+                            }}
+                            className="text-[10px] font-bold text-emerald-500 hover:text-white uppercase tracking-widest transition-colors"
+                          >
+                            {t("notYouLogout") || "Not you? Logout"}
+                          </button>
+                        )}
+                      </div>
                       <Input
                         type="email"
                         name="email"
                         value={formData.email}
                         onChange={handleChange}
                         required
-                        readOnly={!!user}
-                        className={cn("h-14 rounded-2xl bg-black/40 border-slate-800 focus:border-emerald-500 font-bold", user && "opacity-50 cursor-not-allowed")}
+                        className={cn(
+                          "h-14 rounded-2xl bg-black/40 border-slate-800 focus:border-emerald-500 font-bold",
+                          user && !isPending && "opacity-50 cursor-not-allowed"
+                        )}
+                        readOnly={!!user && !isPending}
                       />
                     </div>
                     <div className="space-y-3">
@@ -1005,6 +1138,21 @@ export function Register() {
                         </div>
                       </div>
                     </div>
+                    {selectedRole === "hospital" && formData.hospitalType === "clinic" && (
+                      <div className="space-y-3 mt-8">
+                        <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic">
+                          {t("address")}*
+                        </Label>
+                        <Input
+                          name="address"
+                          value={formData.address}
+                          onChange={handleChange}
+                          required
+                          placeholder="Full Street Address"
+                          className="h-14 rounded-2xl bg-black/40 border-slate-800 font-bold focus:border-emerald-500 text-white"
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* REP SPECIFIC PROFILE ENHANCEMENTS */}
@@ -1269,9 +1417,9 @@ export function Register() {
                                 </span>
                               ) : (
                                 <span className="flex items-baseline gap-1">
-                                  ${bundle.price}{" "}
+                                  {Math.round(bundle.price * (getCurrencyInfo(formData.country).usdRate || 1)).toLocaleString()}{" "}
                                   <span className="text-xs uppercase opacity-40 font-bold">
-                                    USD
+                                    {getCurrencyInfo(formData.country).code}
                                   </span>
                                 </span>
                               )}
@@ -1641,16 +1789,22 @@ export function Register() {
           </div>
           <div className="space-y-8">
             <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white italic">
-              Social Context
+              {t("followUs") || "Follow Us"}
             </h4>
             <div className="flex gap-4">
-              {[Facebook, Instagram, Linkedin].map((Icon, i) => (
+              {[
+                { icon: Facebook, href: "https://www.facebook.com/share/1CnvDsiXyq/?mibextid=wwXIfr" },
+                { icon: Instagram, href: "https://www.instagram.com/lomixahealthcare?igsh=N2lnZWx4OWdpeXN2" },
+                { icon: Linkedin, href: "https://www.linkedin.com/company/lomixa-health-care/" }
+              ].map((social, i) => (
                 <a
                   key={i}
-                  href="#"
-                  className="w-12 h-12 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-brand hover:border-brand/40 transition-all shadow-xl"
+                  href={social.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-12 h-12 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-white hover:bg-emerald-500/20 hover:border-emerald-500/30 transition-all shadow-xl"
                 >
-                  <Icon className="w-5 h-5" />
+                  <social.icon className="w-5 h-5" />
                 </a>
               ))}
             </div>

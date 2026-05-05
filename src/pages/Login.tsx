@@ -62,12 +62,11 @@ export function Login() {
           return;
         }
 
-        const { getAuthorizationDetails } = await import("@/lib/store");
-        const { authorized } = await getAuthorizationDetails(
+        const { authorized, isPending } = await getAuthorizationDetails(
           user.id,
           user.user_metadata?.role,
         );
-        if (authorized) {
+        if (authorized || isPending) {
           navigate("/dashboard", { replace: true });
         } else {
           const { supabase } = await import("@/lib/supabase");
@@ -136,7 +135,7 @@ export function Login() {
         // might have been blocked by RLS policies so they can be available locally.
         await ensureUserEntityExists(freshUser);
 
-        const { authorized, reason } = await getAuthorizationDetails(
+        const { authorized, isPending, reason } = await getAuthorizationDetails(
           freshUser.id,
           actualRole,
         );

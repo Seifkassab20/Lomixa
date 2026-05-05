@@ -3,6 +3,7 @@ import { useAuth } from '@/lib/auth';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
+import { PendingScreen } from './PendingScreen';
 import { useTranslation } from 'react-i18next';
 import { Copilot } from './Copilot';
 import { isUserAuthorized, isRepSubscribed, getBundleRequests, useStoreListener } from '@/lib/store';
@@ -15,7 +16,7 @@ import { LogoutConfirmModal } from './LogoutConfirmModal';
 import logo from '@/assets/logo.svg';
 
 export function Layout() {
-  const { user, role, loading, userId, emailVerified, signOut, refreshVerificationStatus } = useAuth();
+  const { user, role, loading, userId, emailVerified, signOut, refreshVerificationStatus, isPending } = useAuth();
   const [resending, setResending] = useState(false);
    const { toast } = useToast();
   const [, setTick] = React.useState(0);
@@ -134,6 +135,28 @@ export function Layout() {
     );
   }
   */
+
+  if (!user || authorized === false) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Handle Pending Registration State globally
+  // Admins always bypass the pending screen
+  if (isPending && role !== 'admin') {
+    return (
+      <>
+        <PendingScreen role={role} onSignOut={() => setShowLogoutConfirm(true)} />
+        <LogoutConfirmModal 
+          isOpen={showLogoutConfirm} 
+          onClose={() => setShowLogoutConfirm(false)} 
+          onConfirm={() => {
+            setShowLogoutConfirm(false);
+            signOut();
+          }}
+        />
+      </>
+    );
+  }
 
   return (
     <div
