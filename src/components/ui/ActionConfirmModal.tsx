@@ -108,11 +108,11 @@ export function ActionConfirmModal({
                   <ActiveIcon className={cn("h-10 w-10", activeVariant.icon)} />
                 </div>
 
-                <div className="space-y-3">
-                  <h2 className="text-2xl font-black text-white tracking-tight italic uppercase leading-tight">
+                <div className="space-y-4">
+                  <h2 className="text-2xl font-black text-white tracking-tighter italic uppercase leading-tight">
                     {title}
                   </h2>
-                  <p className="text-slate-400 text-sm font-medium leading-relaxed max-w-[280px] mx-auto uppercase tracking-wide">
+                  <p className="text-slate-400 text-body font-medium leading-relaxed max-w-[300px] mx-auto uppercase tracking-wide">
                     {message}
                   </p>
                 </div>
@@ -124,7 +124,7 @@ export function ActionConfirmModal({
                       onClose();
                     }}
                     className={cn(
-                      "h-14 rounded-2xl text-white text-[10px] font-black uppercase tracking-[0.2em] shadow-xl transition-all active:scale-[0.98]",
+                      "h-14 rounded-2xl text-white text-button font-black uppercase tracking-[0.2em] shadow-xl transition-all active:scale-[0.98]",
                       activeVariant.button
                     )}
                   >
@@ -132,7 +132,7 @@ export function ActionConfirmModal({
                   </button>
                   <button
                     onClick={onClose}
-                    className="h-14 rounded-2xl text-slate-500 hover:text-white text-[10px] font-black uppercase tracking-[0.2em] transition-colors"
+                    className="h-14 rounded-2xl text-slate-500 hover:text-white text-button font-black uppercase tracking-[0.2em] transition-colors"
                   >
                     {cancelText || t('cancel') || 'Cancel'}
                   </button>

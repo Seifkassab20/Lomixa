@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Plus, Trash2, Calendar, Clock, Video, Phone, MapPin, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
-import { formatCurrency } from '@/lib/currency';
+import { formatCurrency, getCurrencyInfo, convertCurrency } from '@/lib/currency';
 
 const APPOINTMENT_TYPES = [
   { value: 'In Person', label: 'In-Person', icon: MapPin, defaultPrice: 300 },
@@ -17,11 +17,11 @@ const APPOINTMENT_TYPES = [
 ];
 
 export function DoctorSchedule() {
-  const { userId } = useAuth();
+  const { userId, user } = useAuth();
   const { t, i18n } = useTranslation();
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
   const [doctorId, setDoctorId] = useState<string>('');
-  const [country, setCountry] = useState('sa');
+  const [country, setCountry] = useState(user?.user_metadata?.country || 'sa');
   
   const [form, setForm] = useState({
     date: '',
@@ -248,7 +248,7 @@ export function DoctorSchedule() {
 
               {/* PRICE */}
               <div>
-                <Label className="text-slate-300 mb-2 block font-medium">{t('slotPrice') || 'Slot Price (SAR)'}</Label>
+                <Label className="text-slate-300 mb-2 block font-medium">{t('slotPrice') || 'Slot Price'} ({getCurrencyInfo(country).code})</Label>
                 <div className="relative">
                   <Input 
                     type="number" 
@@ -257,7 +257,7 @@ export function DoctorSchedule() {
                     className="w-full bg-[#1c2636] border-slate-800 border focus:border-emerald-500 text-white px-4 h-14 rounded-xl"
                   />
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold pointer-events-none uppercase">
-                    SAR
+                    {getCurrencyInfo(country).code}
                   </div>
                 </div>
               </div>
@@ -299,7 +299,14 @@ export function DoctorSchedule() {
                     <button
                       key={value}
                       type="button"
-                      onClick={() => setForm(f => ({ ...f, appointmentType: value as AvailabilitySlot['appointmentType'], price: APPOINTMENT_TYPES.find(t => t.value === value)?.defaultPrice || f.price }))}
+                      onClick={() => setForm(f => {
+                        const basePrice = APPOINTMENT_TYPES.find(t => t.value === value)?.defaultPrice || 0;
+                        return { 
+                          ...f, 
+                          appointmentType: value as AvailabilitySlot['appointmentType'], 
+                          price: basePrice || f.price 
+                        };
+                      })}
                       className={cn(
                         "flex items-center gap-3 px-5 py-3.5 rounded-xl border text-sm font-semibold transition-all",
                         form.appointmentType === value
@@ -373,7 +380,7 @@ export function DoctorSchedule() {
                           <span className="flex items-center gap-1"><Calendar className="h-3 w-3 text-slate-500" />{new Date(slot.date).toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-SA', { month: 'short', day: 'numeric' })}</span>
                           <span className="flex items-center gap-1"><Clock className="h-3 w-3 text-slate-500" />{slot.time}</span>
                           <span className="opacity-70 px-1.5 py-0.5 bg-slate-800 rounded text-[10px]">{slot.duration} {t('minutesLabel') || 'min'}</span>
-                          <span className="text-emerald-400 font-bold ml-1">{slot.price || 0}</span>
+                          <span className="text-emerald-400 font-bold ml-1">{formatCurrency(slot.price || 150, country)}</span>
                         </div>
                       </div>
                     </div>

@@ -33,6 +33,9 @@ export interface Doctor {
   avatar?: string;
   location?: Location;
   rejectionReason?: string;
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  reviewedBy?: string;
+  reviewedAt?: string;
 }
 
 export interface AvailabilitySlot {
@@ -73,6 +76,9 @@ export interface SalesRep {
     startDate: string;
   };
   rejectionReason?: string;
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  reviewedBy?: string;
+  reviewedAt?: string;
 }
 
 export interface Hospital {
@@ -94,6 +100,9 @@ export interface Hospital {
   };
   balance?: number;
   rejectionReason?: string;
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  reviewedBy?: string;
+  reviewedAt?: string;
 }
 
 
@@ -116,6 +125,9 @@ export interface PharmaCompany {
   };
   customBundles?: Bundle[];
   rejectionReason?: string;
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  reviewedBy?: string;
+  reviewedAt?: string;
 }
 
 export type VisitStatus = 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled';
@@ -458,7 +470,10 @@ function mapDoctorToDB(d: Doctor) {
     location: d.location ? JSON.stringify(d.location) : null,
     avatar: d.avatar,
     title: d.title,
-    rejection_reason: d.rejectionReason
+    rejection_reason: d.rejectionReason,
+    approval_status: d.approvalStatus,
+    reviewed_by: d.reviewedBy,
+    reviewed_at: d.reviewedAt
   };
 }
 
@@ -483,7 +498,10 @@ function mapDoctorFromDB(db: any): Doctor {
     avatar: db.avatar,
     location: location,
     availability: load(`availability_${db.id}`, []),
-    rejectionReason: db.rejection_reason
+    rejectionReason: db.rejection_reason,
+    approvalStatus: db.approval_status,
+    reviewedBy: db.reviewed_by,
+    reviewedAt: db.reviewed_at
   };
 }
 
@@ -500,7 +518,10 @@ function mapHospitalToDB(h: Hospital) {
     email: h.email,
     avatar: h.avatar,
     balance: h.balance || 0,
-    rejection_reason: h.rejectionReason
+    rejection_reason: h.rejectionReason,
+    approval_status: h.approvalStatus,
+    reviewed_by: h.reviewedBy,
+    reviewed_at: h.reviewedAt
   };
 }
 
@@ -522,7 +543,10 @@ function mapHospitalFromDB(db: any): Hospital {
     avatar: db.avatar,
     documents: docs,
     balance: db.balance || 0,
-    rejectionReason: db.rejection_reason
+    rejectionReason: db.rejection_reason,
+    approvalStatus: db.approval_status,
+    reviewedBy: db.reviewed_by,
+    reviewedAt: db.reviewed_at
   };
 }
 
@@ -539,7 +563,10 @@ function mapPharmaToDB(p: PharmaCompany) {
     avatar: p.avatar,
     phone: p.phone,
     email: p.email,
-    rejection_reason: p.rejectionReason
+    rejection_reason: p.rejectionReason,
+    approval_status: p.approvalStatus,
+    reviewed_by: p.reviewedBy,
+    reviewed_at: p.reviewedAt
   };
   if (p.customBundles) data.custom_bundles = JSON.stringify(p.customBundles);
   return data;
@@ -559,7 +586,10 @@ function mapPharmaFromDB(db: any): PharmaCompany {
     avatar: db.avatar,
     location: db.location ? (typeof db.location === 'string' ? JSON.parse(db.location) : db.location) : null,
     documents: docs,
-    rejectionReason: db.rejection_reason
+    rejectionReason: db.rejection_reason,
+    approvalStatus: db.approval_status,
+    reviewedBy: db.reviewed_by,
+    reviewedAt: db.reviewed_at
   };
 }
 
@@ -585,7 +615,10 @@ function mapRepToDB(r: SalesRep) {
     target_specialties: r.targetSpecialties ? JSON.stringify(r.targetSpecialties) : null,
     products: r.products ? JSON.stringify(r.products) : null,
     subscription: r.subscription ? JSON.stringify(r.subscription) : null,
-    rejection_reason: r.rejectionReason
+    rejection_reason: r.rejectionReason,
+    approval_status: r.approvalStatus,
+    reviewed_by: r.reviewedBy,
+    reviewed_at: r.reviewedAt
   };
 }
 
@@ -610,7 +643,10 @@ function mapRepFromDB(db: any): SalesRep {
     products: products,
     targetSpecialties: db.target_specialties ? JSON.parse(db.target_specialties) : [],
     subscription: db.subscription ? (typeof db.subscription === 'string' ? JSON.parse(db.subscription) : db.subscription) : undefined,
-    rejectionReason: db.rejection_reason
+    rejectionReason: db.rejection_reason,
+    approvalStatus: db.approval_status,
+    reviewedBy: db.reviewed_by,
+    reviewedAt: db.reviewed_at
   };
 }
 
@@ -679,7 +715,7 @@ export async function syncCloudData() {
 
     if (hospitals.data) {
       // Profile fields are local-first — never let cloud downgrade an edited entity
-      const merged = mergeData(getHospitals(), hospitals.data.map(mapHospitalFromDB), ['balance', 'isVerified', 'isActive', 'name', 'phone', 'location', 'avatar']);
+      const merged = mergeData(getHospitals(), hospitals.data.map(mapHospitalFromDB), ['balance', 'isVerified', 'isActive', 'name', 'phone', 'location', 'avatar', 'rejectionReason', 'approvalStatus', 'reviewedBy', 'reviewedAt']);
       save('hospitals', merged);
     }
     if (doctors.data) {
@@ -688,7 +724,7 @@ export async function syncCloudData() {
         if (freshHospitalName) dbDoc.hospital_name = freshHospitalName;
         return mapDoctorFromDB(dbDoc);
       });
-      const merged = mergeData(getDoctors(), dbDoctors, ['balance', 'isVerified', 'isActive', 'name', 'phone', 'location', 'avatar', 'title', 'specialty', 'experienceYears']);
+      const merged = mergeData(getDoctors(), dbDoctors, ['balance', 'isVerified', 'isActive', 'name', 'phone', 'location', 'avatar', 'title', 'specialty', 'experienceYears', 'rejectionReason', 'approvalStatus', 'reviewedBy', 'reviewedAt']);
       save('doctors', merged);
     }
     if (reps.data) {
@@ -697,11 +733,11 @@ export async function syncCloudData() {
         if (freshPharmaName) dbRep.pharma_name = freshPharmaName;
         return mapRepFromDB(dbRep);
       });
-      const merged = mergeData(getSalesReps(), dbReps, ['balance', 'target', 'visitsThisMonth', 'isVerified', 'isActive', 'name', 'phone', 'location', 'avatar', 'firstName', 'lastName', 'roleTitle']);
+      const merged = mergeData(getSalesReps(), dbReps, ['balance', 'target', 'visitsThisMonth', 'isVerified', 'isActive', 'name', 'phone', 'location', 'avatar', 'firstName', 'lastName', 'roleTitle', 'rejectionReason', 'approvalStatus', 'reviewedBy', 'reviewedAt']);
       save('sales_reps', merged);
     }
     if (pharma.data) {
-      const merged = mergeData(getPharmaCompanies(), pharma.data.map(mapPharmaFromDB), ['balance', 'isVerified', 'isActive', 'name', 'phone', 'location', 'avatar']);
+      const merged = mergeData(getPharmaCompanies(), pharma.data.map(mapPharmaFromDB), ['balance', 'isVerified', 'isActive', 'name', 'phone', 'location', 'avatar', 'rejectionReason', 'approvalStatus', 'reviewedBy', 'reviewedAt']);
       save('pharma_companies', merged);
     }
     if (visits.data) {
@@ -769,14 +805,19 @@ export async function syncCloudData() {
   }
 }
 
-// Global cleanup interval for local state
-setInterval(() => {
-  purgeExpiredSlots();
-  purgeExpiredAppointments();
-}, 300000); // Every 5 minutes
+// Clear existing intervals for Vite HMR
+if ((window as any).__storeIntervals) {
+  (window as any).__storeIntervals.forEach((id: any) => clearInterval(id));
+}
+(window as any).__storeIntervals = [
+  setInterval(() => {
+    purgeExpiredSlots();
+    purgeExpiredAppointments();
+  }, 300000), // Every 5 minutes
+  setInterval(syncCloudData, 60000)
+];
 
 setTimeout(syncCloudData, 1000);
-setInterval(syncCloudData, 60000);
 
 
 // ── DATA ACCESS & MUTATION FUNCTIONS ─────────────────────────────
@@ -794,7 +835,12 @@ export function saveHospital(hospital: Hospital) {
   save('hospitals', list);
   notifyMutation();
   if (isSupabaseConfigured) {
-    supabase.from('hospitals').upsert(mapHospitalToDB(hospital)).then(({error}) => error && console.error("Hospital Cloud Push Failed:", error));
+    supabase.from('hospitals').upsert(mapHospitalToDB(hospital)).then(({error}) => {
+      if (error) {
+        console.error("Hospital Cloud Push Failed:", error);
+        window.dispatchEvent(new CustomEvent('lomixa_error', { detail: `Cloud Push Failed: ${error.message}` }));
+      }
+    });
   }
 }
 export function deleteHospital(id: string) {
@@ -1416,6 +1462,7 @@ export async function getAuthorizationDetails(uid: string, role: string): Promis
     let verified = false;
     let active = true;
     let rejectionReason = '';
+    let approvalStatus: 'pending' | 'approved' | 'rejected' = 'pending';
 
     const checkLocal = () => {
       let entity: any;
@@ -1432,27 +1479,29 @@ export async function getAuthorizationDetails(uid: string, role: string): Promis
       verified = !!localEntity.isVerified;
       active = localEntity.isActive !== false;
       rejectionReason = localEntity.rejectionReason || '';
+      approvalStatus = localEntity.approvalStatus || (verified ? 'approved' : (rejectionReason ? 'rejected' : 'pending'));
     } 
 
     // ALWAYS check cloud if local says not verified or not found
     if (isSupabaseConfigured && (!localEntity || !verified)) {
       const { data, error } = await supabase
         .from(table[role])
-        .select('is_verified, is_active, rejection_reason')
+        .select('is_verified, is_active, rejection_reason, approval_status')
         .eq('user_id', uid)
         .maybeSingle();
 
       if (!error && data) {
+        console.log("[AUTH DEBUG] Cloud data:", data);
         found = true;
+        // ... (unchanged code)
         const cloudVerified = data.is_verified === true || data.is_verified === null;
         const cloudActive = data.is_active !== false;
-        // Take the most permissive value: if local OR cloud says verified, treat as verified.
-        // This prevents a stale cloud record from downgrading an admin-approved local entity.
         verified = verified || cloudVerified;
         active = active && cloudActive;
-        rejectionReason = data.rejection_reason || '';
-        
-        // SYNC: If cloud says we are verified, update local storage immediately
+        rejectionReason = data.rejection_reason || rejectionReason;
+        approvalStatus = data.approval_status || (cloudVerified ? 'approved' : (data.rejection_reason ? 'rejected' : 'pending'));
+        console.log("[AUTH DEBUG] Rejection Reason after merge:", rejectionReason);
+        // ... (unchanged code)
         if (cloudVerified && localEntity && !localEntity.isVerified) {
           if (role === 'pharma') savePharmaCompany({ ...localEntity, isVerified: true, isActive: cloudActive });
           else if (role === 'hospital') saveHospital({ ...localEntity, isVerified: true, isActive: cloudActive });
@@ -1465,7 +1514,8 @@ export async function getAuthorizationDetails(uid: string, role: string): Promis
     if (!found) return { authorized: false };
     if (!active) return { authorized: false, reason: rejectionReason || 'Account deactivated' };
     
-    if (!verified) {
+    console.log("[AUTH DEBUG] Final Return for !verified:", { isPending: true, reason: rejectionReason });
+    if (!verified || approvalStatus === 'pending' || approvalStatus === 'rejected') {
       return { authorized: true, isPending: true, reason: rejectionReason };
     }
 
@@ -1551,7 +1601,9 @@ export async function ensureUserEntityExists(user: any) {
           isVerified: existingDoctor?.isVerified ?? true,
           isActive: existingDoctor?.isActive ?? true,
           role: 'doctor',
-          availability: existingDoctor?.availability || []
+          availability: existingDoctor?.availability || [],
+          approvalStatus: existingDoctor?.approvalStatus || (existingDoctor?.isVerified ? 'approved' : 'pending'),
+          rejectionReason: existingDoctor?.rejectionReason
         });
       } else if (role === 'rep' && m) {
         const existingRep = getSalesReps().find(r => r.userId === user.id);
@@ -1569,7 +1621,9 @@ export async function ensureUserEntityExists(user: any) {
           balance: existingRep?.balance || 0,
           isVerified: existingRep?.isVerified ?? true,
           isActive: existingRep?.isActive ?? true,
-          role: 'rep'
+          role: 'rep',
+          approvalStatus: existingRep?.approvalStatus || (existingRep?.isVerified ? 'approved' : 'pending'),
+          rejectionReason: existingRep?.rejectionReason
         });
       } else if (role === 'pharma' && m) {
         const existingPharma = getPharmaCompanies().find(p => p.userId === user.id);
@@ -1580,7 +1634,9 @@ export async function ensureUserEntityExists(user: any) {
           name: existingPharma?.name || m.organization || user.email?.split('@')[1]?.split('.')[0] || 'Pharma',
           balance: existingPharma?.balance ?? 5000,
           isActive: existingPharma?.isActive ?? true,
-          isVerified: existingPharma?.isVerified ?? false
+          isVerified: existingPharma?.isVerified ?? false,
+          approvalStatus: existingPharma?.approvalStatus || (existingPharma?.isVerified ? 'approved' : 'pending'),
+          rejectionReason: existingPharma?.rejectionReason
         });
       } else if (role === 'hospital' && m) {
         const existingHospital = getHospitals().find(h => h.userId === user.id);
@@ -1592,7 +1648,9 @@ export async function ensureUserEntityExists(user: any) {
           location: existingHospital?.location || { country: 'sa', address: 'Regional Center' },
           type: existingHospital?.type || 'clinic',
           isActive: existingHospital?.isActive ?? true,
-          isVerified: existingHospital?.isVerified ?? false
+          isVerified: existingHospital?.isVerified ?? false,
+          approvalStatus: existingHospital?.approvalStatus || (existingHospital?.isVerified ? 'approved' : 'pending'),
+          rejectionReason: existingHospital?.rejectionReason
         });
       }
       return;
@@ -1605,16 +1663,16 @@ export async function ensureUserEntityExists(user: any) {
     // a locally-approved entity is never downgraded by a stale cloud record.
     if (role === 'pharma') {
       const cloud = mapPharmaFromDB(data);
-      savePharmaCompany(mergeData(getPharmaCompanies(), [cloud], ['balance', 'isVerified', 'isActive']).find(p => p.id === cloud.id) || cloud);
+      savePharmaCompany(mergeData(getPharmaCompanies(), [cloud], ['balance', 'isVerified', 'isActive', 'rejectionReason', 'approvalStatus', 'reviewedBy', 'reviewedAt']).find(p => p.id === cloud.id) || cloud);
     } else if (role === 'hospital') {
       const cloud = mapHospitalFromDB(data);
-      saveHospital(mergeData(getHospitals(), [cloud], ['balance', 'isVerified', 'isActive']).find(h => h.id === cloud.id) || cloud);
+      saveHospital(mergeData(getHospitals(), [cloud], ['balance', 'isVerified', 'isActive', 'rejectionReason', 'approvalStatus', 'reviewedBy', 'reviewedAt']).find(h => h.id === cloud.id) || cloud);
     } else if (role === 'doctor') {
       const cloud = mapDoctorFromDB(data);
-      saveDoctor(mergeData(getDoctors(), [cloud], ['balance', 'availability', 'isVerified', 'isActive']).find(d => d.id === cloud.id) || cloud);
+      saveDoctor(mergeData(getDoctors(), [cloud], ['balance', 'availability', 'isVerified', 'isActive', 'rejectionReason', 'approvalStatus', 'reviewedBy', 'reviewedAt']).find(d => d.id === cloud.id) || cloud);
     } else if (role === 'rep') {
       const cloud = mapRepFromDB(data);
-      saveSalesRep(mergeData(getSalesReps(), [cloud], ['balance', 'target', 'visitsThisMonth', 'isVerified', 'isActive']).find(r => r.id === cloud.id) || cloud);
+      saveSalesRep(mergeData(getSalesReps(), [cloud], ['balance', 'target', 'visitsThisMonth', 'isVerified', 'isActive', 'rejectionReason', 'approvalStatus', 'reviewedBy', 'reviewedAt']).find(r => r.id === cloud.id) || cloud);
     }
     
     notifyMutation();

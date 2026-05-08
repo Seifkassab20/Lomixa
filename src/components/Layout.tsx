@@ -16,10 +16,19 @@ import { LogoutConfirmModal } from './LogoutConfirmModal';
 import logo from '@/assets/logo.svg';
 
 export function Layout() {
-  const { user, role, loading, userId, emailVerified, signOut, refreshVerificationStatus, isPending } = useAuth();
+  const { user, role, loading, userId, emailVerified, signOut, refreshVerificationStatus, isPending, rejectionReason } = useAuth();
   const [resending, setResending] = useState(false);
    const { toast } = useToast();
   const [, setTick] = React.useState(0);
+  useEffect(() => {
+    const handleLomixaError = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      toast(customEvent.detail, 'error');
+    };
+    window.addEventListener('lomixa_error', handleLomixaError);
+    return () => window.removeEventListener('lomixa_error', handleLomixaError);
+  }, []);
+
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   useStoreListener(() => setTick(n => n + 1));
 
@@ -145,7 +154,7 @@ export function Layout() {
   if (isPending && role !== 'admin') {
     return (
       <>
-        <PendingScreen role={role} onSignOut={() => setShowLogoutConfirm(true)} />
+        <PendingScreen role={role} rejectionReason={rejectionReason} onSignOut={() => setShowLogoutConfirm(true)} />
         <LogoutConfirmModal 
           isOpen={showLogoutConfirm} 
           onClose={() => setShowLogoutConfirm(false)} 
@@ -166,7 +175,7 @@ export function Layout() {
       <Sidebar />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden relative">
         <Topbar />
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-8 lg:p-12">
           <Outlet />
         </main>
         <Copilot />

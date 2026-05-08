@@ -12,6 +12,7 @@ interface AuthContextType {
   role: Role;
   emailVerified: boolean;
   isPending: boolean;
+  rejectionReason?: string;
   loading: boolean;
   signOut: () => Promise<void>;
   refreshVerificationStatus: () => Promise<void>;
@@ -26,6 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<Role>(null);
   const [emailVerified, setEmailVerified] = useState<boolean>(true);
   const [isPending, setIsPending] = useState<boolean>(false);
+  const [rejectionReason, setRejectionReason] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
 
 
@@ -112,8 +114,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Check pending status from store
     if (uid && role) {
       import('./store').then(async ({ getAuthorizationDetails }) => {
-        const { isPending } = await getAuthorizationDetails(uid, role);
+        const { isPending, reason } = await getAuthorizationDetails(uid, role);
         setIsPending(!!isPending);
+        setRejectionReason(reason);
       });
     }
     setEmailVerified(true);
@@ -126,7 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, userId: user?.id || null, role, emailVerified, isPending, loading, signOut, refreshVerificationStatus, t }}>
+    <AuthContext.Provider value={{ user, userId: user?.id || null, role, emailVerified, isPending, rejectionReason, loading, signOut, refreshVerificationStatus, t }}>
       {children}
     </AuthContext.Provider>
   );

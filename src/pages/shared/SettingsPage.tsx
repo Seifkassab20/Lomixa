@@ -300,6 +300,12 @@ export function SettingsPage() {
       }
     }
 
+    if (isSupabaseConfigured) {
+      supabase.auth.updateUser({
+        data: { country: form.country, phone: finalData.phone, full_name: form.fullName }
+      }).catch(console.error);
+    }
+
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
     toast(t("profileUpdated") || "Changes Saved", "success");

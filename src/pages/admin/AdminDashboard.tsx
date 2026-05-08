@@ -153,7 +153,15 @@ export function AdminDashboard() {
     if (type === "hospital") {
       const h = hospitals.find((hosp) => hosp.id === id);
       if (h) {
-        saveHospital({ ...h, isVerified: true, isActive: true, rejectionReason: "" });
+        saveHospital({ 
+          ...h, 
+          isVerified: true, 
+          isActive: true, 
+          rejectionReason: "", 
+          approvalStatus: 'approved',
+          reviewedBy: userId || undefined,
+          reviewedAt: new Date().toISOString()
+        });
         console.log(
           `[SIMULATED MAIL] To Hospital | ID: ${h.id} | Subject: Infrastructure Verified`,
         );
@@ -168,7 +176,15 @@ export function AdminDashboard() {
     } else if (type === "pharma") {
       const p = pharma.find((ph) => ph.id === id);
       if (p) {
-        savePharmaCompany({ ...p, isVerified: true, isActive: true, rejectionReason: "" });
+        savePharmaCompany({ 
+          ...p, 
+          isVerified: true, 
+          isActive: true, 
+          rejectionReason: "", 
+          approvalStatus: 'approved',
+          reviewedBy: userId || undefined,
+          reviewedAt: new Date().toISOString()
+        });
         console.log(
           `[SIMULATED MAIL] To Pharma | ID: ${p.id} | Subject: Organization Verified`,
         );
@@ -230,9 +246,31 @@ export function AdminDashboard() {
     );
 
     if (type === "hospital") {
-      deleteHospital(id);
+      const h = hospitals.find((hosp) => hosp.id === id);
+      if (h) {
+        saveHospital({ 
+          ...h, 
+          isVerified: false, 
+          isActive: true, 
+          rejectionReason: String(rejectionReason),
+          approvalStatus: 'rejected',
+          reviewedBy: userId || undefined,
+          reviewedAt: new Date().toISOString()
+        });
+      }
     } else if (type === "pharma") {
-      deletePharma(id);
+      const p = pharma.find((ph) => ph.id === id);
+      if (p) {
+        savePharmaCompany({ 
+          ...p, 
+          isVerified: false, 
+          isActive: true, 
+          rejectionReason: String(rejectionReason),
+          approvalStatus: 'rejected',
+          reviewedBy: userId || undefined,
+          reviewedAt: new Date().toISOString()
+        });
+      }
     }
 
     setRejectingUser(null);
@@ -409,8 +447,13 @@ export function AdminDashboard() {
     new Map<string, Hospital>((hospitals || []).filter(h => h && h.id).map((h) => [h.id, h])).values(),
   ), [hospitals]);
 
-  const pendingHosps = useMemo(() => uniqueHospitals.filter((h) => h.isVerified === false), [uniqueHospitals]);
-  const pendingPharmas = useMemo(() => uniquePharma.filter((p) => p.isVerified === false), [uniquePharma]);
+  const pendingHosps = useMemo(() => {
+    const p = uniqueHospitals.filter((h) => h.isVerified === false && !h.rejectionReason);
+    console.log("[DEBUG AdminDashboard] uniqueHospitals:", uniqueHospitals);
+    console.log("[DEBUG AdminDashboard] pendingHosps:", p);
+    return p;
+  }, [uniqueHospitals]);
+  const pendingPharmas = useMemo(() => uniquePharma.filter((p) => p.isVerified === false && !p.rejectionReason), [uniquePharma]);
   const totalPendingVerification = pendingHosps.length + pendingPharmas.length;
 
   const filteredPharma = useMemo(() => uniquePharma.filter(
@@ -535,22 +578,22 @@ export function AdminDashboard() {
             </div>
 
             {totalPendingVerification === 0 ? (
-              <div className="bg-brand/5 border border-brand/20 rounded-[3rem] p-16 text-center">
-                <ShieldCheck className="w-16 h-16 text-brand/20 mx-auto mb-6" />
-                <h3 className="text-2xl font-black text-brand uppercase italic tracking-tighter">
+              <div className="glass-card shadow-premium border dark:border-white/5 rounded-[3rem] p-24 text-center">
+                <ShieldCheck className="w-20 h-20 text-emerald-500/20 mx-auto mb-8 animate-pulse" />
+                <h3 className="text-3xl font-black text-emerald-500 uppercase italic tracking-tighter">
                   {t("regionalGridSecure")}
                 </h3>
-                <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mt-2">
+                <p className="text-slate-500 font-bold uppercase tracking-[0.3em] text-xs mt-4 opacity-60">
                   {t("allFacilityVerified")}
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {/* Hospitals */}
                 {pendingHosps.map((hosp) => (
                   <div
                     key={hosp.id}
-                    className="bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-[2.5rem] p-8 hover:shadow-2xl transition-all border-t-8 border-t-blue-500 shadow-xl relative overflow-hidden group flex flex-col"
+                    className="glass-card shadow-premium border dark:border-white/5 rounded-[3rem] p-10 hover:shadow-2xl transition-all border-t-[12px] border-t-blue-500 relative overflow-hidden group flex flex-col min-h-[480px]"
                   >
                     <div className="absolute -top-4 -right-4 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl group-hover:bg-blue-500/10 transition-colors"></div>
                     <div className="flex items-start justify-between mb-6">
@@ -588,9 +631,9 @@ export function AdminDashboard() {
                           { label: "VAT", active: hosp.documents?.vat }
                         ].map(doc => (
                           <span key={doc.label} className={cn(
-                            "px-2 py-1 rounded-lg text-[8px] font-black border transition-colors",
+                            "px-2.5 py-1 rounded-lg text-[8px] font-black border transition-all duration-500",
                             doc.active 
-                              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" 
+                              ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)] animate-pulse-slow" 
                               : "bg-slate-800/50 border-slate-700 text-slate-600"
                           )}>
                             {doc.label} {doc.active ? "✓" : "✗"}
@@ -624,7 +667,7 @@ export function AdminDashboard() {
                         onClick={() => initiateReject("hospital", hosp.id)}
                       >
                         {t("reject")}
-                      </Button>
+                       </Button>
                     </div>
                   </div>
                 ))}
@@ -633,7 +676,7 @@ export function AdminDashboard() {
                 {pendingPharmas.map((p) => (
                   <div
                     key={p.id}
-                    className="bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-[2.5rem] p-8 hover:shadow-2xl transition-all border-t-8 border-t-purple-500 shadow-xl relative overflow-hidden group flex flex-col"
+                    className="glass-card shadow-premium border dark:border-white/5 rounded-[3rem] p-10 hover:shadow-2xl transition-all border-t-[12px] border-t-purple-500 relative overflow-hidden group flex flex-col min-h-[480px]"
                   >
                     <div className="absolute -top-4 -right-4 w-24 h-24 bg-purple-500/5 rounded-full blur-2xl group-hover:bg-purple-500/10 transition-colors"></div>
                     <div className="flex items-start justify-between mb-6">
@@ -669,9 +712,9 @@ export function AdminDashboard() {
                           { label: "VAT", active: p.documents?.vat }
                         ].map(doc => (
                           <span key={doc.label} className={cn(
-                            "px-2 py-1 rounded-lg text-[8px] font-black border transition-colors",
+                            "px-2.5 py-1 rounded-lg text-[8px] font-black border transition-all duration-500",
                             doc.active 
-                              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" 
+                              ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)] animate-pulse-slow" 
                               : "bg-slate-800/50 border-slate-700 text-slate-600"
                           )}>
                             {doc.label} {doc.active ? "✓" : "✗"}
@@ -973,7 +1016,7 @@ export function AdminDashboard() {
         {activeTab === "ecosystem" && (
           <>
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {[
                 {
                   label: t("totalPharma"),
@@ -1006,24 +1049,13 @@ export function AdminDashboard() {
               ].map((stat, i) => (
                 <div
                   key={i}
-                  className="bg-app-card border dark:border-slate-800 rounded-3xl p-6 relative overflow-hidden group"
+                  className="glass-card shadow-premium border dark:border-white/5 rounded-[2rem] p-8 transition-all hover:scale-[1.02] group"
                 >
-                  <div
-                    className={`absolute top-0 right-0 w-24 h-24 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 transition-colors ${
-                      stat.color === "emerald"
-                        ? "bg-brand/5 group-hover:bg-brand/10"
-                        : stat.color === "blue"
-                          ? "bg-blue-500/5 group-hover:bg-blue-500/10"
-                          : stat.color === "purple"
-                            ? "bg-purple-500/5 group-hover:bg-purple-500/10"
-                            : "bg-amber-500/5 group-hover:bg-amber-500/10"
-                    }`}
-                  ></div>
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center justify-between mb-6">
                     <div
-                      className={`p-3 rounded-2xl ${
+                      className={`h-12 w-12 rounded-2xl flex items-center justify-center shadow-inner ${
                         stat.color === "emerald"
-                          ? "bg-brand/10 text-brand"
+                          ? "bg-emerald-500/10 text-emerald-500"
                           : stat.color === "blue"
                             ? "bg-blue-500/10 text-blue-500"
                             : stat.color === "purple"
@@ -1031,16 +1063,16 @@ export function AdminDashboard() {
                               : "bg-amber-500/10 text-amber-500"
                       }`}
                     >
-                      <stat.icon className="w-5 h-5" />
+                      <stat.icon className="w-6 h-6" />
                     </div>
-                    <span className="text-[10px] font-black text-brand bg-brand/10 px-2 py-1 rounded-lg flex items-center gap-1">
+                    <span className="text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-3 py-1.5 rounded-xl flex items-center gap-1 uppercase tracking-widest">
                       <ArrowUpRight className="w-3 h-3" /> {stat.trend}
                     </span>
                   </div>
-                  <div className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">
+                  <div className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter italic">
                     {stat.value}
                   </div>
-                  <div className="text-[10px] uppercase font-black tracking-widest text-slate-500 mt-1">
+                  <div className="text-[10px] uppercase font-black tracking-[0.2em] text-slate-500 mt-2 opacity-60">
                     {stat.label}
                   </div>
                 </div>
@@ -1049,27 +1081,27 @@ export function AdminDashboard() {
 
             {/* Ecosystem Units Grid */}
             <div className="space-y-8">
-              <div className="flex flex-col md:flex-row gap-6 md:items-center justify-between bg-white dark:bg-slate-900 border dark:border-slate-800 p-8 rounded-[2.5rem] shadow-xl">
+              <div className="glass-card shadow-premium border dark:border-white/5 p-8 rounded-[3rem] flex flex-col md:flex-row gap-8 md:items-center justify-between">
                 <div className="flex items-center gap-6 flex-1 max-w-2xl">
                   <div className="relative flex-1">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
                     <Input
                       placeholder={t("searchOrganization") || "Search organizations..."}
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      className="pl-12 h-14 bg-slate-50 dark:bg-black/40 border-slate-200 dark:border-slate-800 rounded-2xl focus:border-brand/50 transition-all font-bold"
+                      className="pl-14 h-16 bg-slate-50 dark:bg-black/40 border-slate-200 dark:border-white/5 rounded-[2rem] focus:border-emerald-500/50 transition-all font-bold text-lg"
                     />
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-6 px-4">
                    <div className="flex flex-col items-end">
-                      <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest leading-none mb-1">Grid Density</span>
-                      <span className="text-xl font-black italic tracking-tighter text-gray-900 dark:text-white uppercase">{uniquePharma.length + uniqueHospitals.length} Units</span>
+                      <span className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] leading-none mb-2 opacity-60">Grid Density</span>
+                      <span className="text-2xl font-black italic tracking-tighter text-slate-900 dark:text-white uppercase leading-none">{uniquePharma.length + uniqueHospitals.length} Units</span>
                    </div>
-                   <div className="h-12 w-[1px] bg-slate-200 dark:bg-slate-800 mx-2" />
+                   <div className="h-12 w-[2px] bg-slate-200 dark:bg-white/5" />
                    <div className="flex flex-col items-end">
-                      <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest leading-none mb-1">Verification Rate</span>
-                      <span className="text-xl font-black italic tracking-tighter text-brand uppercase">
+                      <span className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] leading-none mb-2 opacity-60">Verification Rate</span>
+                      <span className="text-2xl font-black italic tracking-tighter text-emerald-500 uppercase leading-none">
                         {Math.round(((uniquePharma.filter(p => p.isVerified).length + uniqueHospitals.filter(h => h.isVerified).length) / (uniquePharma.length + uniqueHospitals.length || 1)) * 100)}%
                       </span>
                    </div>

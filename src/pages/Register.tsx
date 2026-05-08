@@ -54,6 +54,9 @@ import {
   getBundles,
   saveBundleRequest,
   useStoreListener,
+  checkUserExistence,
+  deleteUserEntity,
+  saveProfile,
 } from "@/lib/store";
 
 import { sendEmail, EmailTemplates } from "@/lib/email";
@@ -375,7 +378,6 @@ export function Register() {
         if (user) {
           const oldRole = user.user_metadata?.role;
           if (oldRole && oldRole !== selectedRole) {
-            const { deleteUserEntity } = await import('@/lib/store');
             deleteUserEntity(user.id, oldRole);
           }
 
@@ -387,6 +389,7 @@ export function Register() {
                   ? `${formData.firstName} ${formData.lastName}`
                   : formData.organizationName,
               phone: `${formData.phoneCode}${formData.phone}`,
+              country: formData.country,
             }
           };
 
@@ -411,6 +414,7 @@ export function Register() {
                       ? `${formData.firstName} ${formData.lastName}`
                       : formData.organizationName,
                   phone: `${formData.phoneCode}${formData.phone}`,
+                  country: formData.country,
                 },
               },
             },
@@ -494,7 +498,6 @@ export function Register() {
           (p) => p.id === formData.selectedBundleId,
         );
         if (selectedPlan) {
-          const { getCurrencyInfo } = await import("@/lib/currency");
           const currency = getCurrencyInfo(formData.country || "sa");
           const localPrice = Math.round(
             getPriceForCountry(
@@ -559,7 +562,6 @@ export function Register() {
             (b) => b.id === formData.selectedBundleId,
           );
           if (selectedBundle) {
-            const { getCurrencyInfo } = await import("@/lib/currency");
             const currency = getCurrencyInfo(formData.country || "sa");
             const localBalance = Math.round(
               selectedBundle.balance * currency.usdRate,
@@ -601,7 +603,6 @@ export function Register() {
           });
         }
       } else if (selectedRole === "admin") {
-        const { saveProfile } = await import("@/lib/store");
         saveProfile(finalUserId, {
           ...profileData,
           name: formData.organizationName || "System Administrator",
@@ -1307,29 +1308,52 @@ export function Register() {
                           Verification Documents
                         </h3>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                         {[
                           { id: "commCertificate", label: "Commercial Cert" },
                           { id: "natAddress", label: "National Address" },
                           { id: "vatCertificate", label: "VAT Certificate" },
-                        ].map((doc) => (
-                          <div
-                            key={doc.id}
-                            className="relative p-6 rounded-3xl bg-slate-900/50 border border-slate-800 hover:border-emerald-500/30 transition-all flex flex-col items-center gap-4 text-center"
-                          >
-                            <div className="w-12 h-12 rounded-2xl bg-slate-800 text-slate-600 flex items-center justify-center">
-                              <Upload className="w-6 h-6" />
+                        ].map((doc) => {
+                          const uploadedFile = (formData as any)[doc.id];
+                          return (
+                            <div
+                              key={doc.id}
+                              className={cn(
+                                "relative p-10 rounded-[2.5rem] bg-slate-900/60 border transition-all flex flex-col items-center gap-6 text-center shadow-xl group",
+                                uploadedFile 
+                                  ? "border-emerald-500/40 bg-emerald-500/5 shadow-[0_0_20px_rgba(16,185,129,0.1)]" 
+                                  : "border-white/5 hover:border-emerald-500/50 hover:bg-white/5"
+                              )}
+                            >
+                              <div className={cn(
+                                "w-16 h-16 rounded-2xl flex items-center justify-center shadow-inner transition-all duration-500",
+                                uploadedFile 
+                                  ? "bg-emerald-500/20 text-emerald-500 scale-110" 
+                                  : "bg-white/5 text-slate-500 group-hover:scale-110 group-hover:text-emerald-500"
+                              )}>
+                                {uploadedFile ? <Check className="w-8 h-8" /> : <Upload className="w-8 h-8" />}
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <span className={cn(
+                                  "text-[10px] font-black uppercase tracking-[0.2em] transition-colors",
+                                  uploadedFile ? "text-emerald-400" : "text-slate-500 group-hover:text-white"
+                                )}>
+                                  {doc.label}
+                                </span>
+                                {uploadedFile && (
+                                  <span className="text-[8px] font-bold text-slate-400 line-clamp-1 italic max-w-[120px]">
+                                    {uploadedFile.name}
+                                  </span>
+                                )}
+                              </div>
+                              <input
+                                type="file"
+                                onChange={(e) => handleFileChange(e, doc.id)}
+                                className="absolute inset-0 opacity-0 cursor-pointer"
+                              />
                             </div>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                              {doc.label}
-                            </span>
-                            <input
-                              type="file"
-                              onChange={(e) => handleFileChange(e, doc.id)}
-                              className="absolute inset-0 opacity-0 cursor-pointer"
-                            />
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -1367,7 +1391,7 @@ export function Register() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     {(selectedRole === "rep" ? REP_PLANS : getBundles()).map(
                       (bundle: any) => (
                         <button
@@ -1380,7 +1404,7 @@ export function Register() {
                             }))
                           }
                           className={cn(
-                            "relative p-8 rounded-[2.5rem] border-2 transition-all text-left flex flex-col h-full group overflow-hidden bg-black/40 backdrop-blur-md hover:border-white/20",
+                            "relative p-10 rounded-[2.5rem] border-2 transition-all text-left flex flex-col h-full group overflow-hidden bg-white/5 backdrop-blur-md hover:border-white/20",
                             formData.selectedBundleId === bundle.id
                               ? selectedRole === "rep"
                                 ? "border-orange-500 bg-orange-500/10 shadow-3xl shadow-orange-500/20"

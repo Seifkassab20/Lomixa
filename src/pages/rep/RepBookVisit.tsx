@@ -31,7 +31,7 @@ export function RepBookVisit() {
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [meetingRoom, setMeetingRoom] = useState<string | null>(null);
   const [balance, setBalance] = useState(0);
-  const [country, setCountry] = useState('sa');
+  const [country, setCountry] = useState(user?.user_metadata?.country || 'sa');
 
   const reps = getSalesReps();
   const currentRep = reps.find(r => r.userId === userId);
@@ -551,7 +551,7 @@ export function RepBookVisit() {
                           <Clock className="h-3.5 w-3.5 text-gray-400" />
                           <span>{slot.time}</span>
                           <span className="text-gray-400">{slot.duration}m</span>
-                          <span className="text-emerald-400 font-bold ml-1">{slot.price || 150}</span>
+                          <span className="text-emerald-400 font-bold ml-1">{formatCurrency(slot.price || 150, country)}</span>
                         </div>
                       </button>
                     ))}

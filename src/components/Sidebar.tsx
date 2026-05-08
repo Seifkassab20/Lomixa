@@ -89,8 +89,8 @@ export function Sidebar() {
             href: "/admin-control/verification",
             icon: ShieldCheck,
             badge:
-              (getHospitals() || []).filter((h) => h && !h.isVerified).length +
-              (getPharmaCompanies() || []).filter((p) => p && !p.isVerified)
+              (getHospitals() || []).filter((h) => h && !h.isVerified && !h.rejectionReason).length +
+              (getPharmaCompanies() || []).filter((p) => p && !p.isVerified && !p.rejectionReason)
                 .length,
           },
           {
@@ -279,10 +279,10 @@ export function Sidebar() {
         </div>
         {!collapsed && (
           <div className="overflow-hidden">
-            <div className="text-lg font-black italic tracking-tighter uppercase text-gray-900 dark:text-white leading-none">
+            <div className="text-sm font-black italic tracking-tighter uppercase text-gray-900 dark:text-white leading-tight">
               {t("appName")}
             </div>
-            <div className="text-[10px] text-gray-400 dark:text-slate-500 whitespace-nowrap">
+            <div className="text-[10px] font-bold text-gray-400 dark:text-slate-500 whitespace-nowrap uppercase tracking-[0.2em] italic">
               {displayRole
                 ? t(roleSubtitleKey[displayRole] || "dashboard")
                 : "Portal"}
@@ -320,7 +320,7 @@ export function Sidebar() {
                     )}
                   />
                   {!collapsed && (
-                    <span className="truncate uppercase tracking-tighter italic">
+                    <span className="truncate uppercase tracking-[0.1em] font-black text-[11px] italic">
                       {link.name}
                     </span>
                   )}

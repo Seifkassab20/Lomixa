@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/components/ui/Toast";
 import { motion, AnimatePresence } from "motion/react";
+import { getAuthorizationDetails, ensureUserEntityExists } from "@/lib/store";
 import logo from "@/assets/logo.svg";
 
 
@@ -128,9 +129,6 @@ export function Login() {
       }
 
       if (freshUser && actualRole && actualRole !== "admin") {
-        const { getAuthorizationDetails, ensureUserEntityExists } =
-          await import("@/lib/store");
-
         // This is necessary to self-heal doctors created by hospitals whose insertions
         // might have been blocked by RLS policies so they can be available locally.
         await ensureUserEntityExists(freshUser);
