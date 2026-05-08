@@ -5,6 +5,7 @@ import { Button } from './ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../lib/auth';
+import { cn } from '@/lib/utils';
 
 interface PendingScreenProps {
   role: string | null;
@@ -109,22 +110,29 @@ export function PendingScreen({ role, rejectionReason, onSignOut }: PendingScree
         )}
 
         <motion.div variants={itemVariants} className="grid grid-cols-1 gap-3.5 mt-10">
-          <Button 
-            onClick={() => navigate(`/register/${role}`)}
-            className={`h-16 rounded-2xl ${isRejected ? 'bg-white text-[#050b14] hover:bg-slate-200' : 'bg-emerald-600 hover:bg-emerald-500 text-white'} font-bold uppercase tracking-widest text-[11px] gap-3 shadow-xl transition-all active:scale-[0.98] border-none`}
-          >
-            <UserCog className="w-4.5 h-4.5" />
-            {isRejected ? 'Edit Your Account' : (t('changeRegistration') || 'Update Application Details')}
-            <ArrowRight className="w-4.5 h-4.5" />
-          </Button>
+          {isRejected && (
+            <Button 
+              onClick={() => navigate(`/register/${role}`)}
+              className="h-16 rounded-2xl bg-white text-[#050b14] hover:bg-slate-200 font-bold uppercase tracking-widest text-[11px] gap-3 shadow-xl transition-all active:scale-[0.98] border-none"
+            >
+              <UserCog className="w-4.5 h-4.5" />
+              Edit Your Account
+              <ArrowRight className="w-4.5 h-4.5" />
+            </Button>
+          )}
           
           <Button 
             variant="ghost"
             onClick={onSignOut}
-            className="h-16 rounded-2xl border border-white/5 text-slate-500 hover:bg-rose-500/10 hover:text-rose-500 hover:border-rose-500/20 font-bold uppercase tracking-widest text-[11px] gap-3 transition-all"
+            className={cn(
+              "h-16 rounded-2xl border border-white/5 font-bold uppercase tracking-widest text-[11px] gap-3 transition-all",
+              isRejected 
+                ? "text-slate-500 hover:bg-rose-500/10 hover:text-rose-500 hover:border-rose-500/20" 
+                : "text-emerald-500 hover:bg-emerald-500/10 hover:border-emerald-500/20"
+            )}
           >
             <LogOut className="w-4.5 h-4.5" />
-            {t('terminateSession') || 'Secure Sign Out'}
+            {isRejected ? (t('terminateSession') || 'Secure Sign Out') : 'Back to Login'}
           </Button>
         </motion.div>
       </motion.div>

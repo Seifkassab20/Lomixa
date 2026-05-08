@@ -53,7 +53,7 @@ export function RepBookVisit() {
     if (myRep) {
       setRepData(myRep);
       setBalance(myRep.balance || 0);
-      setCountry(myRep.location?.country || 'sa');
+      setCountry(myRep.location?.country || user?.user_metadata?.country || 'sa');
     }
   };
 

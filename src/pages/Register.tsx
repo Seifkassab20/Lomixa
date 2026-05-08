@@ -352,6 +352,7 @@ export function Register() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     try {
       if (!selectedRole) throw new Error("Role selection missing.");
@@ -470,6 +471,7 @@ export function Register() {
               : formData.organizationName || t("independentClinic"),
           isVerified: false,
           isActive: true,
+          approvalStatus: 'pending_approval',
           availability: [],
         });
       } else if (selectedRole === "rep") {
@@ -490,6 +492,7 @@ export function Register() {
           balance: 0,
           isVerified: false, // Ensures self-registered reps start as PENDING
           isActive: true, // Will go to false if rejected
+          approvalStatus: 'pending_approval',
           targetSpecialties: formData.targetSpecialties,
         });
 
@@ -507,7 +510,7 @@ export function Register() {
           );
 
           saveBundleRequest({
-            id: generateId(),
+            id: `req_${finalUserId}`,
             pharmaId: finalUserId,
             pharmaName: `${formData.firstName} ${formData.lastName}`,
             bundleId: selectedPlan.id,
@@ -516,7 +519,7 @@ export function Register() {
             price: localPrice,
             cardNumber: `**** **** **** ${formData.cardNo.slice(-4)}`,
             cardHolder: formData.cardHolder,
-            status: "pending",
+            status: "pending_approval",
             date: new Date().toISOString(),
             type: "rep",
           });
@@ -548,6 +551,7 @@ export function Register() {
               : (selectedRole as any),
           isActive: true,
           isVerified: false,
+          approvalStatus: 'pending_approval',
           documents: {
             commercial: !!(formData as any).commCertificate,
             address: !!(formData as any).natAddress,
@@ -571,7 +575,7 @@ export function Register() {
             );
 
             saveBundleRequest({
-              id: generateId(),
+              id: `req_${finalUserId}`,
               pharmaId: finalUserId,
               pharmaName: formData.organizationName,
               bundleId: selectedBundle.id,
@@ -580,7 +584,7 @@ export function Register() {
               price: localPrice,
               cardNumber: `**** **** **** ${formData.cardNo.slice(-4)}`,
               cardHolder: formData.cardHolder,
-              status: "pending",
+              status: "pending_approval",
               date: new Date().toISOString(),
               type: "pharma",
             });

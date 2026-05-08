@@ -436,7 +436,7 @@ export function AdminDashboard() {
     toast(t("bundleRejected"), "error");
   };
 
-  const pendingRequests = requests.filter((r) => r.status === "pending");
+  const pendingRequests = requests.filter((r) => r.status === "pending_approval");
 
   // Deduplicate everything
   const uniquePharma = useMemo(() => Array.from(

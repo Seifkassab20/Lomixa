@@ -36,7 +36,7 @@ export function RepDashboard() {
        const myVisits = getVisits().filter(v => v.repId === myRep!.id);
        setVisits(myVisits.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')));
        setBalance(myRep!.balance || 0);
-       setCountry(myRep!.location?.country || 'sa');
+       setCountry(myRep!.location?.country || user?.user_metadata?.country || 'sa');
     }
     setLoading(false);
   }, [userId]);

@@ -37,7 +37,7 @@ export function DoctorSchedule() {
     const myDoc = doctors.find(d => d.userId === userId);
     if (myDoc) {
       setDoctorId(myDoc.id);
-      setCountry(myDoc.location?.country || 'sa');
+      setCountry(myDoc.location?.country || user?.user_metadata?.country || 'sa');
       setSlots(getDoctorAvailability(myDoc.id));
     }
   }, [userId]);

@@ -46,7 +46,7 @@ export function DoctorDashboard() {
       setMyDoc(doc);
       setDoctorId(doc.id);
       setBalance(doc.balance || 0);
-      setCountry(doc.location?.country || 'sa');
+      setCountry(doc.location?.country || user?.user_metadata?.country || 'sa');
       const myVisits = getVisits().filter(v => v.doctorId === doc!.id);
       setVisits(myVisits.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')));
     }

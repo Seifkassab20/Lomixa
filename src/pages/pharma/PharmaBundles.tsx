@@ -60,7 +60,7 @@ export function PharmaBundles() {
   };
 
   const handleMockPayment = async () => {
-    if (!showPayment || !mine) return;
+    if (!showPayment || !mine || loading) return;
     
     setLoading('payment');
     try {
@@ -81,7 +81,7 @@ export function PharmaBundles() {
         price: localPrice,
         cardNumber: cardNo.slice(-4) || '0000',
         cardHolder: holder,
-        status: 'pending',
+        status: 'pending_approval',
         date: new Date().toISOString(),
         type: 'pharma'
       });
@@ -129,12 +129,12 @@ export function PharmaBundles() {
 
       {/* Pending / Rejected Notifications */}
       <div className="space-y-3">
-        {pendingRequests.some(r => r.status === 'pending') && (
+        {pendingRequests.some(r => r.status === 'pending_approval') && (
           <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
                <Clock className="w-5 h-5 text-amber-500" />
                <div className="text-sm font-bold text-amber-500 uppercase tracking-tighter">
-                 Acquisition Protocol Pending ({formatCurrency(pendingRequests.find(r => r.status === 'pending')?.price || 0, country)})
+                 Acquisition Protocol Pending ({formatCurrency(pendingRequests.find(r => r.status === 'pending_approval')?.price || 0, country)})
                </div>
             </div>
             <Badge className="bg-amber-500/20 text-amber-500 border-amber-500/30">Admin Review Required</Badge>
