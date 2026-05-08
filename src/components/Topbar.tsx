@@ -112,7 +112,7 @@ export function Topbar() {
               <User className="h-4 w-4" />
             )}
           </button>
-          <span className="text-sm text-gray-600 dark:text-slate-300 hidden sm:block max-w-[120px] truncate">
+          <span className="text-[11px] font-black text-gray-600 dark:text-slate-300 hidden sm:block max-w-[140px] truncate uppercase tracking-[0.1em] italic">
             {user?.user_metadata?.full_name ||
               user?.email?.split("@")[0] ||
               "User"}

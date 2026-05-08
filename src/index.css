@@ -1,6 +1,10 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100;200;300;400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
 
 @theme {
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-outfit: "Outfit", sans-serif;
+  
   --color-brand: var(--brand-clr);
   --color-brand-foreground: var(--brand-fg);
   --color-brand-muted: var(--brand-muted);
@@ -10,6 +14,24 @@
   --color-app-bg-sidebar: var(--app-bg-sidebar);
   --color-app-card: var(--app-card);
   --color-app-border: var(--app-border);
+
+  /* Custom Font Sizes */
+  --text-title: var(--font-size-title);
+  --text-body: var(--font-size-text);
+  --text-button: var(--font-size-button);
+
+  /* Premium Shadows */
+  --shadow-premium: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+
+  /* Custom Animations */
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-shimmer: shimmer 2.5s infinite linear;
+
+  @keyframes shimmer {
+    from { background-position: 0% 0%; }
+    to { background-position: 200% 0%; }
+  }
 }
 
 /* ── Dark mode ── */
@@ -20,13 +42,18 @@
   *,
   *::before,
   *::after {
-    transition-property: background-color, border-color, color, fill, stroke;
-    transition-duration: 200ms;
-    transition-timing-function: ease;
+    transition-property: background-color, border-color, color, fill, stroke, transform, box-shadow;
+    transition-duration: 300ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* Default Variables (Emerald Oasis - Clinical) */
   :root {
+    /* Font Sizes - Optimized for Hierarchy */
+    --font-size-title: 2.5rem;
+    --font-size-text: 1rem;
+    --font-size-button: 0.875rem;
+
+    /* Default Variables (Emerald Oasis - Clinical) */
     --brand-clr: #10b981;
     --brand-fg: #ffffff;
     --brand-muted: rgba(16, 185, 129, 0.1);
@@ -36,6 +63,27 @@
     --app-bg-sidebar: #ffffff;
     --app-card: #ffffff;
     --app-border: #e2e8f0;
+
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: var(--app-bg);
+    color: #334155; 
+    font-size: var(--font-size-text);
+    line-height: 1.6;
+    letter-spacing: -0.011em;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 900;
+    letter-spacing: -0.04em;
+    color: #0f172a;
+    line-height: 1.1;
+    font-family: var(--font-outfit);
   }
 
   .dark {
@@ -43,44 +91,15 @@
     --app-bg-sidebar: #0a111c;
     --app-card: #0a111c;
     --app-border: #1e293b;
+    color: #e2e8f0;
   }
 
-  /* Sapphire Grid (Tech/Royal) */
-  [data-theme="sapphire"] {
-    --brand-clr: #4f46e5;
-    --brand-muted: rgba(79, 70, 229, 0.1);
-    --brand-dark: #4338ca;
-
-    --app-bg: #f1f5f9; /* Slate-100 */
-    --app-bg-sidebar: #f8fafc;
-    --app-card: #ffffff;
-    --app-border: #cbd5e1;
+  .dark body {
+    color: #94a3b8; 
   }
 
-  [data-theme="sapphire"].dark {
-    --app-bg: #0f172a; /* Slate-900 */
-    --app-bg-sidebar: #1e293b;
-    --app-card: #1e293b;
-    --app-border: #334155;
-  }
-
-  /* Desert Oasis (Warm Premium) */
-  [data-theme="oasis"] {
-    --brand-clr: #0d9488;
-    --brand-muted: rgba(13, 148, 136, 0.1);
-    --brand-dark: #0f766e;
-
-    --app-bg: #fafaf9; /* Stone-50 */
-    --app-bg-sidebar: #fffbeb; /* Amber-50 */
-    --app-card: #ffffff;
-    --app-border: #e7e5e4;
-  }
-
-  [data-theme="oasis"].dark {
-    --app-bg: #1c1917; /* Stone-900 */
-    --app-bg-sidebar: #292524;
-    --app-card: #292524;
-    --app-border: #44403c;
+  .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+    color: #f8fafc;
   }
 
   .scrollbar-hide::-webkit-scrollbar {
@@ -89,6 +108,23 @@
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+
+  /* Glassmorphism Utilities */
+  .glass-card {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
+  }
+
+  .dark .glass-card {
+    background: rgba(10, 17, 28, 0.6);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
   }
 
   .dark {

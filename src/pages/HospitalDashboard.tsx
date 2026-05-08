@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { getVisits, getDoctors, getHospitals, saveHospital, saveDoctor, generateId, Hospital } from '@/lib/store';
-import { Stethoscope, Calendar, Activity, Users, ArrowRight, DollarSign } from 'lucide-react';
-import { formatCurrency } from '@/lib/currency';
+import { Stethoscope, Calendar, Activity, Users, ArrowRight, DollarSign, Plus } from 'lucide-react';
+import { formatCurrency, getCurrencyInfo } from '@/lib/currency';
 
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 
 
@@ -41,7 +42,8 @@ export function HospitalDashboard() {
     return () => clearInterval(interval);
   }, [loadData]);
 
-  const earningsValue = formatCurrency(myFacility?.balance || 0, myFacility?.location?.country || 'sa');
+  const currencyInfo = getCurrencyInfo(myFacility?.location?.country || user?.user_metadata?.country || 'sa');
+  const earningsValue = `${(myFacility?.balance || 0).toLocaleString(i18n.language === 'ar' ? 'ar-SA' : 'en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${currencyInfo.code}`;
 
 
 
@@ -60,8 +62,8 @@ export function HospitalDashboard() {
   }));
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="space-y-10">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
         {[
           { label: t('totalDoctors'), value: doctors.length, sub: myFacility?.type === 'clinic' ? t('clinic') : t('inYourFacility'), icon: Stethoscope, color: 'emerald' },
           { label: t('visitsThisWeek'), value: visits.filter(v => { const d = new Date(v.date); const now = new Date(); const diff = (now.getTime() - d.getTime()) / 86400000; return diff <= 7; }).length, sub: `${visits.filter(v => v.status === 'Pending').length} ${t('pendingCount')}`, icon: Calendar, color: 'blue' },
@@ -69,69 +71,65 @@ export function HospitalDashboard() {
           { label: t('earnings'), value: earningsValue, sub: t('estFromVisits'), icon: DollarSign, color: 'purple' },
         ].map(({ label, value, sub, icon: Icon, color }) => (
 
-          <div key={label} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium text-gray-500 dark:text-slate-400">{label}</span>
-              <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center", 
-                color === 'emerald' && "bg-emerald-100 dark:bg-emerald-500/20",
-                color === 'blue' && "bg-blue-100 dark:bg-blue-500/20",
-                color === 'amber' && "bg-amber-100 dark:bg-amber-500/20",
-                color === 'purple' && "bg-purple-100 dark:bg-purple-500/20"
-              )}>
-                <Icon className={cn("h-4 w-4", 
-                  color === 'emerald' && "text-emerald-600 dark:text-emerald-400",
-                  color === 'blue' && "text-blue-600 dark:text-blue-400",
-                  color === 'amber' && "text-amber-600 dark:text-amber-400",
-                  color === 'purple' && "text-purple-600 dark:text-purple-400"
-                )} />
+          <div key={label} className="glass-card shadow-premium border dark:border-white/5 rounded-[2rem] p-6 transition-all hover:scale-[1.02]">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{label}</span>
+              <div className={`h-10 w-10 rounded-2xl bg-${color}-500/10 flex items-center justify-center shadow-inner`}>
+                <Icon className={`h-5 w-5 text-${color}-600 dark:text-${color}-400`} />
               </div>
             </div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">{value}</div>
-            <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">{sub}</div>
+            <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter italic">{value}</div>
+            {sub && <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2 uppercase tracking-widest">{sub}</div>}
           </div>
         ))}
       </div>
 
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
 
-        <div className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
-          <div className="flex items-center justify-between mb-4">
+        <div className="glass-card shadow-premium border dark:border-white/5 rounded-[2.5rem] p-8">
+          <div className="flex items-center justify-between mb-8">
             <div className="space-y-1">
-              <h3 className="font-semibold dark:text-white">{t('doctorsOverview')}</h3>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter italic">{t('clinicalStaffDirectory')}</p>
+              <h3 className="text-xl font-black uppercase italic tracking-tighter text-slate-900 dark:text-white flex items-center gap-3">
+                <Users className="w-5 h-5 text-emerald-500" />
+                {t('doctorsOverview')}
+              </h3>
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em] italic opacity-60 ml-8">{t('clinicalStaffDirectory')}</p>
             </div>
+            <Button onClick={() => navigate('/doctors?add=true')} size="sm" className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white border border-emerald-500/20 text-[10px] font-black uppercase tracking-widest px-4 h-10 rounded-xl">
+              <Plus className="w-4 h-4 mr-1" /> {t('add')}
+            </Button>
           </div>
           {doctors.length === 0 ? (
-            <div className="py-8 text-center text-sm text-gray-400 dark:text-slate-500">{t('noDoctorsAdded')}</div>
+            <div className="py-12 text-center text-sm font-medium text-slate-400 dark:text-slate-500 italic uppercase tracking-widest">{t('noDoctorsAdded')}</div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {doctors.slice(0, 4).map(doc => (
-                <div key={doc.id} className="flex items-center justify-between p-3 rounded-xl border dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-all group">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-sm shadow-inner group-hover:scale-110 transition-transform">
+                <div key={doc.id} className="flex items-center justify-between p-4 rounded-2xl border dark:border-white/5 hover:bg-white dark:hover:bg-white/5 transition-all group shadow-sm">
+                  <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 font-black text-sm shadow-inner group-hover:scale-110 transition-transform">
                       {doc.name.split(' ').filter(n => ['Dr.', 'Prof.', 'Asst.', 'Assoc.', 'Dr', 'Prof', 'Asst', 'Assoc'].every(t => !n.startsWith(t))).map(n => n[0]).join('').slice(0, 2) || doc.name[0]}
                     </div>
                     <div>
-                      <div className="text-sm font-black dark:text-white flex items-center gap-2">
+                      <div className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
                         {doc.name}
                         {!doc.isActive && <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />}
                       </div>
-                      <div className="text-[10px] text-gray-500 dark:text-slate-400 font-bold uppercase tracking-widest">{t(`spec_${doc.specialty}`) || doc.specialty}</div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest">{t(`spec_${doc.specialty}`) === `spec_${doc.specialty}` ? doc.specialty : t(`spec_${doc.specialty}`)}</div>
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2">
-                    <div className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400">
+                    <div className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-widest">
                       {doc.availability?.filter(s => !s.isBooked).length || 0} {t('open')}
                     </div>
                     <button
                       onClick={() => handleToggleDoctor(doc)}
                       className={cn(
-                        "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter transition-all",
+                        "px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
                         doc.isActive 
-                          ? "bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white"
-                          : "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500 hover:text-white"
+                          ? "bg-red-500/10 text-red-500 border border-red-500/10 hover:bg-red-500 hover:text-white"
+                          : "bg-emerald-500/10 text-emerald-500 border border-emerald-500/10 hover:bg-emerald-500 hover:text-white"
                       )}
                     >
                       {doc.isActive ? t('deactivate') : t('activate')}
@@ -143,8 +141,11 @@ export function HospitalDashboard() {
           )}
         </div>
 
-        <div className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5">
-          <h3 className="font-semibold dark:text-white mb-4">{t('monthlyVisitActivity')}</h3>
+        <div className="glass-card shadow-premium border dark:border-white/5 rounded-[2.5rem] p-8">
+          <h3 className="text-xl font-black uppercase italic tracking-tighter text-slate-900 dark:text-white mb-8 flex items-center gap-3">
+             <Activity className="w-5 h-5 text-emerald-500" />
+             {t('monthlyVisitActivity')}
+          </h3>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={monthlyData}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.1} />
@@ -160,19 +161,21 @@ export function HospitalDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         {[
           { label: t('manageDoctors') || 'Manage Doctors', href: '/doctors', icon: Stethoscope },
           { label: t('allBookings') || 'All Bookings', href: '/bookings', icon: Calendar },
         ].map(({ label, href, icon: Icon }) => (
-          <button key={label} onClick={() => navigate(href)} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-6 flex items-center justify-between hover:border-emerald-500/50 hover:shadow-md transition-all group text-left">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
-                <Icon className="h-6 w-6" />
+          <button key={label} onClick={() => navigate(href)} className="glass-card shadow-premium border dark:border-white/5 rounded-[2rem] p-8 flex items-center justify-between hover:shadow-2xl transition-all group text-left">
+            <div className="flex items-center gap-6">
+              <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 shadow-inner">
+                <Icon className="h-7 w-7" />
               </div>
-              <span className="text-sm font-black text-gray-700 dark:text-slate-300 uppercase tracking-widest italic">{label}</span>
+              <span className="text-xs font-black text-slate-700 dark:text-slate-200 uppercase tracking-[0.2em] italic">{label}</span>
             </div>
-            <ArrowRight className="w-5 h-5 text-slate-400 group-hover:translate-x-1 group-hover:text-emerald-500 transition-all" />
+            <div className="h-10 w-10 rounded-full bg-slate-500/5 flex items-center justify-center group-hover:bg-emerald-500/10 transition-colors">
+              <ArrowRight className="w-5 h-5 text-slate-400 group-hover:translate-x-1 group-hover:text-emerald-500 transition-all" />
+            </div>
           </button>
         ))}
       </div>

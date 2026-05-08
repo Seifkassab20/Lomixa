@@ -55,7 +55,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 {t.type === 'success' && <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0" />}
                 {t.type === 'info' && <Info className="h-5 w-5 text-blue-400 shrink-0" />}
                 
-                <p className="text-sm font-medium flex-1 leading-tight">{t.message}</p>
+                <p className="text-body font-bold flex-1 leading-tight tracking-tight">{t.message}</p>
                 
                 <button 
                   onClick={() => removeToast(t.id)}

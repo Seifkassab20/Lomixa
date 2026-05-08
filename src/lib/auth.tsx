@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase, isSupabaseConfigured } from './supabase';
-import { ensureUserEntityExists } from './store';
+import { ensureUserEntityExists, useStoreListener } from './store';
 import { User } from '@supabase/supabase-js';
+import { useTranslation } from 'react-i18next';
 
 type Role = 'pharma' | 'hospital' | 'doctor' | 'rep' | 'admin' | null;
 
@@ -10,35 +11,25 @@ interface AuthContextType {
   userId: string | null;
   role: Role;
   emailVerified: boolean;
+  isPending: boolean;
+  rejectionReason?: string;
   loading: boolean;
   signOut: () => Promise<void>;
   refreshVerificationStatus: () => Promise<void>;
+  t: (key: string) => string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation();
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<Role>(null);
   const [emailVerified, setEmailVerified] = useState<boolean>(true);
+  const [isPending, setIsPending] = useState<boolean>(false);
+  const [rejectionReason, setRejectionReason] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
 
-  const fetchVerificationStatus = async (uid: string) => {
-    // Temporarily disabled verification feature
-    setEmailVerified(true);
-    /*
-    try {
-      const { data, error } = await supabase.functions.invoke('auth-tokens', {
-        body: { action: 'get_security_status', userId: uid }
-      });
-      if (!error && data?.success) {
-        setEmailVerified(data.verified);
-      }
-    } catch (err) {
-      console.error("Failed to fetch verification status:", err);
-    }
-    */
-  };
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -53,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (userRole) {
           setRole(userRole);
           ensureUserEntityExists(session.user);
-          fetchVerificationStatus(session.user.id);
+          fetchVerificationStatus(session.user.id, userRole);
           setLoading(false);
         } else {
           loadDemoSession();
@@ -70,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (userRole) {
           setRole(userRole);
           ensureUserEntityExists(session.user);
-          fetchVerificationStatus(session.user.id);
+          fetchVerificationStatus(session.user.id, userRole);
           setLoading(false);
         } else {
           loadDemoSession();
@@ -82,6 +73,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Listen for local store mutations (e.g. from syncCloudData)
+  useStoreListener(() => {
+    if (user?.id && role) {
+      fetchVerificationStatus(user.id, role);
+    }
+  });
 
   const loadDemoSession = () => {
     const storedRole = localStorage.getItem('demo_role') as Role;
@@ -112,14 +110,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setEmailVerified(false);
   };
 
+  const fetchVerificationStatus = async (uid: string, role: string | null) => {
+    // Check pending status from store
+    if (uid && role) {
+      import('./store').then(async ({ getAuthorizationDetails }) => {
+        const { isPending, reason } = await getAuthorizationDetails(uid, role);
+        setIsPending(!!isPending);
+        setRejectionReason(reason);
+      });
+    }
+    setEmailVerified(true);
+  };
+
   const refreshVerificationStatus = async () => {
     if (user?.id) {
-      await fetchVerificationStatus(user.id);
+      await fetchVerificationStatus(user.id, role);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, userId: user?.id || null, role, emailVerified, loading, signOut, refreshVerificationStatus }}>
+    <AuthContext.Provider value={{ user, userId: user?.id || null, role, emailVerified, isPending, rejectionReason, loading, signOut, refreshVerificationStatus, t }}>
       {children}
     </AuthContext.Provider>
   );

@@ -109,16 +109,18 @@ export function SettingsPage() {
         }
       }
 
+      // Initialize form with intelligent role-based defaults
       setForm({
         fullName:
-          entity?.name ||
+          (role === "rep" || role === "doctor" ? entity?.name : null) ||
           profile.fullName ||
           user?.user_metadata?.full_name ||
           "",
         phoneCode: extractedCode,
         phone: extractedNumber,
         organization:
-          pharmaEntity?.name ||
+          (role === "pharma" || role === "hospital" ? entity?.name : null) ||
+          doctorEntity?.hospitalName ||
           profile.organization ||
           user?.user_metadata?.organization ||
           "",
@@ -218,9 +220,14 @@ export function SettingsPage() {
           );
         }
 
-         saveSalesRep({
+        const [firstName, ...lastNameParts] = form.fullName.split(" ");
+        const lastName = lastNameParts.join(" ");
+
+        saveSalesRep({
           ...r,
           name: form.fullName,
+          firstName,
+          lastName,
           phone: finalData.phone,
           balance: newBalance,
           avatar: form.avatar,
@@ -249,9 +256,14 @@ export function SettingsPage() {
           );
         }
 
+        const [firstName, ...lastNameParts] = form.fullName.split(" ");
+        const lastName = lastNameParts.join(" ");
+
         saveDoctor({
           ...d,
           name: form.fullName,
+          firstName,
+          lastName,
           phone: finalData.phone,
           balance: newBalance,
           avatar: form.avatar,
@@ -273,7 +285,7 @@ export function SettingsPage() {
       if (h) {
         saveHospital({
           ...h,
-          name: form.fullName,
+          name: form.organization,
           phone: finalData.phone,
           avatar: form.avatar,
           location: {
@@ -286,6 +298,12 @@ export function SettingsPage() {
           type: form.facilityType,
         });
       }
+    }
+
+    if (isSupabaseConfigured) {
+      supabase.auth.updateUser({
+        data: { country: form.country, phone: finalData.phone, full_name: form.fullName }
+      }).catch(console.error);
     }
 
     setSaved(true);

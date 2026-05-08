@@ -12,6 +12,8 @@ import { formatCurrency, getCurrencyInfo } from '@/lib/currency';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { createClient } from '@supabase/supabase-js';
+import { motion, AnimatePresence } from 'motion/react';
+import { ActionConfirmModal } from '@/components/ui/ActionConfirmModal';
 import { ARABIC_COUNTRY_CODES, COUNTRIES, CITY_MAP, AREA_MAP } from '@/lib/constants';
 
 // Helper client that doesn't persist session so signing up a user doesn't log out the admin
@@ -32,6 +34,19 @@ export function PharmaSubordinates() {
   const [form, setForm] = useState({ name: '', email: '', phoneCode: '+966', phone: '', target: 25, password: '', country: 'sa', cities: [] as string[], areas: [] as string[] });
   const [allocationRep, setAllocationRep] = useState<SalesRep | null>(null);
   const [allocationAmount, setAllocationAmount] = useState(10);
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant: 'danger' | 'warning' | 'info' | 'success';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    variant: 'info'
+  });
 
   const pharmaCompanies = getPharmaCompanies();
   const myCompany = pharmaCompanies.find(c => c.userId === userId);
@@ -57,14 +72,30 @@ export function PharmaSubordinates() {
     return () => clearInterval(interval);
   }, [loadData]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('add') === 'true') {
+      setShowForm(true);
+      setEditingRep(null);
+      setForm({ name: '', email: '', phoneCode: '+966', phone: '', target: 25, password: '', country: 'sa', cities: [], areas: [] });
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!myCompany) return;
 
     const fullPhone = `${form.phoneCode}${form.phone}`;
     const emailExists = await checkUserExistence('email', form.email);
+    const phoneExists = await checkUserExistence('phone', fullPhone);
+
     if (emailExists && (!editingRep || form.email !== editingRep.email)) {
       toast(t('emailAlreadyExists'), 'error');
+      return;
+    }
+    if (phoneExists && (!editingRep || fullPhone !== editingRep.phone)) {
+      toast(t('phoneAlreadyExists'), 'error');
       return;
     }
 
@@ -162,12 +193,18 @@ export function PharmaSubordinates() {
       ? (t('confirmDeactivateUser') || 'Are you sure you want to deactivate this user?')
       : (t('confirmActivateUser') || 'Are you sure you want to activate this user?');
 
-    if (confirm(msg)) {
-      const updated = { ...rep, isActive: !rep.isActive };
-      saveSalesRep(updated);
-      loadData();
-      toast(updated.isActive ? t('repActivated') || 'Representative activated' : t('repDeactivated') || 'Representative deactivated', 'info');
-    }
+    setConfirmConfig({
+      isOpen: true,
+      title: rep.isActive ? (t('deactivateAccount') || 'Deactivate Account') : (t('activateAccount') || 'Activate Account'),
+      message: msg,
+      variant: rep.isActive ? 'warning' : 'success',
+      onConfirm: () => {
+        const updated = { ...rep, isActive: !rep.isActive };
+        saveSalesRep(updated);
+        loadData();
+        toast(updated.isActive ? t('accountActivated') || 'Activated' : t('accountDeactivated') || 'Deactivated', 'info');
+      }
+    });
   };
 
   const handleApprove = (rep: SalesRep) => {
@@ -178,11 +215,17 @@ export function PharmaSubordinates() {
   };
 
   const handleDelete = (id: string, name: string) => {
-    if (confirm(`${t('confirmDeleteUser') || 'Are you sure you want to delete this user?'} (${name})`)) {
-      deleteSalesRep(id);
-      setReps(prev => prev.filter(r => r.id !== id));
-      toast(t('repDeleted') || 'Representative removed permanently', 'success');
-    }
+    setConfirmConfig({
+      isOpen: true,
+      title: t('deleteAccount') || 'Delete Account',
+      message: `${t('confirmDeleteUser') || 'Are you sure you want to delete this user?'} (${name})`,
+      variant: 'danger',
+      onConfirm: () => {
+        deleteSalesRep(id);
+        setReps(prev => prev.filter(r => r.id !== id));
+        toast(t('accountDeleted') || 'Account Deleted', 'success');
+      }
+    });
   };
 
   const handleAllocateCredits = (e: React.FormEvent) => {
@@ -201,173 +244,249 @@ export function PharmaSubordinates() {
   const rankedReps = [...reps].sort((a, b) => (repVisitCounts[b.id] || 0) - (repVisitCounts[a.id] || 0));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('salesRepsTitle') || 'Sales Representatives'}</h1>
-          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">{t('manageFieldTeam') || 'Manage your field team and visit targets'}</p>
+        <div className="space-y-1">
+          <h1 className="text-3xl font-black text-slate-900 dark:text-white uppercase italic tracking-tighter">{t('salesRepsTitle') || 'Sales Representatives'}</h1>
+          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em] italic opacity-60">{t('manageFieldTeam') || 'Manage your field team and visit targets'}</p>
         </div>
         <Button
-          onClick={() => { setShowForm(true); setEditingRep(null); setForm({ name: '', email: '', phoneCode: '+966', phone: '', target: 25, password: '' }); }}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+          onClick={() => { setShowForm(true); setEditingRep(null); setForm({ name: '', email: '', phoneCode: '+966', phone: '', target: 25, password: '', country: 'sa', cities: [], areas: [] }); }}
+          className="bg-emerald-600 hover:bg-emerald-700 text-white gap-3 h-12 px-6 rounded-2xl font-black uppercase tracking-widest italic shadow-lg shadow-emerald-500/20 transition-all active:scale-[0.98]"
         >
           <Plus className="h-4 w-4" /> {t('addRep') || 'Add Rep'}
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-4 flex items-center gap-4">
-          <div className="h-10 w-10 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center">
-            <Users className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">{reps.length}</div>
-            <div className="text-xs text-gray-500 dark:text-slate-400">{t('totalRepsLabel') || 'Total Representatives'}</div>
-          </div>
-        </div>
-        <div className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-4 flex items-center gap-4">
-          <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center">
-            <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">{Object.values(repVisitCounts).reduce((a: number, v: number) => a + v, 0)}</div>
-            <div className="text-xs text-gray-500 dark:text-slate-400">{t('totalVisitsMonth') || 'Total Visits This Month (Real)'}</div>
-          </div>
-        </div>
-        <div className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-4 flex items-center gap-4">
-          <div className="h-10 w-10 rounded-lg bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center">
-            <Target className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">
-              {reps.length > 0 ? Math.round(reps.reduce((a, r) => a + Math.min((repVisitCounts[r.id] || 0) / r.target, 1) * 100, 0) / reps.length) : 0}%
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {[
+          { label: t('totalRepsLabel'), value: reps.length, icon: Users, color: 'emerald' },
+          { label: t('totalVisitsMonth'), value: Object.values(repVisitCounts).reduce((a: number, v: number) => a + v, 0), icon: TrendingUp, color: 'blue' },
+          { label: t('avgTargetCompletion'), value: `${reps.length > 0 ? Math.round(reps.reduce((a, r) => a + Math.min((repVisitCounts[r.id] || 0) / r.target, 1) * 100, 0) / reps.length) : 0}%`, icon: Target, color: 'amber' },
+        ].map((stat) => (
+          <div key={stat.label} className="glass-card shadow-premium border dark:border-white/5 rounded-[2rem] p-8 flex items-center gap-6 group transition-all hover:scale-[1.02]">
+            <div className={`h-14 w-14 rounded-2xl flex items-center justify-center shadow-inner group-hover:rotate-6 transition-all duration-500 ${
+              stat.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-500' :
+              stat.color === 'blue' ? 'bg-blue-500/10 text-blue-500' :
+              'bg-amber-500/10 text-amber-500'
+            }`}>
+              <stat.icon className="h-7 w-7" />
             </div>
-            <div className="text-xs text-gray-500 dark:text-slate-400">{t('avgTargetCompletion') || 'Avg Target Completion'}</div>
+            <div>
+              <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter italic leading-none">{stat.value}</div>
+              <div className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em] mt-2 opacity-60">{stat.label}</div>
+            </div>
           </div>
-        </div>
+        ))}
       </div>
 
-      {showForm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-md border dark:border-slate-700 shadow-2xl">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold dark:text-white">{editingRep ? (t('editRep') || 'Edit Representative') : (t('addRepLabel') || 'Add Representative')}</h2>
-              <button onClick={() => setShowForm(false)} className="text-gray-500 hover:text-gray-700 dark:hover:text-white">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label className="dark:text-slate-300">{t('fullName') || 'Full Name'}</Label>
-                <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="Ahmed Al-Farsi" className="mt-1 dark:bg-slate-800 dark:border-slate-600 dark:text-white" />
-              </div>
-              <div>
-                <Label className="dark:text-slate-300">{t('email') || 'Email'}</Label>
-                <Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required placeholder="rep@company.com.sa" className="mt-1 dark:bg-slate-800 dark:border-slate-600 dark:text-white" />
-              </div>
-              <div>
-                <Label className="dark:text-slate-300">{t('phone') || 'Phone'}</Label>
-                <div className="flex gap-2 mt-1">
-                  <div className="relative w-24 shrink-0">
-                    <select
-                      value={form.phoneCode}
-                      onChange={e => setForm(f => ({ ...f, phoneCode: e.target.value }))}
-                      className="w-full h-10 pl-2 pr-6 rounded-lg bg-white dark:bg-slate-800 border dark:border-slate-600 text-xs font-bold outline-none appearance-none"
-                    >
-                      {ARABIC_COUNTRY_CODES.map(c => (
-                        <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400 pointer-events-none" />
+      <AnimatePresence>
+        {showForm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowForm(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-xl"
+            />
+            
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-[#0c121d] w-full max-w-xl rounded-[2.5rem] border border-white/5 shadow-[0_32px_128px_-16px_rgba(0,0,0,0.8)] overflow-hidden relative"
+            >
+              <div className="relative p-10 max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-2xl bg-emerald-500/20 flex items-center justify-center border border-emerald-500/20">
+                      <Users className="w-5 h-5 text-emerald-500" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-black text-white uppercase tracking-wider italic">{editingRep ? t('editRep') : t('onboardNewRep') || 'Onboard New Representative'}</h2>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{t('secureIdentityProvisioning') || 'Field Team Deployment'}</p>
+                    </div>
                   </div>
-                  <Input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="5X XXX XXXX" className="flex-1 dark:bg-slate-800 dark:border-slate-600 dark:text-white" />
-                </div>
-              </div>
-              <div>
-                <Label className="dark:text-slate-300">{t('monthlyVisitTarget') || 'Monthly Visit Target'}</Label>
-                <Input type="number" value={form.target} onChange={e => setForm(f => ({ ...f, target: parseInt(e.target.value) || 25 }))} required min={1} className="mt-1 dark:bg-slate-800 dark:border-slate-600 dark:text-white" />
-              </div>
-              {!editingRep && (
-                <div>
-                  <div className="bg-emerald-50 dark:bg-emerald-500/10 p-2 rounded text-[10px] text-emerald-600 dark:text-emerald-400 mb-2 border border-emerald-100 dark:border-emerald-500/20">
-                    {t('adminCreatorNote') || "Defining a password will automatically register a pre-verified account for this representative."}
-                  </div>
-                  <Label className="dark:text-slate-300">{t('password')}</Label>
-                  <Input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} required placeholder="••••••••" className="mt-1 dark:bg-slate-800 dark:border-slate-600 dark:text-white" />
-                </div>
-              )}
-
-              <div className="pt-4 border-t dark:border-slate-800 space-y-4">
-                <div>
-                   <Label className="text-[10px] uppercase font-black tracking-widest text-slate-500">Operating Country*</Label>
-                   <select 
-                      value={form.country} 
-                      onChange={e => setForm(f => ({ ...f, country: e.target.value, cities: [], areas: [] }))}
-                      className="w-full h-10 mt-1 rounded-lg bg-white dark:bg-slate-800 border dark:border-slate-600 text-xs font-bold outline-none"
-                   >
-                      {COUNTRIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                   </select>
-                </div>
-                
-                <div>
-                   <Label className="text-[10px] uppercase font-black tracking-widest text-slate-500">Operating Cities*</Label>
-                   <div className="flex flex-wrap gap-1 mt-2 max-h-32 overflow-y-auto p-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg border dark:border-slate-700">
-                      {CITY_MAP[form.country]?.map(city => (
-                        <button
-                          key={city}
-                          type="button"
-                          onClick={() => setForm(f => ({ 
-                            ...f, 
-                            cities: f.cities.includes(city) ? f.cities.filter(c => c !== city) : [...f.cities, city],
-                            areas: f.cities.includes(city) ? f.areas.filter(a => !(AREA_MAP[city] || []).includes(a)) : f.areas
-                          }))}
-                          className={cn(
-                            "px-2 py-1 rounded text-[10px] font-bold uppercase transition-all",
-                            form.cities.includes(city)
-                              ? "bg-emerald-500 text-white"
-                              : "bg-white dark:bg-slate-900 text-slate-500 border border-slate-200 dark:border-slate-700 hover:border-emerald-500/50"
-                          )}
-                        >
-                          {city}
-                        </button>
-                      ))}
-                   </div>
+                  <button onClick={() => setShowForm(false)} className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all">
+                    <X className="h-5 w-5" />
+                  </button>
                 </div>
 
-                {form.cities.length > 0 && (
-                   <div className="animate-in slide-in-from-top-2">
-                      <Label className="text-[10px] uppercase font-black tracking-widest text-emerald-500">Target Areas (Districts)*</Label>
-                      <div className="flex flex-wrap gap-1 mt-2 max-h-32 overflow-y-auto p-2 bg-emerald-500/5 rounded-lg border border-emerald-500/20">
-                         {form.cities.flatMap(city => AREA_MAP[city] || []).filter((v, i, a) => a.indexOf(v) === i).map(area => (
-                            <button
-                               key={area}
-                               type="button"
-                               onClick={() => setForm(f => ({ 
-                                 ...f, 
-                                 areas: f.areas.includes(area) ? f.areas.filter(a => a !== area) : [...f.areas, area] 
-                               }))}
-                               className={cn(
-                                 "px-2 py-1 rounded text-[10px] font-bold uppercase transition-all",
-                                 form.areas.includes(area)
-                                   ? "bg-emerald-600 text-white"
-                                   : "bg-white dark:bg-slate-900/50 text-slate-500 border border-emerald-500/10 hover:border-emerald-500/30"
-                               )}
-                            >
-                               {area}
-                            </button>
-                         ))}
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase text-slate-500 px-2 italic">{t('fullName')}</label>
+                      <input 
+                        required
+                        value={form.name}
+                        onChange={e => setForm({...form, name: e.target.value})}
+                        placeholder="Ahmed Al-Farsi"
+                        className="w-full h-14 rounded-2xl bg-black/40 border border-white/10 px-6 font-black text-white outline-none focus:border-emerald-500/50 transition-all" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase text-slate-500 px-2 italic">{t('email')}</label>
+                      <div className="relative group">
+                        <Mail className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-emerald-500 transition-colors" />
+                        <input 
+                          required
+                          type="email"
+                          value={form.email}
+                          onChange={e => setForm({...form, email: e.target.value})}
+                          placeholder="rep@pharma.com"
+                          className="w-full h-14 rounded-2xl bg-black/40 border border-white/10 pl-14 pr-6 font-black text-white outline-none focus:border-emerald-500/50 transition-all" 
+                        />
                       </div>
-                   </div>
-                )}
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase text-slate-500 px-2 italic">{t('mobile')}</label>
+                      <div className="flex gap-2">
+                        <div className="relative w-28 group">
+                          <select
+                            value={form.phoneCode}
+                            onChange={e => setForm({...form, phoneCode: e.target.value})}
+                            className="w-full h-14 pl-3 pr-8 rounded-2xl bg-black/40 border border-white/10 font-black text-white outline-none focus:border-emerald-500/50 transition-all appearance-none text-[10px]"
+                          >
+                            {ARABIC_COUNTRY_CODES.map(c => (
+                              <option key={c.code} value={c.code} className="bg-[#0c121d]">{c.flag} {c.code}</option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-500 pointer-events-none" />
+                        </div>
+                        <div className="relative group flex-1">
+                          <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-600 group-focus-within:text-emerald-500 transition-colors" />
+                          <input 
+                            required
+                            value={form.phone}
+                            onChange={e => setForm({...form, phone: e.target.value})}
+                            placeholder="5X XXX XXXX"
+                            className="w-full h-14 rounded-2xl bg-black/40 border border-white/10 pl-10 pr-4 font-black text-white outline-none focus:border-emerald-500/50 transition-all" 
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase text-slate-500 px-2 italic">{t('monthlyVisitTarget') || 'Monthly Target'}</label>
+                      <div className="relative group">
+                        <Target className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-emerald-500 transition-colors" />
+                        <input 
+                          type="number"
+                          required
+                          value={form.target}
+                          onChange={e => setForm({...form, target: parseInt(e.target.value) || 25})}
+                          className="w-full h-14 rounded-2xl bg-black/40 border border-white/10 pl-14 pr-6 font-black text-white outline-none focus:border-emerald-500/50 transition-all" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {!editingRep && (
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase text-slate-500 px-2 italic">{t('password')}</label>
+                      <div className="bg-emerald-500/10 p-4 rounded-2xl border border-emerald-500/10 mb-2">
+                        <p className="text-[10px] text-emerald-500/80 font-bold uppercase tracking-tight italic">
+                          {t('onboardingKeySecurityNote') || "Credential generation will automatically provision a secure workspace for this field representative."}
+                        </p>
+                      </div>
+                      <input 
+                        required
+                        type="password"
+                        value={form.password}
+                        onChange={e => setForm({...form, password: e.target.value})}
+                        placeholder="••••••••"
+                        className="w-full h-14 rounded-2xl bg-black/40 border border-white/10 px-6 font-black text-white outline-none focus:border-emerald-500/50 transition-all" 
+                      />
+                    </div>
+                  )}
+
+                  <div className="pt-8 border-t border-white/5 space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase text-slate-500 px-2 italic">Operating Country*</label>
+                        <select 
+                          value={form.country} 
+                          onChange={e => setForm(f => ({ ...f, country: e.target.value, cities: [], areas: [] }))}
+                          className="w-full h-14 rounded-2xl bg-black/40 border border-white/10 px-6 font-black text-white outline-none focus:border-emerald-500/50 transition-all appearance-none"
+                        >
+                          {COUNTRIES.map(c => <option key={c.id} value={c.id} className="bg-[#0c121d]">{c.name}</option>)}
+                        </select>
+                      </div>
+                      
+                      <div className="md:col-span-2 space-y-3">
+                        <label className="text-[10px] font-black uppercase text-slate-500 px-2 italic">Operating Cities*</label>
+                        <div className="flex flex-wrap gap-2 p-6 rounded-3xl bg-black/40 border border-white/10">
+                          {CITY_MAP[form.country]?.map(city => (
+                            <button
+                              key={city}
+                              type="button"
+                              onClick={() => setForm(f => ({ 
+                                ...f, 
+                                cities: f.cities.includes(city) ? f.cities.filter(c => c !== city) : [...f.cities, city],
+                                areas: f.cities.includes(city) ? f.areas.filter(a => !(AREA_MAP[city] || []).includes(a)) : f.areas
+                              }))}
+                              className={cn(
+                                "px-4 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all",
+                                form.cities.includes(city)
+                                  ? "bg-emerald-500 border-emerald-400 text-white"
+                                  : "bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-700"
+                              )}
+                            >
+                              {city}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {form.cities.length > 0 && (
+                        <div className="md:col-span-2 space-y-3 animate-in slide-in-from-top-2">
+                          <label className="text-[10px] font-black uppercase text-emerald-500 px-2 italic">Operating Areas / Districts*</label>
+                          <div className="flex flex-wrap gap-2 p-6 rounded-3xl bg-emerald-500/5 border border-emerald-500/20">
+                            {form.cities.flatMap(city => AREA_MAP[city] || []).filter((v, i, a) => a.indexOf(v) === i).map(area => (
+                              <button
+                                key={area}
+                                type="button"
+                                onClick={() => setForm(f => ({ 
+                                  ...f, 
+                                  areas: f.areas.includes(area) ? f.areas.filter(a => a !== area) : [...f.areas, area] 
+                                }))}
+                                className={cn(
+                                  "px-4 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all",
+                                  form.areas.includes(area)
+                                    ? "bg-emerald-500 border-emerald-400 text-white"
+                                    : "bg-slate-900 border-slate-800 text-slate-500 hover:border-emerald-500/30"
+                                )}
+                              >
+                                {area}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pt-8 flex gap-4">
+                    <button 
+                      type="button"
+                      onClick={() => setShowForm(false)}
+                      className="flex-1 h-14 rounded-2xl border border-white/5 text-slate-400 font-black uppercase tracking-widest hover:bg-white/5 transition-all"
+                    >
+                      {t('cancel')}
+                    </button>
+                    <button 
+                      type="submit"
+                      className="flex-2 h-14 rounded-2xl bg-emerald-600 text-white font-black uppercase tracking-widest hover:bg-emerald-500 shadow-lg shadow-emerald-500/20 transition-all px-8"
+                    >
+                      {editingRep ? t('update') : t('onboardRep') || 'Deploy Representative'}
+                    </button>
+                  </div>
+                </form>
               </div>
-              <div className="flex gap-3 pt-2">
-                <Button type="button" variant="outline" onClick={() => setShowForm(false)} className="flex-1 dark:border-slate-600 dark:text-slate-300">{t('cancel') || 'Cancel'}</Button>
-                <Button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white">{editingRep ? (t('update') || 'Update') : (t('add') || 'Add')} {t('rep') || 'Rep'}</Button>
-              </div>
-            </form>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
         {allocationRep && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -396,104 +515,113 @@ export function PharmaSubordinates() {
           <Button onClick={() => setShowForm(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"><Plus className="h-4 w-4" /> {t('addFirstRepBtn') || 'Add First Rep'}</Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {rankedReps.map((rep, rankIdx) => {
             const actualVisits = repVisitCounts[rep.id] || 0;
             const progress = Math.min(Math.round((actualVisits / rep.target) * 100), 100);
             const rankColors = ['text-yellow-500', 'text-slate-400', 'text-amber-600'];
             return (
-              <div key={rep.id} className="bg-white dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl p-5 hover:shadow-lg transition-shadow">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="relative h-10 w-10">
-                      <div className="h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-sm">
-                        {rep.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+              <div key={rep.id} className="glass-card shadow-premium border dark:border-white/5 rounded-[2.5rem] p-8 transition-all hover:shadow-2xl group flex flex-col min-h-[440px]">
+                <div className="flex items-start justify-between mb-8">
+                  <div className="flex items-center gap-4">
+                    <div className="relative h-14 w-14">
+                      <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 font-black text-lg shadow-inner group-hover:scale-110 transition-transform">
+                        {rep.name.split(' ').filter(n => !n.includes('.')).map(n => n[0]).join('').slice(0, 2) || rep.name[0]}
                       </div>
                       {rankIdx < 3 && (
-                        <Trophy className={`absolute -top-1 -right-1 h-3.5 w-3.5 ${rankColors[rankIdx]}`} />
+                        <div className="absolute -top-2 -right-2 bg-slate-900 rounded-full p-1 border border-white/10 shadow-lg">
+                          <Trophy className={`h-4 w-4 ${rankColors[rankIdx]}`} />
+                        </div>
                       )}
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900 dark:text-white line-clamp-1">{rep.name}</h3>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        {rep.isVerified ? (
-                          rep.isActive ? (
-                            <ShieldCheck className="w-3 h-3 text-emerald-500" />
-                          ) : (
-                            <ShieldAlert className="w-3 h-3 text-red-500" />
-                          )
-                        ) : (
-                          <Clock className="w-3 h-3 text-amber-500" />
-                        )}
+                      <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight line-clamp-1">{rep.name}</h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className={cn(
+                          "h-1.5 w-1.5 rounded-full animate-pulse",
+                          rep.isActive ? "bg-emerald-500" : "bg-red-500"
+                        )} />
                         <span className={cn(
-                          "text-[10px] font-black uppercase tracking-widest italic",
-                          rep.isVerified ? (rep.isActive ? "text-emerald-500" : "text-red-500") : "text-amber-500"
+                          "text-[10px] font-black uppercase tracking-[0.2em] italic",
+                          rep.isActive ? "text-emerald-500" : "text-red-500"
                         )}>
-                          {rep.isVerified ? (rep.isActive ? t('active') : t('inactive') || 'Inactive') : (t('pending') || 'PENDING')}
+                          {rep.isActive ? t('active') : t('inactive')}
                         </span>
                       </div>
                     </div>
                   </div>
                   
-                  {rep.isVerified ? (
-                    <>
-                      <div className="flex items-center gap-2 pr-2 border-r dark:border-slate-700">
-                        <span className="text-[10px] font-black uppercase tracking-tighter text-slate-500">
-                          {rep.isActive ? t('active') : t('inactive') || 'Inactive'}
-                        </span>
-                        <Switch 
-                          checked={rep.isActive} 
-                          onCheckedChange={() => toggleActivation(rep)}
-                          className="scale-75"
-                        />
-                      </div>
-                      <button onClick={() => handleEdit(rep)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
-                        <Edit2 className="h-4 w-4 text-gray-400 dark:text-slate-500" />
-                      </button>
-                    </>
-                  ) : (
-                    <div className="flex items-center gap-2 pr-2 border-r dark:border-slate-700">
-                      <Button size="sm" onClick={() => handleApprove(rep)} className="bg-emerald-500 hover:bg-emerald-400 text-black h-8 text-[10px] uppercase font-black tracking-widest italic rounded-xl">
-                        {t('approve') || 'Approve'}
-                      </Button>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => handleEdit(rep)} className="h-10 w-10 rounded-xl bg-slate-500/5 flex items-center justify-center text-slate-400 hover:text-emerald-500 hover:bg-emerald-500/10 transition-all">
+                      <Edit2 className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => handleDelete(rep.id, rep.name)} className="h-10 w-10 rounded-xl bg-red-500/5 flex items-center justify-center text-red-500/60 hover:text-white hover:bg-red-500 transition-all">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
 
-                  <button onClick={() => handleDelete(rep.id, rep.name)} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors">
-                    <Trash2 className="h-4 w-4 text-red-500/60 hover:text-red-500" />
-                  </button>
-                </div>
-                <div className="space-y-2 text-sm text-gray-500 dark:text-slate-400 mb-4">
-                  {rep.email && <div className="flex items-center gap-2"><Mail className="h-3.5 w-3.5" />{rep.email}</div>}
-                  {rep.phone && <div className="flex items-center gap-2"><Phone className="h-3.5 w-3.5" />{rep.phone}</div>}
-                </div>
-                <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl mb-4 border dark:border-slate-700">
-                  <div>
-                    <div className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">{t('availableCredits') || 'Available Balance'}</div>
-                    <div className="text-lg font-bold text-gray-900 dark:text-white leading-none mt-1">{rep.balance || 0} <span className="text-[10px] font-medium opacity-60">{getCurrencyInfo(myCompany?.location?.country).code}</span></div>
+                <div className="flex-1 space-y-4 mb-8">
+                  <div className="grid grid-cols-2 gap-4">
+                     <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-1">
+                        <div className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest opacity-60">
+                           <Mail className="w-3 h-3" /> {t('email')}
+                        </div>
+                        <div className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1 truncate">{rep.email}</div>
+                     </div>
+                     <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-1">
+                        <div className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest opacity-60">
+                           <Phone className="w-3 h-3" /> {t('mobile')}
+                        </div>
+                        <div className="text-xs font-bold text-slate-900 dark:text-white truncate">{rep.phone}</div>
+                     </div>
                   </div>
-                  <Button size="sm" variant="outline" onClick={() => setAllocationRep(rep)} className="h-8 text-xs gap-1.5 border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10">
-                    <Plus className="h-3 w-3" /> {t('giveFunds')}
-                  </Button>
-                </div>
-                <div>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-gray-500 dark:text-slate-400">{t('monthlyProgress') || 'Monthly Progress (Real)'}</span>
-                    <span className="font-medium text-gray-700 dark:text-slate-300">{actualVisits}/{rep.target} {t('visits') || 'visits'}</span>
+
+                  <div className="glass-card bg-emerald-500/5 border border-emerald-500/10 p-5 rounded-2xl flex items-center justify-between shadow-inner">
+                    <div className="space-y-1">
+                      <div className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest opacity-60">{t('availableCredits')}</div>
+                      <div className="text-xl font-black text-slate-900 dark:text-white italic tracking-tighter">
+                        {rep.balance || 0} <span className="text-[10px] font-medium opacity-60 not-italic uppercase ml-1">{getCurrencyInfo(myCompany?.location?.country).code}</span>
+                      </div>
+                    </div>
+                    <Button onClick={() => setAllocationRep(rep)} className="h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest italic text-[10px] shadow-lg shadow-emerald-500/20">
+                      <Plus className="h-3 w-3 mr-1" /> {t('giveFunds')}
+                    </Button>
                   </div>
-                  <div className="h-1.5 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex justify-between items-end">
+                    <div className="space-y-1">
+                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest opacity-60">{t('monthlyProgress')}</span>
+                       <div className="text-sm font-black text-slate-900 dark:text-white uppercase italic tracking-tighter">{actualVisits} / {rep.target} {t('visits')}</div>
+                    </div>
+                    <div className="text-xl font-black italic tracking-tighter" style={{ color: progress >= 100 ? '#10b981' : progress >= 60 ? '#3b82f6' : '#f59e0b' }}>{progress}%</div>
+                  </div>
+                  <div className="h-2.5 bg-slate-100 dark:bg-slate-900 rounded-full overflow-hidden shadow-inner p-0.5">
                     <div
-                      className={`h-full rounded-full transition-all ${progress >= 100 ? 'bg-emerald-500' : progress >= 60 ? 'bg-blue-500' : 'bg-amber-500'}`}
+                      className={cn(
+                        "h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(0,0,0,0.1)]",
+                        progress >= 100 ? 'bg-emerald-500' : progress >= 60 ? 'bg-blue-500' : 'bg-amber-500'
+                      )}
                       style={{ width: `${progress}%` }}
                     />
                   </div>
-                  <div className="text-right text-xs mt-1 font-medium" style={{ color: progress >= 100 ? '#10b981' : progress >= 60 ? '#3b82f6' : '#f59e0b' }}>{progress}%</div>
                 </div>
               </div>
             );
           })}
         </div>
       )}
+      {/* Confirm Modal */}
+      <ActionConfirmModal
+        isOpen={confirmConfig.isOpen}
+        onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmConfig.onConfirm}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        variant={confirmConfig.variant}
+      />
     </div>
   );
 }
