@@ -110,16 +110,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setEmailVerified(false);
   };
 
-  const fetchVerificationStatus = async (uid: string, role: string | null) => {
+  const fetchVerificationStatus = async (uid: string, currentRole: string | null) => {
     // Check pending status from store
-    if (uid && role) {
+    if (uid && currentRole) {
       import('./store').then(async ({ getAuthorizationDetails }) => {
-        const { isPending, reason } = await getAuthorizationDetails(uid, role);
+        const { isPending, reason } = await getAuthorizationDetails(uid, currentRole);
         setIsPending(!!isPending);
         setRejectionReason(reason);
       });
     }
-    setEmailVerified(!!user?.email_confirmed_at);
+    
+    if (isSupabaseConfigured) {
+      const { data: { user: latestUser } } = await supabase.auth.getUser();
+      if (latestUser) {
+        setUser(latestUser);
+        setEmailVerified(!!latestUser.email_confirmed_at);
+      }
+    } else {
+      setEmailVerified(!!user?.email_confirmed_at);
+    }
   };
 
   const refreshVerificationStatus = async () => {

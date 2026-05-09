@@ -56,13 +56,16 @@ export const emailService = {
   },
 
   /**
-   * Resends verification email
+   * Resends verification link (Magic Link)
    */
   async resendVerification(userId: string, email: string, name: string) {
     if (!isSupabaseConfigured) return;
-    return supabase.auth.resend({
-      type: 'signup',
+    return supabase.auth.signInWithOtp({
       email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/`,
+        shouldCreateUser: true
+      }
     });
   }
 };

@@ -7,57 +7,13 @@ export interface EmailOptions {
 }
 
 /**
- * Service to send real-time emails. 
- * Note: For production security, this should always be triggered via a 
- * Supabase Edge Function to protect API keys.
+ * Service to send system notifications (Mocked as per requirements to use only native Supabase Auth)
  */
-export async function sendEmail({ to, subject, html }: EmailOptions, apiKeyOverride?: string) {
-  const apiKey = apiKeyOverride || import.meta.env.VITE_RESEND_API_KEY;
-
-  // Direct Resend API Call (High Priority for testing)
-  if (apiKey) {
-    try {
-      const response = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          from: 'Lomixa <onboarding@resend.dev>',
-          to: [to],
-          subject,
-          html
-        })
-      });
-      const data = await response.json();
-      return { ...data, mode: 'live' };
-    } catch (err) {
-      console.error('Direct Resend API call failed:', err);
-    }
-  }
-
-  // If Supabase is configured, we attempt to call an Edge Function 'send-email'
-  if (isSupabaseConfigured) {
-    try {
-      const { data, error } = await supabase.functions.invoke('send-email', {
-        body: { to, subject, html }
-      });
-      if (error) throw error;
-      return { ...data, mode: 'edge' };
-    } catch (err) {
-      console.warn('Supabase Edge Function email failed, falling back to log:', err);
-    }
-  }
-
-  // Fallback / Demo Mode: Log to console
-  console.log('--- EMAIL SENT (DEMO MODE) ---');
+export async function sendEmail({ to, subject, html }: EmailOptions) {
+  console.log('--- SYSTEM EMAIL (NATIVE SUPABASE AUTH ONLY) ---');
   console.log(`To: ${to}`);
   console.log(`Subject: ${subject}`);
-  console.log('--- Content Start ---');
-  console.log(html.replace(/<[^>]*>?/gm, ' ')); // Stripping HTML for console readability
-  console.log('--- Content End ---');
-  return { success: true, mode: 'demo' };
+  return { success: true, mode: 'native' };
 }
 
 /**
