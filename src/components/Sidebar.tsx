@@ -98,7 +98,7 @@ export function Sidebar() {
             name: t("pendingApprovalDesk"),
             href: "/admin-control/bundles",
             icon: CreditCard,
-            badge: getBundleRequests().filter((r) => r.status === "pending")
+            badge: getBundleRequests().filter((r) => r.status === "pending_approval")
               .length,
           },
           {

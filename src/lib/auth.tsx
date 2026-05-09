@@ -119,7 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRejectionReason(reason);
       });
     }
-    setEmailVerified(true);
+    setEmailVerified(!!user?.email_confirmed_at);
   };
 
   const refreshVerificationStatus = async () => {

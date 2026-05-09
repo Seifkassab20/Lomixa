@@ -256,7 +256,7 @@ export function RoleSelection() {
               </li>
               <li>
                 <Link
-                  to="/select-role"
+                  to="/register"
                   className="text-sm text-slate-400 hover:text-emerald-500 transition-colors font-medium"
                 >
                   {t("initiateRegistration")}

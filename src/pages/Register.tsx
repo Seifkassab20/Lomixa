@@ -244,6 +244,13 @@ export function Register() {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (!isPending && !user) {
+      toast("Please verify your email first.", "error");
+      navigate("/register");
+    }
+  }, [user, isPending, navigate]);
+
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
@@ -376,60 +383,37 @@ export function Register() {
       let isEmailConfirmationRequired = false;
 
       if (isSupabaseConfigured) {
-        if (user) {
-          const oldRole = user.user_metadata?.role;
-          if (oldRole && oldRole !== selectedRole) {
-            deleteUserEntity(user.id, oldRole);
-          }
-
-          const updatePayload: any = {
-            data: {
-              role: selectedRole,
-              full_name:
-                selectedRole === "doctor" || selectedRole === "rep"
-                  ? `${formData.firstName} ${formData.lastName}`
-                  : formData.organizationName,
-              phone: `${formData.phoneCode}${formData.phone}`,
-              country: formData.country,
-            }
-          };
-
-          if (formData.email !== user.email) {
-            updatePayload.email = formData.email;
-            isEmailConfirmationRequired = true;
-          }
-
-          const { error: authError } = await supabase.auth.updateUser(updatePayload);
-          if (authError) throw new Error(`Profile update failed: ${authError.message}`);
-          finalUserId = user.id;
-        } else {
-          const { data: authData, error: authError } = await supabase.auth.signUp(
-            {
-              email: formData.email,
-              password: formData.password,
-              options: {
-                data: {
-                  role: selectedRole,
-                  full_name:
-                    selectedRole === "doctor" || selectedRole === "rep"
-                      ? `${formData.firstName} ${formData.lastName}`
-                      : formData.organizationName,
-                  phone: `${formData.phoneCode}${formData.phone}`,
-                  country: formData.country,
-                },
-              },
-            },
-          );
-
-          if (authError)
-            throw new Error(`Registration failed: ${authError.message}`);
-          if (authData?.user?.id) {
-            finalUserId = authData.user.id;
-            if (!authData.session) {
-              isEmailConfirmationRequired = true;
-            }
-          }
+        if (!user) throw new Error("Authentication required for profile completion.");
+        
+        const oldRole = user.user_metadata?.role;
+        if (oldRole && oldRole !== selectedRole) {
+          deleteUserEntity(user.id, oldRole);
         }
+
+        const isAutoApproved = selectedRole === "doctor" || selectedRole === "admin";
+
+        const updatePayload: any = {
+          password: formData.password,
+          data: {
+            role: selectedRole,
+            registration_state: isAutoApproved ? 'completed' : 'awaiting_admin_approval',
+            full_name:
+              selectedRole === "doctor" || selectedRole === "rep"
+                ? `${formData.firstName} ${formData.lastName}`
+                : formData.organizationName,
+            phone: `${formData.phoneCode}${formData.phone}`,
+            country: formData.country,
+          }
+        };
+
+        if (formData.email !== user.email) {
+          updatePayload.email = formData.email;
+          isEmailConfirmationRequired = true;
+        }
+
+        const { error: authError } = await supabase.auth.updateUser(updatePayload);
+        if (authError) throw new Error(`Profile update failed: ${authError.message}`);
+        finalUserId = user.id;
       } else {
         // In demo mode, use a predictable ID that AuthProvider will generate
         finalUserId = `demo_${selectedRole}_user`;
@@ -469,9 +453,9 @@ export function Register() {
               ? hospitals.find((h) => h.id === formData.selectedHospitalId)
                   ?.name || t("pendingHospital")
               : formData.organizationName || t("independentClinic"),
-          isVerified: false,
+          isVerified: true,
           isActive: true,
-          approvalStatus: 'pending_approval',
+          approvalStatus: 'approved',
           availability: [],
         });
       } else if (selectedRole === "rep") {
@@ -551,7 +535,7 @@ export function Register() {
               : (selectedRole as any),
           isActive: true,
           isVerified: false,
-          approvalStatus: 'pending_approval',
+          approvalStatus: 'pending_approval' as const,
           documents: {
             commercial: !!(formData as any).commCertificate,
             address: !!(formData as any).natAddress,
@@ -1082,10 +1066,9 @@ export function Register() {
                         />
                       </div>
                     </div>
-                    {!user && (
                       <div className="md:col-span-2 space-y-3">
                         <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic">
-                          {t("securityKey")}*
+                          {t("securityKey")} (Set Your Password)*
                         </Label>
                         <Input
                           type="password"
@@ -1096,7 +1079,6 @@ export function Register() {
                           className="h-14 rounded-2xl bg-black/40 border-slate-800 focus:border-emerald-500 tracking-widest font-bold"
                         />
                       </div>
-                    )}
                   </div>
 
                   {/* ROLE SPECIFIC & LOCATION */}

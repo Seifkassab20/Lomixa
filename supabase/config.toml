@@ -229,7 +229,7 @@ otp_expiry = 3600
 # host = "smtp.sendgrid.net"
 # port = 587
 # user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
+# pass = ""
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
@@ -402,35 +402,3 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
 
-[functions.send-email]
-enabled = true
-verify_jwt = true
-import_map = "./functions/send-email/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
-entrypoint = "./functions/send-email/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/send-email/*.html" ]
-
-[functions.auth-tokens]
-enabled = true
-verify_jwt = true
-import_map = "./functions/auth-tokens/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
-entrypoint = "./functions/auth-tokens/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/auth-tokens/*.html" ]
-
-[functions.meeting-reminders]
-enabled = true
-verify_jwt = true
-import_map = "./functions/meeting-reminders/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
-entrypoint = "./functions/meeting-reminders/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/meeting-reminders/*.html" ]

@@ -12,6 +12,7 @@ import logo from '@/assets/logo.svg';
 
 // Lazy load pages for performance
 const Login = lazy(() => import('./pages/Login').then(m => ({ default: m.Login })));
+const RegisterPhase1 = lazy(() => import('./pages/RegisterPhase1').then(m => ({ default: m.RegisterPhase1 })));
 const Register = lazy(() => import('./pages/Register').then(m => ({ default: m.Register })));
 const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
 const Onboarding = lazy(() => import('./pages/Onboarding').then(m => ({ default: m.Onboarding })));
@@ -46,7 +47,7 @@ function OnboardingWrapper() {
   const navigate = useNavigate();
   const handleComplete = () => {
     localStorage.setItem('lomixa_onboarding_seen', 'true');
-    navigate('/select-role');
+    navigate('/register');
   };
   return <Onboarding onComplete={handleComplete} />;
 }
@@ -84,7 +85,7 @@ function InitialCheck() {
     return <Navigate to="/onboarding" replace />;
   }
 
-  return <Navigate to="/select-role" replace />;
+  return <Navigate to="/login" replace />;
 }
 
 export default function App() {
@@ -120,7 +121,7 @@ export default function App() {
                 <Route path="/onboarding" element={<OnboardingWrapper />} />
                 <Route path="/select-role" element={<RoleSelection />} />
                 <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
+                <Route path="/register" element={<RegisterPhase1 />} />
                 <Route path="/register/:role" element={<Register />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />

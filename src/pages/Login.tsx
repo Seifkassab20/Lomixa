@@ -484,7 +484,7 @@ export function Login() {
                   <p className="text-xs text-slate-500 uppercase tracking-[0.2em] font-black italic">
                     {t("newToPlatform")}{" "}
                     <Link
-                      to="/select-role"
+                      to="/register"
                       className="text-emerald-500 hover:text-white transition-colors"
                     >
                       {t("initiateRegistration")}
@@ -535,7 +535,7 @@ export function Login() {
               </li>
               <li>
                 <Link
-                  to="/select-role"
+                  to="/register"
                   className="text-sm text-slate-400 hover:text-emerald-500 transition-colors font-medium"
                 >
                   {t("initiateRegistration")}
