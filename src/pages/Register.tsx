@@ -245,7 +245,7 @@ export function Register() {
   }, [user]);
 
   useEffect(() => {
-    if (!isPending && !user) {
+    if (!isPending && (!user || (!user.email_confirmed_at && !user.id.startsWith('demo_')))) {
       toast("Please verify your email first.", "error");
       navigate("/register");
     }

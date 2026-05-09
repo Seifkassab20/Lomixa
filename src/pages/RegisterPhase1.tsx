@@ -21,8 +21,8 @@ export function RegisterPhase1() {
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(0);
-  const [isPending, setIsPending] = useState(false);
   const [showExistsModal, setShowExistsModal] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
 
   React.useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -38,9 +38,13 @@ export function RegisterPhase1() {
     setLoading(true);
 
     try {
+      // Ensure no stale session exists before starting a new registration
+      if (isSupabaseConfigured) {
+        await supabase.auth.signOut();
+      }
       if (!isSupabaseConfigured) {
         toast("Demo mode: Simulated verification email sent.", "success");
-        setIsPending(true);
+        setShowVerificationModal(true);
         return;
       }
 
@@ -71,8 +75,8 @@ export function RegisterPhase1() {
         throw new Error(`Registration failed: ${error.message}`);
       }
 
-      // If a session is returned, the user was auto-confirmed or already logged in.
-      if (data?.session) {
+      // If a session is returned and the user is confirmed, redirect to home.
+      if (data?.session && data.user?.email_confirmed_at) {
         navigate("/");
         return;
       }
@@ -83,7 +87,7 @@ export function RegisterPhase1() {
         return;
       }
 
-      setIsPending(true);
+      setShowVerificationModal(true);
       window.scrollTo(0, 0);
     } catch (err: any) {
       toast(err.message, "error");
@@ -142,113 +146,115 @@ export function RegisterPhase1() {
       </motion.div>
 
       <main className="w-full max-w-xl flex-1">
-        <AnimatePresence mode="wait">
-          {!isPending ? (
-            <motion.div
-              key="phase1"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="rounded-[3.5rem] p-12 bg-slate-900/30 border border-white/5 backdrop-blur-xl shadow-3xl space-y-12"
-            >
-              <div className="space-y-4 text-center">
-                <h1 className="text-4xl font-black text-white italic tracking-tighter uppercase">
-                  Identity Verification
-                </h1>
-                <p className="text-slate-400 font-bold text-sm uppercase tracking-widest leading-relaxed">
-                  Enter your email address to begin the secure registration process.
-                </p>
+        <motion.div
+          key="phase1"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="rounded-[3.5rem] p-12 bg-slate-900/30 border border-white/5 backdrop-blur-xl shadow-3xl space-y-12"
+        >
+          <div className="space-y-4 text-center">
+            <h1 className="text-4xl font-black text-white italic tracking-tighter uppercase">
+              Identity Verification
+            </h1>
+            <p className="text-slate-400 font-bold text-sm uppercase tracking-widest leading-relaxed">
+              Enter your email address to begin the secure registration process.
+            </p>
+          </div>
+
+          <form onSubmit={handleRegister} className="space-y-8">
+            <div className="space-y-3">
+              <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic">
+                Email Address*
+              </Label>
+              <div className="relative group/input">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500 group-focus-within/input:text-emerald-500 transition-colors" />
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  placeholder="Enter your professional email"
+                  className="h-16 pl-14 rounded-2xl bg-black/40 border-slate-800 font-bold focus:border-emerald-500 text-base"
+                />
               </div>
+            </div>
 
-              <form onSubmit={handleRegister} className="space-y-8">
-                <div className="space-y-3">
-                  <Label className="text-[10px] font-black uppercase text-slate-500 px-2 tracking-widest italic">
-                    Email Address*
-                  </Label>
-                  <div className="relative group/input">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500 group-focus-within/input:text-emerald-500 transition-colors" />
-                    <Input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      placeholder="Enter your professional email"
-                      className="h-16 pl-14 rounded-2xl bg-black/40 border-slate-800 font-bold focus:border-emerald-500 text-base"
-                    />
-                  </div>
+            <Button
+              type="submit"
+              disabled={loading || !email.trim()}
+              className="w-full h-16 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-black uppercase tracking-[0.2em] text-sm shadow-xl shadow-emerald-900/40 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            >
+              {loading ? (
+                t("processing") || "Processing..."
+              ) : (
+                <div className="flex items-center gap-3">
+                  Verify Identity
+                  <ShieldCheck className={cn("w-5 h-5")} />
                 </div>
+              )}
+            </Button>
 
-                <Button
-                  type="submit"
-                  disabled={loading || !email.trim()}
-                  className="w-full h-16 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-black uppercase tracking-[0.2em] text-sm shadow-xl shadow-emerald-900/40 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            <div className="text-center pt-4 border-t border-white/5">
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 flex items-center justify-center gap-4">
+                <span>{t("alreadyHaveAccount")}</span>
+                <Link
+                  to="/login"
+                  className="text-emerald-500 hover:text-white transition-all underline underline-offset-8 decoration-emerald-500/30"
                 >
-                  {loading ? (
-                    t("processing") || "Processing..."
-                  ) : (
-                    <div className="flex items-center gap-3">
-                      Verify Identity
-                      <ChevronRight className={cn("w-5 h-5", isRTL && "rotate-180")} />
-                    </div>
-                  )}
-                </Button>
+                  {t("signIn")}
+                </Link>
+              </p>
+            </div>
+          </form>
+        </motion.div>
+      </main>
 
-                <div className="text-center pt-4 border-t border-white/5">
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 flex items-center justify-center gap-4">
-                    <span>{t("alreadyHaveAccount")}</span>
-                    <Link
-                      to="/login"
-                      className="text-emerald-500 hover:text-white transition-all underline underline-offset-8 decoration-emerald-500/30"
-                    >
-                      {t("signIn")}
-                    </Link>
-                  </p>
-                </div>
-              </form>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="pending"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="text-center space-y-10 rounded-[3.5rem] p-12 bg-slate-900/30 border border-emerald-500/20 backdrop-blur-xl shadow-3xl"
+      {/* Verification Pending Modal */}
+      <AnimatePresence>
+        {showVerificationModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/90 backdrop-blur-xl">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="w-full max-w-lg bg-slate-900 border-2 border-emerald-500/20 rounded-[3.5rem] p-12 shadow-4xl text-center space-y-10 relative overflow-hidden"
             >
-              <div className="w-32 h-32 mx-auto rounded-[3rem] bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 shadow-2xl shadow-emerald-500/20 relative animate-pulse-slow">
-                <ShieldCheck className="w-16 h-16 text-emerald-400 relative z-10" />
-                <div className="absolute inset-0 bg-emerald-500/20 rounded-[3rem] blur-xl"></div>
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
+              
+              <div className="w-24 h-24 mx-auto rounded-[2.5rem] bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center relative animate-pulse-slow">
+                <Mail className="w-10 h-10 text-emerald-400 z-10" />
+                <div className="absolute inset-0 bg-emerald-500/20 rounded-[2.5rem] blur-xl"></div>
               </div>
-
-              <div className="space-y-6">
-                <h2 className="text-4xl font-black uppercase italic tracking-tighter text-white">
-                  Verification Sent
-                </h2>
-                <div className="bg-black/40 p-6 rounded-3xl border border-white/5 inline-block">
-                  <p className="text-emerald-400 font-bold font-mono tracking-wider">{email}</p>
-                </div>
-                <p className="text-slate-400 font-bold max-w-sm mx-auto leading-relaxed text-sm">
-                  We have sent a secure verification link to your email address. Please click the link to verify your identity and continue the registration process.
+              
+              <div className="space-y-4">
+                <h3 className="text-3xl font-black uppercase italic tracking-tighter text-white leading-tight">
+                  Verification Pending
+                </h3>
+                <p className="text-slate-400 text-sm font-medium leading-relaxed italic">
+                  We've sent a secure link to <span className="text-emerald-400 font-bold font-mono underline decoration-emerald-500/30">{email}</span>. Please click the link in your email to continue registration.
                 </p>
               </div>
 
-              <div className="pt-8 border-t border-white/5 space-y-6 flex flex-col items-center">
-                <p className="text-xs text-slate-500 font-black uppercase tracking-widest italic">
+              <div className="bg-white/5 rounded-2xl p-6 border border-white/5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4">
                   Didn't receive the email?
                 </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <Button
-                    onClick={handleResend}
-                    disabled={resendLoading || resendCountdown > 0}
-                    variant="outline"
-                    className="h-14 px-8 rounded-2xl border-slate-700 bg-slate-900 text-white font-black uppercase tracking-widest hover:border-emerald-500 hover:text-emerald-400 disabled:opacity-50"
-                  >
-                    {resendLoading ? "Sending..." : resendCountdown > 0 ? `Resend in ${resendCountdown}s` : "Resend Email"}
-                  </Button>
-                </div>
+                <Button 
+                  onClick={handleResend}
+                  disabled={resendLoading || resendCountdown > 0}
+                  className="h-14 px-10 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black uppercase tracking-[0.2em] text-[10px] shadow-xl shadow-emerald-500/20 disabled:opacity-50"
+                >
+                  {resendLoading ? "Sending..." : resendCountdown > 0 ? `Resend in ${resendCountdown}s` : "Resend Verification Email"}
+                </Button>
               </div>
+
+              <p className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-600">
+                LOMIXA Identity Protocol · Secure Node
+              </p>
             </motion.div>
-          )}
-        </AnimatePresence>
-      </main>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Existing Email Modal */}
       <AnimatePresence>

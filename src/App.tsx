@@ -73,6 +73,17 @@ function InitialCheck() {
   if (authLoading || (user && authorized === null)) return null;
 
   if (user) {
+    // If email is not confirmed, we should stay at the root or go to dashboard 
+    // where Layout will catch the unverified state. 
+    // We only go to select-role if verified AND missing role.
+    // STRICT GATING: If email is not confirmed, they MUST go to dashboard
+    // to be handled by the Layout verification screen.
+    // They are NOT allowed to reach select-role.
+    if (!user.email_confirmed_at && !user.id.startsWith('demo_')) {
+      console.log("[InitialCheck] Email unconfirmed, forcing to dashboard gate");
+      return <Navigate to="/dashboard" replace />;
+    }
+
     if (!user.user_metadata?.role) {
       console.log("[InitialCheck] Missing role, redirecting to select-role");
       return <Navigate to="/select-role" replace />;

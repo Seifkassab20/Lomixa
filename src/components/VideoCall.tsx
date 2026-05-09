@@ -40,14 +40,19 @@ export function VideoCall({ appointment, onClose }: VideoCallProps) {
     // Time enforcement interval
     const timeInterval = setInterval(async () => {
       const now = await getServerTime();
+      const start = new Date(appointment.startTime);
       const end = new Date(appointment.endTime);
-      const diff = end.getTime() - now.getTime();
       
-      if (diff <= 0) {
+      const fiveMins = 5 * 60 * 1000;
+      
+      if (now.getTime() < start.getTime() - fiveMins) {
         clearInterval(timeInterval);
-        endCall('Session انتهت');
+        endCall(t('tooEarlyToJoin') || 'It is too early to join this session.');
+      } else if (now.getTime() > end.getTime()) {
+        clearInterval(timeInterval);
+        endCall(t('sessionEnded') || 'Session انتهت');
       } else {
-        setTimeLeft(Math.floor(diff / 1000));
+        setTimeLeft(Math.floor((end.getTime() - now.getTime()) / 1000));
       }
     }, 5000);
 

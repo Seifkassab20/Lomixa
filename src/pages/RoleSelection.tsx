@@ -1,5 +1,6 @@
 import React from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, Navigate } from "react-router-dom";
+import { useAuth } from "@/lib/auth";
 import { motion } from "motion/react";
 import { useTranslation } from "react-i18next";
 import {
@@ -25,6 +26,12 @@ import { cn } from "@/lib/utils";
 export function RoleSelection() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
+
+  if (loading) return null;
+  if (user && !user.email_confirmed_at && !user.id.startsWith('demo_')) {
+    return <Navigate to="/" replace />;
+  }
   const isRTL = i18n.language === "ar";
   const [logoClicks, setLogoClicks] = React.useState(0);
   const [showAdmin, setShowAdmin] = React.useState(false);
