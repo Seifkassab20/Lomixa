@@ -278,7 +278,7 @@ export function Login() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: 0.4 }}
           className="w-full max-w-[1000px] flex flex-col lg:grid lg:grid-cols-2 gap-16 items-center"
         >
           {/* Brand Presentation */}
@@ -308,7 +308,7 @@ export function Login() {
                   </h2>
                 </div>
 
-                <AnimatePresence mode="wait">
+                <AnimatePresence mode="popLayout">
                   {!isResetMode ? (
                     <motion.form
                       key="login"

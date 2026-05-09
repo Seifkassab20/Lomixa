@@ -767,13 +767,14 @@ export function Register() {
           </div>
 
           <form onSubmit={handleNextStep} className="space-y-16 pb-32">
-            <AnimatePresence mode="wait">
+            <AnimatePresence mode="popLayout">
               {step === 1 ? (
                 <motion.div
                   key="step1"
-                  initial={{ opacity: 0, x: -20 }}
+                  initial={{ opacity: 0, x: -15 }}
                   animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
+                  exit={{ opacity: 0, x: 15 }}
+                  transition={{ duration: 0.2 }}
                   className="rounded-[3.5rem] p-12 bg-slate-900/30 border border-white/5 backdrop-blur-xl shadow-3xl space-y-12"
                 >
                   {/* PROFILE LOGO CLUSTER */}
@@ -1603,8 +1604,9 @@ export function Register() {
               ) : (
                 <motion.div
                   key="step3"
-                  initial={{ opacity: 0, scale: 0.95 }}
+                  initial={{ opacity: 0, scale: 0.98 }}
                   animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.2 }}
                   className="flex flex-col items-center justify-center text-center space-y-12 py-20"
                 >
                   <div className="relative">

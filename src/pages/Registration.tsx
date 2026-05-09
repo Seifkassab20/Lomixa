@@ -150,8 +150,9 @@ export function Registration() {
       <main className="w-full max-w-xl flex-1">
         <motion.div
           key="phase1"
-          initial={{ opacity: 0, x: -20 }}
+          initial={{ opacity: 0, x: -10 }}
           animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.2 }}
           className="rounded-[3.5rem] p-12 bg-slate-900/30 border border-white/5 backdrop-blur-xl shadow-3xl space-y-12"
         >
           <div className="space-y-4 text-center">

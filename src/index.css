@@ -39,14 +39,6 @@
 
 /* ── Base Styles ── */
 @layer base {
-  *,
-  *::before,
-  *::after {
-    transition-property: background-color, border-color, color, fill, stroke, transform, box-shadow;
-    transition-duration: 300ms;
-    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
   :root {
     /* Font Sizes - Optimized for Hierarchy */
     --font-size-title: 2.5rem;
