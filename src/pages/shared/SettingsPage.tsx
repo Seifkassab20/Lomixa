@@ -814,9 +814,9 @@ export function SettingsPage() {
                 },
                 {
                   id: "oasis",
-                  name: "Desert Oasis",
-                  color: "bg-[#0d9488]",
-                  desc: t("warm_premium") || "Warm Premium",
+                  name: "Amethyst Glow",
+                  color: "bg-[#9333ea]",
+                  desc: t("modern_premium") || "Modern Premium",
                 },
               ].map((p) => (
                 <button

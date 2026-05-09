@@ -1,10 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100;200;300;400;500;600;700;800;900&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@100;200;300;400;500;600;700;800;900&display=swap");
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
   --font-outfit: "Outfit", sans-serif;
-  
+
   --color-brand: var(--brand-clr);
   --color-brand-foreground: var(--brand-fg);
   --color-brand-muted: var(--brand-muted);
@@ -21,7 +21,8 @@
   --text-button: var(--font-size-button);
 
   /* Premium Shadows */
-  --shadow-premium: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-premium:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
 
   /* Custom Animations */
@@ -29,8 +30,12 @@
   --animate-shimmer: shimmer 2.5s infinite linear;
 
   @keyframes shimmer {
-    from { background-position: 0% 0%; }
-    to { background-position: 200% 0%; }
+    from {
+      background-position: 0% 0%;
+    }
+    to {
+      background-position: 200% 0%;
+    }
   }
 }
 
@@ -64,13 +69,18 @@
 
   body {
     background-color: var(--app-bg);
-    color: #334155; 
+    color: #334155;
     font-size: var(--font-size-text);
     line-height: 1.6;
     letter-spacing: -0.011em;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-weight: 900;
     letter-spacing: -0.04em;
     color: #0f172a;
@@ -87,10 +97,15 @@
   }
 
   .dark body {
-    color: #94a3b8; 
+    color: #94a3b8;
   }
 
-  .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+  .dark h1,
+  .dark h2,
+  .dark h3,
+  .dark h4,
+  .dark h5,
+  .dark h6 {
     color: #f8fafc;
   }
 
@@ -138,4 +153,17 @@
     --fc-today-bg-color: rgba(5, 150, 105, 0.1);
     --fc-now-indicator-color: #ef4444;
   }
+}
+
+/* ── Theme Presets ── */
+[data-theme="sapphire"] {
+  --brand-clr: #4f46e5;
+  --brand-dark: #4338ca;
+  --brand-muted: rgba(79, 70, 229, 0.1);
+}
+
+[data-theme="oasis"] {
+  --brand-clr: #9333ea;
+  --brand-dark: #7e22ce;
+  --brand-muted: rgba(147, 51, 234, 0.1);
 }

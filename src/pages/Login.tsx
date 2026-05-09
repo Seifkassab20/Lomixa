@@ -181,7 +181,7 @@ export function Login() {
   const roles = [
     {
       id: "hospital",
-      title: t("hospital"),
+      title: t("hospitalClinicRole"),
       icon: Activity,
       color: "bg-emerald-500",
       light: "bg-emerald-500/10",

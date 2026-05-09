@@ -120,12 +120,12 @@ export function PharmaDashboard() {
           <div key={label} className="glass-card shadow-premium border dark:border-white/5 rounded-[2.5rem] p-8 transition-all hover:scale-[1.02] group">
             <div className="flex items-center justify-between mb-6">
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 opacity-60">{label}</span>
-              <div className={`h-12 w-12 rounded-2xl bg-${color}-500/10 flex items-center justify-center shadow-inner group-hover:scale-110 group-hover:rotate-3 transition-all duration-500`}>
-                <Icon className={`h-6 w-6 text-${color}-600 dark:text-${color}-400`} />
+              <div className="h-12 w-12 rounded-2xl bg-brand/10 flex items-center justify-center shadow-inner group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
+                <Icon className="h-6 w-6 text-brand" />
               </div>
             </div>
             <div className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter italic leading-none">{value}</div>
-            {sub && <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-4 uppercase tracking-[0.2em] italic">{sub}</div>}
+            {sub && <div className="text-[10px] font-bold text-brand mt-4 uppercase tracking-[0.2em] italic">{sub}</div>}
           </div>
         ))}
       </div>
@@ -139,12 +139,12 @@ export function PharmaDashboard() {
           <div className="flex items-center justify-between mb-8">
             <div className="space-y-1">
               <h3 className="text-xl font-black uppercase italic tracking-tighter text-slate-900 dark:text-white flex items-center gap-3">
-                <CalendarIcon className="w-5 h-5 text-emerald-500" />
+                <CalendarIcon className="w-5 h-5 text-brand" />
                 {t('recentVisits')}
               </h3>
               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em] italic opacity-60 ml-8">{t('latestActivityOverview')}</p>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/bookings')} className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 h-10 px-4 rounded-xl border border-emerald-500/20">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/bookings')} className="text-[10px] font-black uppercase tracking-widest text-brand hover:bg-brand/10 h-10 px-4 rounded-xl border border-brand/20">
               {t('viewAll')}
             </Button>
           </div>
@@ -157,7 +157,7 @@ export function PharmaDashboard() {
                 return (
                   <div key={visit.id} className="flex items-center justify-between p-4 rounded-2xl border dark:border-white/5 hover:bg-white dark:hover:bg-white/5 transition-all group shadow-sm">
                     <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 shadow-inner group-hover:scale-110 transition-transform">
+                      <div className="h-12 w-12 rounded-xl bg-brand/10 flex items-center justify-center text-brand shadow-inner group-hover:scale-110 transition-transform">
                         <TypeIcon className="h-5 w-5" />
                       </div>
                       <div>
@@ -178,7 +178,7 @@ export function PharmaDashboard() {
         {/* Chart */}
         <div className="glass-card shadow-premium border dark:border-white/5 rounded-[2.5rem] p-8">
           <h3 className="text-xl font-black uppercase italic tracking-tighter text-slate-900 dark:text-white mb-8 flex items-center gap-3">
-            <TrendingUp className="w-5 h-5 text-emerald-500" />
+            <TrendingUp className="w-5 h-5 text-brand" />
             {t('monthlyVisits')}
           </h3>
           <ResponsiveContainer width="100%" height={220}>
@@ -190,7 +190,7 @@ export function PharmaDashboard() {
                 cursor={{ fill: 'currentColor', opacity: 0.05 }}
                 contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '1rem', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} 
               />
-              <Bar dataKey="visits" fill="#10b981" radius={[4, 4, 0, 0]} barSize={24} />
+              <Bar dataKey="visits" fill="var(--brand-clr)" radius={[4, 4, 0, 0]} barSize={24} />
             </BarChart>
           </ResponsiveContainer>
         </div>
