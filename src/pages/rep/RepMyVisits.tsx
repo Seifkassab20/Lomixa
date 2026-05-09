@@ -256,7 +256,7 @@ export function RepMyVisits() {
                       const appointment = getAppointments().find(a => 
                         a.doctorId === visit.doctorId && 
                         a.repId === visit.repId && 
-                        a.startTime.includes(visit.date)
+                        new Date(a.startTime).toDateString() === new Date(visit.date).toDateString()
                       );
                       
                       if (!appointment) return null;
@@ -269,19 +269,37 @@ export function RepMyVisits() {
                       
                       return (
                         <div className="flex flex-col items-end gap-1">
-                          {isNow ? (
-                            <Button size="sm" onClick={() => setActiveAppointment(appointment)} className="gap-1 bg-[#39b596] hover:bg-emerald-500 text-white h-8 text-xs font-bold animate-pulse">
-                              <Video className="h-3.5 w-3.5" /> {t('joinCall') || 'Join Call'}
-                            </Button>
-                          ) : isFuture ? (
-                            <span className="text-[10px] text-amber-500 font-bold bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 italic">
-                              {t('callNotAvailableYet') || 'Call not available yet'}
-                            </span>
-                          ) : (
-                            <span className="text-[10px] text-slate-500 font-bold bg-slate-500/10 px-2 py-1 rounded border border-slate-500/20 italic">
-                              {t('appointmentEnded') || 'Appointment انتهت'}
-                            </span>
-                          )}
+                          {(() => {
+                            const now = serverTime.getTime();
+                            const start = new Date(appointment.startTime).getTime();
+                            const end = new Date(appointment.endTime).getTime();
+                            const fiveMins = 5 * 60 * 1000;
+                            
+                            const isNow = now >= start && now <= end;
+                            const isEarly = now >= (start - fiveMins) && now < start;
+                            const isFuture = now < (start - fiveMins);
+                            const isEnded = now > end;
+
+                            if (isNow || isEarly) {
+                              return (
+                                <Button size="sm" onClick={() => setActiveAppointment(appointment)} className={cn("gap-1 text-white h-8 text-xs font-bold shadow-lg", isNow ? "bg-[#39b596] hover:bg-emerald-500 animate-pulse shadow-emerald-500/20" : "bg-blue-600 hover:bg-blue-700 shadow-blue-500/20")}>
+                                  <Video className="h-3.5 w-3.5" /> {t('joinNow') || 'Join Now'}
+                                </Button>
+                              );
+                            } else if (isFuture) {
+                              return (
+                                <span className="text-[10px] text-amber-500 font-bold bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 italic">
+                                  {t('callNotAvailableYet') || 'Call not available yet'}
+                                </span>
+                              );
+                            } else {
+                              return (
+                                <span className="text-[10px] text-slate-500 font-bold bg-slate-500/10 px-2 py-1 rounded border border-slate-500/20 italic">
+                                  {t('appointmentEnded') || 'Appointment Ended'}
+                                </span>
+                              );
+                            }
+                          })()}
                         </div>
                       );
                     })()}

@@ -10,6 +10,7 @@ import { isUserAuthorized, isRepSubscribed, getBundleRequests, useStoreListener 
 import { ShieldAlert, Rocket, Clock } from 'lucide-react';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { emailService } from '@/lib/emailService';
 import { useToast } from './ui/Toast';
 import { LogoutConfirmModal } from './LogoutConfirmModal';
@@ -98,9 +99,7 @@ export function Layout() {
     return <Navigate to="/login" replace />;
   }
 
-  // Verification Block - Temporarily disabled
-  /*
-  if (!emailVerified) {
+  if (!emailVerified && isSupabaseConfigured && role !== 'admin' && role !== 'doctor') {
     return (
       <div className="flex h-screen items-center justify-center bg-[#050b14] p-6 overflow-hidden relative">
          <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-[120px] -z-10 animate-pulse-slow"></div>
@@ -126,7 +125,13 @@ export function Layout() {
               </Button>
               <Button 
                 variant="outline" 
-                onClick={() => refreshVerificationStatus()}
+                onClick={() => {
+                  if (isSupabaseConfigured) {
+                    supabase.auth.getUser().then(() => refreshVerificationStatus());
+                  } else {
+                    refreshVerificationStatus();
+                  }
+                }}
                 className="h-14 rounded-2xl border-white/5 bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest"
               >
                 {t('iHaveVerified')}
@@ -143,7 +148,6 @@ export function Layout() {
       </div>
     );
   }
-  */
 
   if (!user || authorized === false) {
     return <Navigate to="/login" replace />;
@@ -151,7 +155,7 @@ export function Layout() {
 
   // Handle Pending Registration State globally
   // Admins always bypass the pending screen
-  if (isPending && role !== 'admin') {
+  if (isPending && role !== 'admin' && role !== 'doctor') {
     return (
       <>
         <PendingScreen role={role} rejectionReason={rejectionReason} onSignOut={() => setShowLogoutConfirm(true)} />

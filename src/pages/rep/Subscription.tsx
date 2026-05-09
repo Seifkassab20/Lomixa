@@ -73,7 +73,7 @@ export function RepSubscription() {
         price: price,
         cardNumber: paymentData.cardNo.slice(-4) || '0000',
         cardHolder: paymentData.cardHolder,
-        status: 'pending',
+        status: 'pending_approval',
         date: new Date().toISOString(),
         type: 'rep'
       });

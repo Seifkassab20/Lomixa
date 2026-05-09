@@ -17,25 +17,14 @@ export default function ForgotPassword() {
     setError('');
 
     try {
-      // Find the user first to make sure they exist (optional, or backend can do it)
-      // Since we rely on auth.users we can't query by email unless we have RPC.
-      // But we can just use supabase.auth.resetPasswordForEmail! Wait, we built custom token generation!
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
       
-      // We will look up the user in user_security directly if possible, but RLS prevents it.
-      // Alternatively, we use Supabase built-in auth reset and then Sendgrid webhook?
-      // Wait, we can generate custom tokens via edge function since it uses service role key.
-      
-      const { data: userSec, error: userError } = await supabase
-          .functions.invoke('auth-tokens', {
-            body: { action: 'generate_reset', email: email, userId: 'dummy_for_lookup_via_rpc' }
-          });
-      
-      // Wait, we didn't implement email lookup in edge function properly. Let's rely on standard supabase then update.
-      // Actually, my Edge function generate_reset needs userId which is hard to get here safely.
-      // A better way: Let Edge Function lookup User ID by email! I need to update auth-tokens. 
-      // For now, let's use the UI.
+      if (resetError) {
+        throw new Error(resetError.message);
+      }
 
-      await emailService.generateAndSendToken('generate_reset', '', email, email.split('@')[0]);
       setSuccess(true);
     } catch (err: any) {
       console.error(err);

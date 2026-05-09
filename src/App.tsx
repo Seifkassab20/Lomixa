@@ -12,6 +12,7 @@ import logo from '@/assets/logo.svg';
 
 // Lazy load pages for performance
 const Login = lazy(() => import('./pages/Login').then(m => ({ default: m.Login })));
+const Registration = lazy(() => import('./pages/Registration').then(m => ({ default: m.Registration })));
 const Register = lazy(() => import('./pages/Register').then(m => ({ default: m.Register })));
 const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
 const Onboarding = lazy(() => import('./pages/Onboarding').then(m => ({ default: m.Onboarding })));
@@ -46,7 +47,7 @@ function OnboardingWrapper() {
   const navigate = useNavigate();
   const handleComplete = () => {
     localStorage.setItem('lomixa_onboarding_seen', 'true');
-    navigate('/select-role');
+    navigate('/register');
   };
   return <Onboarding onComplete={handleComplete} />;
 }
@@ -72,6 +73,17 @@ function InitialCheck() {
   if (authLoading || (user && authorized === null)) return null;
 
   if (user) {
+    // If email is not confirmed, we should stay at the root or go to dashboard 
+    // where Layout will catch the unverified state. 
+    // We only go to select-role if verified AND missing role.
+    // STRICT GATING: If email is not confirmed, they MUST go to dashboard
+    // to be handled by the Layout verification screen.
+    // They are NOT allowed to reach select-role.
+    if (!user.email_confirmed_at && !user.id.startsWith('demo_')) {
+      console.log("[InitialCheck] Email unconfirmed, forcing to dashboard gate");
+      return <Navigate to="/dashboard" replace />;
+    }
+
     if (!user.user_metadata?.role) {
       console.log("[InitialCheck] Missing role, redirecting to select-role");
       return <Navigate to="/select-role" replace />;
@@ -84,7 +96,7 @@ function InitialCheck() {
     return <Navigate to="/onboarding" replace />;
   }
 
-  return <Navigate to="/select-role" replace />;
+  return <Navigate to="/login" replace />;
 }
 
 export default function App() {
@@ -120,7 +132,7 @@ export default function App() {
                 <Route path="/onboarding" element={<OnboardingWrapper />} />
                 <Route path="/select-role" element={<RoleSelection />} />
                 <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
+                <Route path="/register" element={<Registration />} />
                 <Route path="/register/:role" element={<Register />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />

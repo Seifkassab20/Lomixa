@@ -93,19 +93,21 @@ export function Login() {
     setError("");
 
     try {
+      const normalizedEmail = email.trim().toLowerCase();
+      
       if (!selectedRole) {
         toast(t("identifyRoleFirst"), "error");
         throw new Error(t("pleaseSelectRole"));
       }
-      if (!email.trim() || !password.trim()) {
+      if (!normalizedEmail || !password.trim()) {
         toast(t("enterCredentials"), "error");
         throw new Error(t("credentialMismatch"));
       }
 
       if (!isSupabaseConfigured) {
         localStorage.setItem("demo_role", selectedRole);
-        localStorage.setItem("demo_email", email);
-        localStorage.setItem("demo_name", email.split("@")[0]);
+        localStorage.setItem("demo_email", normalizedEmail);
+        localStorage.setItem("demo_name", normalizedEmail.split("@")[0]);
         window.location.href = "/";
         return;
       }
@@ -113,7 +115,7 @@ export function Login() {
       localStorage.setItem("lomixa_target_role", selectedRole);
 
       const { error } = await supabase.auth.signInWithPassword({
-        email,
+        email: normalizedEmail,
         password,
       });
       if (error) throw error;
@@ -161,7 +163,8 @@ export function Login() {
     setLoading(true);
     try {
       if (isSupabaseConfigured) {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        const normalizedEmail = email.trim().toLowerCase();
+        const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
           redirectTo: `${window.location.origin}/login?type=recovery`,
         });
         if (error) throw error;
@@ -484,7 +487,7 @@ export function Login() {
                   <p className="text-xs text-slate-500 uppercase tracking-[0.2em] font-black italic">
                     {t("newToPlatform")}{" "}
                     <Link
-                      to="/select-role"
+                      to="/register"
                       className="text-emerald-500 hover:text-white transition-colors"
                     >
                       {t("initiateRegistration")}
@@ -535,7 +538,7 @@ export function Login() {
               </li>
               <li>
                 <Link
-                  to="/select-role"
+                  to="/register"
                   className="text-sm text-slate-400 hover:text-emerald-500 transition-colors font-medium"
                 >
                   {t("initiateRegistration")}

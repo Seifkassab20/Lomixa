@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { getVisits, getSalesReps, saveSalesRep, useStoreListener, Appointment, getAppointments, getServerTime } from '@/lib/store';
 import { Calendar, CreditCard, Clock, Target, Video, Phone, MapPin, X, Activity } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -87,6 +88,62 @@ export function RepDashboard() {
         <VideoCall appointment={activeAppointment} onClose={() => setActiveAppointment(null)} />
       )}
 
+      {/* Live Meeting Alert */}
+      {(() => {
+        const liveMeeting = visits.find(v => {
+          if (v.status !== 'Confirmed' || v.visitType !== 'Video') return false;
+          const appointment = getAppointments().find(a => 
+            a.doctorId === v.doctorId && 
+            a.repId === v.repId && 
+            new Date(a.startTime).toDateString() === new Date(v.date).toDateString()
+          );
+          if (!appointment) return false;
+          const now = serverTime.getTime();
+          const start = new Date(appointment.startTime).getTime();
+          const end = new Date(appointment.endTime).getTime();
+          const fiveMins = 5 * 60 * 1000;
+          return now >= (start - fiveMins) && now <= end;
+        });
+
+        if (!liveMeeting) return null;
+
+        const appointment = getAppointments().find(a => 
+          a.doctorId === liveMeeting.doctorId && 
+          a.repId === liveMeeting.repId && 
+          new Date(a.startTime).toDateString() === new Date(liveMeeting.date).toDateString()
+        )!;
+
+        const isNow = serverTime.getTime() >= new Date(appointment.startTime).getTime();
+
+        return (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-blue-500/30 flex flex-col md:flex-row items-center justify-between gap-6"
+          >
+            <div className="flex items-center gap-6">
+              <div className="h-16 w-16 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md border border-white/30 animate-pulse">
+                <Video className="h-8 w-8 text-white" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping"></span>
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-100">{isNow ? 'Meeting is Live' : 'Meeting Starting Soon'}</span>
+                </div>
+                <h2 className="text-2xl font-black italic tracking-tighter uppercase">{t('visitWith')} {liveMeeting.doctorName}</h2>
+                <p className="text-sm text-blue-100/80 font-medium">{liveMeeting.time} ({liveMeeting.durationMinutes}min) • {liveMeeting.hospitalName}</p>
+              </div>
+            </div>
+            <Button 
+              onClick={() => setActiveAppointment(appointment)}
+              className="bg-white text-blue-600 hover:bg-blue-50 h-14 rounded-2xl px-10 font-black uppercase tracking-widest italic shadow-xl"
+            >
+              <Video className="h-5 w-5 mr-2" /> {t('joinNow')}
+            </Button>
+          </motion.div>
+        );
+      })()}
+
       {/* KPI Grid Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
@@ -168,7 +225,7 @@ export function RepDashboard() {
                           const appointment = getAppointments().find(a => 
                              a.doctorId === visit.doctorId && 
                              a.repId === visit.repId && 
-                             a.startTime.includes(visit.date)
+                             new Date(a.startTime).toDateString() === new Date(visit.date).toDateString()
                           );
                           
                           if (!appointment) return null;
@@ -176,13 +233,28 @@ export function RepDashboard() {
                           const now = serverTime.getTime();
                           const start = new Date(appointment.startTime).getTime();
                           const end = new Date(appointment.endTime).getTime();
-                          const isNow = now >= start && now <= end;
+                          const fiveMins = 5 * 60 * 1000;
                           
-                          if (!isNow) return null;
+                          const canJoin = now >= (start - fiveMins) && now <= end;
+                          const isNow = now >= start && now <= end;
+                          const isEarly = now >= (start - fiveMins) && now < start;
+                          const isFuture = now < (start - fiveMins);
+                          const isEnded = now > end;
+                          
+                          if (isEnded || isFuture) return null;
 
                           return (
-                            <Button size="sm" onClick={() => setActiveAppointment(appointment)} className="h-9 rounded-xl gap-2 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black uppercase tracking-widest px-4 shadow-lg shadow-blue-500/20 animate-pulse">
-                              <Video className="h-4 w-4" /> {t('join')}
+                            <Button 
+                              size="sm" 
+                              onClick={() => setActiveAppointment(appointment)} 
+                              className={cn(
+                                "h-9 rounded-xl gap-2 text-[10px] font-black uppercase tracking-widest px-4 shadow-lg transition-all",
+                                isNow 
+                                  ? "bg-[#39b596] hover:bg-emerald-500 text-white shadow-emerald-500/20 animate-pulse" 
+                                  : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20"
+                              )}
+                            >
+                              <Video className="h-4 w-4" /> {t('joinNow') || 'Join Now'}
                             </Button>
                           );
                       })()}
