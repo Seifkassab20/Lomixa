@@ -332,7 +332,7 @@ function mapVisitToDB(v: Visit) {
     doctor_name: v.doctorName,
     rep_id: v.repId,
     rep_name: v.repName,
-    rep_user_id: v.repUserId,
+    rep_user_id: v.repUserId || null,
     pharma_id: v.pharmaId === 'default' || !v.pharmaId ? null : v.pharmaId,
     pharma_name: v.pharmaName,
     hospital_id: v.hospitalId === 'default' || !v.hospitalId ? null : v.hospitalId,
@@ -456,7 +456,7 @@ function mapTransactionFromDB(db: any): Transaction {
 function mapDoctorToDB(d: Doctor) {
   return {
     id: d.id,
-    user_id: d.userId,
+    user_id: d.userId || null,
     hospital_id: d.hospitalId === 'default' || !d.hospitalId ? null : d.hospitalId,
     hospital_name: d.hospitalName,
     name: d.name,
@@ -508,7 +508,7 @@ function mapDoctorFromDB(db: any): Doctor {
 function mapHospitalToDB(h: Hospital) {
   return { 
     id: h.id, 
-    user_id: h.userId, 
+    user_id: h.userId || null, 
     name: h.name, 
     location: h.location ? (typeof h.location === 'string' ? h.location : JSON.stringify(h.location)) : null, 
     is_active: h.isActive, 
@@ -554,7 +554,7 @@ function mapHospitalFromDB(db: any): Hospital {
 function mapPharmaToDB(p: PharmaCompany) {
   const data: any = { 
     id: p.id, 
-    user_id: p.userId, 
+    user_id: p.userId || null, 
     name: p.name, 
     balance: p.balance, 
     is_active: p.isActive, 
@@ -596,7 +596,7 @@ function mapPharmaFromDB(db: any): PharmaCompany {
 function mapRepToDB(r: SalesRep) {
   return {
     id: r.id, 
-    user_id: r.userId, 
+    user_id: r.userId || null, 
     pharma_id: r.pharmaId === 'default' || !r.pharmaId ? null : r.pharmaId, 
     pharma_name: r.pharmaName,
     name: r.name, 
@@ -1612,7 +1612,7 @@ export async function ensureUserEntityExists(user: any) {
           hospitalId: existingDoctor?.hospitalId || m.hospital_id || 'default',
           hospitalName: existingDoctor?.hospitalName || m.hospital_name || 'Hospital',
           phone: existingDoctor?.phone || m.phone || '',
-          email: existingDoctor?.email || user.email || '',
+          email: (existingDoctor?.email || user.email || '').toLowerCase(),
           isVerified: existingDoctor?.isVerified ?? false,
           isActive: existingDoctor?.isActive ?? true,
           role: 'doctor',
@@ -1634,7 +1634,7 @@ export async function ensureUserEntityExists(user: any) {
           userId: user.id,
           name: existingRep?.name || m.full_name || user.email?.split('@')[0] || 'Rep',
           phone: existingRep?.phone || m.phone || '',
-          email: existingRep?.email || user.email || '',
+          email: (existingRep?.email || user.email || '').toLowerCase(),
           pharmaId: existingRep?.pharmaId || m.pharma_id || 'default',
           pharmaName: existingRep?.pharmaName || m.pharma_name || 'Pharma',
           target: existingRep?.target ?? (isNaN(parseInt(m.target)) ? 25 : parseInt(m.target)),

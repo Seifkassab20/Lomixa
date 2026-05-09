@@ -11,7 +11,7 @@ import { useToast } from "@/components/ui/Toast";
 import { motion, AnimatePresence } from "motion/react";
 import logo from "@/assets/logo.svg";
 
-export function RegisterPhase1() {
+export function Registration() {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
@@ -23,6 +23,8 @@ export function RegisterPhase1() {
   const [resendCountdown, setResendCountdown] = useState(0);
   const [showExistsModal, setShowExistsModal] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
+
+  const normalizedEmail = email.trim().toLowerCase();
 
   React.useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -36,7 +38,7 @@ export function RegisterPhase1() {
     e.preventDefault();
     if (loading) return;
     setLoading(true);
-
+    
     try {
       // Ensure no stale session exists before starting a new registration
       if (isSupabaseConfigured) {
@@ -52,7 +54,7 @@ export function RegisterPhase1() {
       const tempPassword = Math.random().toString(36).slice(-10) + "A1!" + crypto.randomUUID();
 
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: normalizedEmail,
         password: tempPassword,
         options: {
           data: {
@@ -105,7 +107,7 @@ export function RegisterPhase1() {
     try {
       const { error } = await supabase.auth.resend({
         type: 'signup',
-        email,
+        email: normalizedEmail,
       });
       
       if (error) {
@@ -231,7 +233,7 @@ export function RegisterPhase1() {
                   Verification Pending
                 </h3>
                 <p className="text-slate-400 text-sm font-medium leading-relaxed italic">
-                  We've sent a secure link to <span className="text-emerald-400 font-bold font-mono underline decoration-emerald-500/30">{email}</span>. Please click the link in your email to continue registration.
+                  We've sent a secure link to <span className="text-emerald-400 font-bold font-mono underline decoration-emerald-500/30">{email.trim().toLowerCase()}</span>. Please click the link in your email to continue registration.
                 </p>
               </div>
 
@@ -275,7 +277,7 @@ export function RegisterPhase1() {
                   Email Already Registered
                 </h3>
                 <p className="text-slate-400 text-sm font-medium leading-relaxed italic">
-                  The email <span className="text-white font-bold">{email}</span> is already associated with a LOMIXA account. Please use a different email address or sign in to your existing account.
+                  The email <span className="text-white font-bold">{email.trim().toLowerCase()}</span> is already associated with a LOMIXA account. Please use a different email address or sign in to your existing account.
                 </p>
               </div>
 

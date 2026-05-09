@@ -12,7 +12,7 @@ import logo from '@/assets/logo.svg';
 
 // Lazy load pages for performance
 const Login = lazy(() => import('./pages/Login').then(m => ({ default: m.Login })));
-const RegisterPhase1 = lazy(() => import('./pages/RegisterPhase1').then(m => ({ default: m.RegisterPhase1 })));
+const Registration = lazy(() => import('./pages/Registration').then(m => ({ default: m.Registration })));
 const Register = lazy(() => import('./pages/Register').then(m => ({ default: m.Register })));
 const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
 const Onboarding = lazy(() => import('./pages/Onboarding').then(m => ({ default: m.Onboarding })));
@@ -132,7 +132,7 @@ export default function App() {
                 <Route path="/onboarding" element={<OnboardingWrapper />} />
                 <Route path="/select-role" element={<RoleSelection />} />
                 <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<RegisterPhase1 />} />
+                <Route path="/register" element={<Registration />} />
                 <Route path="/register/:role" element={<Register />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
