@@ -153,16 +153,15 @@ export function DoctorDashboard() {
             : []
           ),
         ].map(({ label, value, sub, icon: Icon, color }) => (
-
           <div key={label} className="glass-card shadow-premium border dark:border-white/5 rounded-[2rem] p-6 transition-all hover:scale-[1.02]">
             <div className="flex items-center justify-between mb-4">
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{label}</span>
-              <div className={`h-10 w-10 rounded-2xl bg-${color}-500/10 flex items-center justify-center shadow-inner`}>
-                <Icon className={`h-5 w-5 text-${color}-600 dark:text-${color}-400`} />
+              <div className="h-10 w-10 rounded-2xl bg-brand/10 flex items-center justify-center shadow-inner">
+                <Icon className="h-5 w-5 text-brand" />
               </div>
             </div>
             <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter italic">{value}</div>
-            <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2 uppercase tracking-widest">{sub}</div>
+            <div className="text-[10px] font-bold text-brand mt-2 uppercase tracking-widest">{sub}</div>
           </div>
         ))}
       </div>
@@ -214,7 +213,7 @@ export function DoctorDashboard() {
         <div className="glass-card shadow-premium border dark:border-white/5 rounded-[2.5rem] p-8">
           <div className="flex items-center justify-between mb-8">
             <h3 className="text-xl font-black uppercase italic tracking-tighter text-slate-900 dark:text-white flex items-center gap-3">
-              <Calendar className="w-5 h-5 text-emerald-500" />
+              <Calendar className="w-5 h-5 text-brand" />
               {t('todayVisits')}
             </h3>
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{new Date().toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-SA', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
@@ -228,7 +227,7 @@ export function DoctorDashboard() {
                 return (
                   <div key={visit.id} className="p-4 rounded-2xl border dark:border-white/5 hover:bg-white dark:hover:bg-white/5 transition-all flex items-center justify-between shadow-sm group">
                     <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 shadow-inner group-hover:scale-110 transition-transform">
+                      <div className="h-12 w-12 rounded-xl bg-brand/10 flex items-center justify-center text-brand shadow-inner group-hover:scale-110 transition-transform">
                         <TypeIcon className="h-5 w-5" />
                       </div>
                       <div>
@@ -286,7 +285,7 @@ export function DoctorDashboard() {
           { label: t('settings'), href: '/settings', icon: CheckCircle2 },
         ].map(({ label, href, icon: Icon }) => (
           <button key={label} onClick={() => navigate(href)} className="glass-card shadow-premium border dark:border-white/5 rounded-[2rem] p-8 flex flex-col items-center gap-4 hover:shadow-2xl transition-all group">
-            <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 shadow-inner">
+            <div className="h-14 w-14 rounded-2xl bg-brand/10 flex items-center justify-center text-brand group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 shadow-inner">
               <Icon className="h-7 w-7" />
             </div>
             <span className="text-xs font-black text-slate-700 dark:text-slate-200 uppercase tracking-[0.2em] italic">{label}</span>

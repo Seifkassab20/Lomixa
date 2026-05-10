@@ -53,16 +53,14 @@ function OnboardingWrapper() {
 }
 
 function InitialCheck() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, emailVerified } = useAuth();
   const [authorized, setAuthorized] = React.useState<boolean | null>(null);
   const onboardingSeen = localStorage.getItem('lomixa_onboarding_seen') === 'true';
 
   React.useEffect(() => {
     if (user) {
       const role = user.user_metadata?.role;
-      console.log("[InitialCheck] User detected, role:", role);
       isUserAuthorized(user.id, role).then((auth) => {
-        console.log("[InitialCheck] Auth result:", auth);
         setAuthorized(auth);
       });
     } else {
@@ -73,22 +71,25 @@ function InitialCheck() {
   if (authLoading || (user && authorized === null)) return null;
 
   if (user) {
-    // If email is not confirmed, we should stay at the root or go to dashboard 
-    // where Layout will catch the unverified state. 
-    // We only go to select-role if verified AND missing role.
-    // STRICT GATING: If email is not confirmed, they MUST go to dashboard
-    // to be handled by the Layout verification screen.
-    // They are NOT allowed to reach select-role.
-    if (!user.email_confirmed_at && !user.id.startsWith('demo_')) {
-      console.log("[InitialCheck] Email unconfirmed, forcing to dashboard gate");
+    // 1. If NOT verified, go to register (which now shows the verification pending screen if they just signed up)
+    // or dashboard (where Layout handles the gate). 
+    // To match the user's Step 2/3, we'll let them land on Dashboard where Layout shows the verification gate.
+    if (!emailVerified && !user.id.startsWith('demo_')) {
       return <Navigate to="/dashboard" replace />;
     }
 
+    // 2. If verified but NO role, go to select-role (Step 4 start)
     if (!user.user_metadata?.role) {
-      console.log("[InitialCheck] Missing role, redirecting to select-role");
       return <Navigate to="/select-role" replace />;
     }
-    if (authorized === false) return <Navigate to="/login" replace />;
+
+    // 3. If verified and HAS role, but not authorized (rejected/pending admin), go to dashboard
+    if (authorized === false) {
+       // Layout will handle the Pending/Rejected screen
+       return <Navigate to="/dashboard" replace />;
+    }
+
+    // 4. Everything OK, go to dashboard
     return <Navigate to="/dashboard" replace />;
   }
 

@@ -127,7 +127,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/5 rounded-full blur-[120px] -z-10 translate-y-1/2 -translate-x-1/2"></div>
 
       <div className="flex-1 w-full max-w-xl mx-auto px-6 flex flex-col justify-center items-center relative py-20">
-        <AnimatePresence mode="wait" initial={false} custom={currentSlide}>
+        <AnimatePresence mode="popLayout" initial={false} custom={currentSlide}>
           <motion.div
             key={currentSlide}
             custom={currentSlide}
@@ -136,7 +136,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             animate="center"
             exit="exit"
             transition={{
-              x: { type: "spring", stiffness: 300, damping: 30 },
+              x: { type: "spring", stiffness: 400, damping: 30 },
               opacity: { duration: 0.2 },
             }}
             className="w-full flex flex-col items-center text-center space-y-8"

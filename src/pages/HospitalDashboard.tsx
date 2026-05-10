@@ -74,12 +74,12 @@ export function HospitalDashboard() {
           <div key={label} className="glass-card shadow-premium border dark:border-white/5 rounded-[2rem] p-6 transition-all hover:scale-[1.02]">
             <div className="flex items-center justify-between mb-4">
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{label}</span>
-              <div className={`h-10 w-10 rounded-2xl bg-${color}-500/10 flex items-center justify-center shadow-inner`}>
-                <Icon className={`h-5 w-5 text-${color}-600 dark:text-${color}-400`} />
+              <div className="h-10 w-10 rounded-2xl bg-brand/10 flex items-center justify-center shadow-inner">
+                <Icon className="h-5 w-5 text-brand" />
               </div>
             </div>
             <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter italic">{value}</div>
-            {sub && <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2 uppercase tracking-widest">{sub}</div>}
+            {sub && <div className="text-[10px] font-bold text-brand mt-2 uppercase tracking-widest">{sub}</div>}
           </div>
         ))}
       </div>
@@ -92,12 +92,12 @@ export function HospitalDashboard() {
           <div className="flex items-center justify-between mb-8">
             <div className="space-y-1">
               <h3 className="text-xl font-black uppercase italic tracking-tighter text-slate-900 dark:text-white flex items-center gap-3">
-                <Users className="w-5 h-5 text-emerald-500" />
+                <Users className="w-5 h-5 text-brand" />
                 {t('doctorsOverview')}
               </h3>
               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em] italic opacity-60 ml-8">{t('clinicalStaffDirectory')}</p>
             </div>
-            <Button onClick={() => navigate('/doctors?add=true')} size="sm" className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white border border-emerald-500/20 text-[10px] font-black uppercase tracking-widest px-4 h-10 rounded-xl">
+            <Button onClick={() => navigate('/doctors?add=true')} size="sm" className="bg-brand/10 text-brand hover:bg-brand hover:text-white border border-brand/20 text-[10px] font-black uppercase tracking-widest px-4 h-10 rounded-xl">
               <Plus className="w-4 h-4 mr-1" /> {t('add')}
             </Button>
           </div>
@@ -143,7 +143,7 @@ export function HospitalDashboard() {
 
         <div className="glass-card shadow-premium border dark:border-white/5 rounded-[2.5rem] p-8">
           <h3 className="text-xl font-black uppercase italic tracking-tighter text-slate-900 dark:text-white mb-8 flex items-center gap-3">
-             <Activity className="w-5 h-5 text-emerald-500" />
+             <Activity className="w-5 h-5 text-brand" />
              {t('monthlyVisitActivity')}
           </h3>
           <ResponsiveContainer width="100%" height={220}>
@@ -155,7 +155,7 @@ export function HospitalDashboard() {
                 cursor={{ fill: 'currentColor', opacity: 0.05 }}
                 contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '1rem', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
               />
-              <Bar dataKey="visits" fill="#10b981" radius={[4, 4, 0, 0]} barSize={24} />
+              <Bar dataKey="visits" fill="var(--brand-clr)" radius={[4, 4, 0, 0]} barSize={24} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -168,7 +168,7 @@ export function HospitalDashboard() {
         ].map(({ label, href, icon: Icon }) => (
           <button key={label} onClick={() => navigate(href)} className="glass-card shadow-premium border dark:border-white/5 rounded-[2rem] p-8 flex items-center justify-between hover:shadow-2xl transition-all group text-left">
             <div className="flex items-center gap-6">
-              <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 shadow-inner">
+              <div className="h-14 w-14 rounded-2xl bg-brand/10 flex items-center justify-center text-brand group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 shadow-inner">
                 <Icon className="h-7 w-7" />
               </div>
               <span className="text-xs font-black text-slate-700 dark:text-slate-200 uppercase tracking-[0.2em] italic">{label}</span>

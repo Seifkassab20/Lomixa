@@ -14,77 +14,65 @@ The following diagram illustrates the complete operational lifecycle inside the 
 
 ```mermaid
 flowchart TD
-    %% Core Entities
-    Admin([LOMIXA Admin])
-    Pharma[Pharma Company]
-    Hospital[Hospital/Clinic]
-    Rep((Sales Rep))
-    Doctor((Doctor))
+    %% Global Cloud Infrastructure
+    subgraph Cloud [Supabase Cloud Environment]
+        DB[(PostgreSQL / RLS Protected)]
+        Auth{Auth Gateway}
+        Notify[Real-time Channels]
+    end
+
+    %% User Roles & Account Types
+    subgraph Users [System Participants]
+        Admin([LOMIXA Admin])
+        Pharma[Pharma Manager]
+        Hospital[Hospital Manager]
+        Rep((Sales Representative))
+        Doctor((Medical Doctor))
+    end
+
+    %% Administrative Logic (Verification & Lifecycle)
+    Admin -- "Vets & Approves" --> Pharma & Hospital
+    Pharma -- "Registers & Allocates" --> Rep
+    Hospital -- "Registers & Manages" --> Doctor
+
+    %% Communication & Business Logic
+    Rep -- "Uses Credits to Request" --> Visit{Visit Logic}
+    Visit -- "Sync Status" --> DB
+    Visit -- "Push Alert" --> Doctor
+    Doctor -- "Accepts/Rejects" --> Visit
     
-    %% Admin Verification Flow
-    Pharma -- Registers --> Admin
-    Hospital -- Registers --> Admin
-    Admin -- Verifies & Activates --> Pharma
-    Admin -- Verifies & Activates --> Hospital
-
-    %% Pharma Internal Flow
-    Pharma -- Purchases Bundles --> Credits[(Visit Credits)]
-    Pharma -- Creates & Manages --> Rep
-    Credits -- Allocates to --> Rep
-
-    %% Hospital Internal Flow
-    Hospital -- Onboards & Manages --> Doctor
+    %% Transactional Communication
+    Visit -- "On Rejection: Auto-Refund" --> Pharma
+    Visit -- "On Completion: Report" --> Pharma
+    Doctor -- "Qualitative Feedback" --> Rep
     
-    %% Doctor Flow
-    Doctor -- Defines --> Slots[Availability Slots]
+    %% Database Interaction Layer
+    Users -- "JWT Auth & RLS Queries" --> Auth
+    Auth -- "Filtered Data Access" --> DB
+    DB -- "Broadcast Updates" --> Notify
+    Notify -- "Instant Refresh" --> Users
 
-    %% The Core Interaction: Booking a Visit
-    Rep -- Uses Credits to Book --> Slots
-    Slots -- Creates --> Visit{Pending Visit}
-    Visit -- Notifies --> Doctor
+    %% Hybrid Sync Logic (Per Client)
+    subgraph Client [Frontend Execution Context]
+        App[React Application]
+        Sync{Hybrid Sync Layer}
+        Local[(LocalStorage Cache)]
+    end
 
-    %% Validation Layer
-    System{Uniqueness Check} -- Case-insensitive Email/Phone --> Pharma & Hospital & Rep & Doctor
-    
-    %% Visit Lifecycle
-    Doctor -- Accepts/Rejects --> Visit
-    Visit -- Status Updates --> Rep
-    
-    %% Post-Visit & Quality Loop
-    Rep & Doctor -- Executes Meeting --> Visit
-    Visit -- Completed --> Reports([Post-Visit Reports])
-    Reports -- Triggers --> Rating([Rating & Peer Review])
-    Rating -- High Performance --> TopRep[Top Rep Badge]
-    Rating -- Feedback --> Outcome[(Feedback Data)]
-    
-    %% Notification Layer
-    Visit & Rating -- Event --> Notify([Notification Hub])
-    Notify -- Real-time Alerts --> Rep & Doctor & Pharma
+    Users --- App
+    App -- "Optimistic Writes" --> Local
+    App -- "Background Sync" --> Sync
+    Sync -- "Persistence Logic" --> Auth
 
-    %% Analytics
-    Visit -- Data Point --> Analytics[(Analytics & TPA Monitoring)]
-    Pharma -. Monitors Performance .-> Analytics
-    Hospital -. Monitors Engagement .-> Analytics
+    classDef core fill:#f8fafc,stroke:#334155,color:#0f172a,font-weight:bold;
+    classDef storage fill:#3b82f6,stroke:#1d4ed8,color:#fff;
+    classDef logic fill:#ef4444,stroke:#b91c1c,color:#fff;
+    classDef group fill:#f1f5f9,stroke:#cbd5e1,color:#64748b,stroke-dasharray: 5 5;
 
-    classDef admin fill:#f97316,stroke:#c2410c,color:#fff,font-weight:bold;
-    classDef pharma fill:#3b82f6,stroke:#1d4ed8,color:#fff,font-weight:bold;
-    classDef rep fill:#0ea5e9,stroke:#0369a1,color:#fff,font-weight:bold;
-    classDef hospital fill:#10b981,stroke:#047857,color:#fff,font-weight:bold;
-    classDef doc fill:#14b8a6,stroke:#0f766e,color:#fff,font-weight:bold;
-    classDef action fill:#8b5cf6,stroke:#6d28d9,color:#fff;
-    classDef feedback fill:#ec4899,stroke:#be185d,color:#fff;
-    classDef db fill:#64748b,stroke:#475569,color:#fff;
-    classDef security fill:#ef4444,stroke:#b91c1c,color:#fff;
-
-    class Admin admin;
-    class Pharma pharma;
-    class Hospital hospital;
-    class Rep rep;
-    class Doctor doc;
-    class Visit,Slots action;
-    class Reports,Rating,Notify feedback;
-    class Credits,Analytics,Outcome db;
-    class System security;
+    class Admin,Pharma,Hospital,Rep,Doctor core;
+    class DB,Local storage;
+    class Visit,Sync,Auth logic;
+    class Cloud,Users,Client group;
 ```
 
 ---
@@ -102,25 +90,37 @@ flowchart TD
 - **Advanced TPA Analytics**: Monitor Targets vs. Performance (TPA) with real-time completion statistics.
 
 ### 🏥 Hospital & Clinic Portal
-- **Facility Branding**: Dedicated paths for "Hospital" vs "Clinic" identity with immutable role designations to ensure organizational integrity.
-- **Accelerated Onboarding**: Direct "Add Doctor" shortcut from the dashboard to rapidly expand the clinical roster.
-- **Clinical Roster Setup**: Independently rapidly onboard staff Doctors as 'Pre-Verified' network participants with mandatory specialty mapping.
-- **Engagement Surveillance**: Track clinical staff interaction metrics via comprehensive analytics endpoints.
+- **Organizational Routing**: Logic-driven paths for "Hospital" vs "Clinic" identity with immutable role designations to ensure data integrity.
+- **Roster Expansion**: Direct interface for clinical staff onboarding; Doctors are managed as subordinate entities with mandatory specialty mapping.
+- **Engagement Analytics**: Monitoring logic for clinical staff interaction frequency and departmental engagement levels.
 
 ### 🩺 Doctor Hub
-- **Professional Identity**: Doctors register with mandatory specialty selection (e.g., Cardiology, Neurology) to ensure accurate matching.
-- **Availability Matrix**: Fine-tune daily/weekly booking slots precisely defining audience windows.
-- **Direct Connectivity**: Accept or decline inbound visits; engage via In-Person routing, Video Tele-conferencing, or Phone.
-- **Peer Accountability**: Rate representative professional conduct and provide structured clinical feedback.
+- **Specialty Matching Logic**: Doctors register with mandatory specialty tokens (e.g., Cardiology, Neurology) to enable accurate Rep-to-Doc discovery.
+- **Availability Matrix**: Configurable time-slot logic defining the exact windows available for inbound visit requests.
+- **Interaction Management**: Business logic for accepting/declining visits with automated state transitions and audit logging.
+- **Peer Accountability**: Structural feedback loop allowing Doctors to quantify Representative performance and provide qualitative clinical data.
 
 ### 💼 Field Representative (Rep) Dashboard
 - **Optimized Visit Booking**: Search doctors/hospitals via professional select-based interface with automatic credit refunding on rejection.
 - **Post-Visit Reporting**: Structured outcome forms to document interaction summaries and follow-up requirements.
 - **Target Tracking**: Real-time progress monitoring against monthly performance benchmarks.
 
+### 💸 Credit & Transactional Logic
+- **Atomic Credit Allocation**: Pharma companies purchase bundles that inject credits into a managed pool. Credits are atomically deducted when a Sales Rep initiates a booking.
+- **Automated Refund Mechanism**: If a visit request is rejected by a Doctor or cancelled within the valid window, the system triggers an immediate credit restoration to the Pharma/Rep wallet.
+- **Financial Auditing**: Admins have a global view of all credit injections and transactions to ensure fiscal transparency.
+
+### 🛡️ Multi-Tenant Access Control (RBAC)
+- **Identity Isolation**: Strict backend enforcement (RLS) ensures that a 'Doctor' cannot access 'Pharma' endpoints, and 'Hospitals' can only manage Doctors within their own roster.
+- **Verification Gating**: A "Pending Approval" state blocks all non-admin roles from accessing functional dashboards until their registration is manually vetted by LOMIXA staff.
+
+### 🔄 Data Cohesion & Synchronization
+- **Hybrid Persistence Algorithm**: The system uses a multi-layered sync logic that merges local memory-mapped state with Supabase cloud datasets, resolving conflicts based on server-side timestamps.
+- **Case-Insensitive Identity Guard**: Universal uniqueness checks on Email and Phone numbers across all roles (Admin, Pharma, Hospital, Doctor, Rep) to prevent duplicate identity fragmentation.
+
 ### 🔔 Notification Hub
 - **Real-time Alerts**: Global notification system for booking requests, status updates, and peer reviews.
-- **Transactional Communication**: Integrated automation for critical account and visit events.
+- **Transactional Communication**: Integrated automation for critical account events including verification codes and account approval/rejection notices.
 
 ---
 
