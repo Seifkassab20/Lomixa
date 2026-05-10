@@ -21,11 +21,13 @@ flowchart TD
     Rep((Sales Rep))
     Doctor((Doctor))
     
-    %% Admin Verification Flow
+    %% Admin Verification & Template Flow
     Pharma -- Registers --> Admin
-    Hospital -- Registers --> Admin
+    Hospital -- Registers & Selects Identity --> Admin
     Admin -- Verifies & Activates --> Pharma
     Admin -- Verifies & Activates --> Hospital
+    Admin -- Branding Hub --> Templates{Emerald/Sapphire/Amethyst}
+    Templates -- Applies Globally --> UI[Platform Interface]
 
     %% Pharma Internal Flow
     Pharma -- Purchases Bundles --> Credits[(Visit Credits)]
@@ -36,15 +38,16 @@ flowchart TD
     Hospital -- Onboards & Manages --> Doctor
     
     %% Doctor Flow
-    Doctor -- Defines --> Slots[Availability Slots]
+    Doctor -- Defines Availability --> Slots[Booking Slots]
 
     %% The Core Interaction: Booking a Visit
     Rep -- Uses Credits to Book --> Slots
     Slots -- Creates --> Visit{Pending Visit}
     Visit -- Notifies --> Doctor
 
-    %% Validation Layer
-    System{Uniqueness Check} -- Case-insensitive Email/Phone --> Pharma & Hospital & Rep & Doctor
+    %% Validation & Security Layer
+    System{Security Gate} -- Auth & RLS Checks --> Data[(Cloud Vault)]
+    Data -- Syncs --> Local[Hybrid Persistence]
     
     %% Visit Lifecycle
     Doctor -- Accepts/Rejects --> Visit
@@ -52,19 +55,8 @@ flowchart TD
     
     %% Post-Visit & Quality Loop
     Rep & Doctor -- Executes Meeting --> Visit
-    Visit -- Completed --> Reports([Post-Visit Reports])
-    Reports -- Triggers --> Rating([Rating & Peer Review])
-    Rating -- High Performance --> TopRep[Top Rep Badge]
-    Rating -- Feedback --> Outcome[(Feedback Data)]
-    
-    %% Notification Layer
-    Visit & Rating -- Event --> Notify([Notification Hub])
-    Notify -- Real-time Alerts --> Rep & Doctor & Pharma
-
-    %% Analytics
-    Visit -- Data Point --> Analytics[(Analytics & TPA Monitoring)]
-    Pharma -. Monitors Performance .-> Analytics
-    Hospital -. Monitors Engagement .-> Analytics
+    Visit -- Completed --> Reports([Interaction Reports])
+    Reports -- Feedback & Performance --> Analytics[(Market Analytics)]
 
     classDef admin fill:#f97316,stroke:#c2410c,color:#fff,font-weight:bold;
     classDef pharma fill:#3b82f6,stroke:#1d4ed8,color:#fff,font-weight:bold;
@@ -81,9 +73,9 @@ flowchart TD
     class Hospital hospital;
     class Rep rep;
     class Doctor doc;
-    class Visit,Slots action;
-    class Reports,Rating,Notify feedback;
-    class Credits,Analytics,Outcome db;
+    class Visit,Slots,Templates action;
+    class Reports,UI feedback;
+    class Credits,Analytics,Data,Local db;
     class System security;
 ```
 
@@ -118,9 +110,13 @@ flowchart TD
 - **Post-Visit Reporting**: Structured outcome forms to document interaction summaries and follow-up requirements.
 - **Target Tracking**: Real-time progress monitoring against monthly performance benchmarks.
 
+### 🎨 Custom Branding & Templates
+- **Dynamic Visual Engine**: Switch between three premium design presets—**Emerald Oasis** (default), **Sapphire Grid**, and **Amethyst Glow**—which instantly rebrand the entire interface including charts, icons, and buttons.
+- **Enterprise Localization**: Advanced i18n implementation providing deep multi-lingual support (Arabic/English) with automatic RTL/LTR layout flipping.
+
 ### 🔔 Notification Hub
 - **Real-time Alerts**: Global notification system for booking requests, status updates, and peer reviews.
-- **Transactional Communication**: Integrated automation for critical account and visit events.
+- **Transactional Communication**: Integrated automation for critical account events including verification codes and account approval/rejection notices.
 
 ---
 
