@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Video, Phone, MapPin, MessageSquare, Clock, History, XCircle, FileText, CheckCircle2, Star, Plus, Trash2, Send } from 'lucide-react';
-import { getVisits, saveVisit, saveDoctor, getDoctors, getSalesReps, Visit, VisitStatus, pushNotification, saveRating, generateId, Rating, Appointment, getAppointments, getServerTime } from '@/lib/store';
+import { getVisits, saveVisit, saveDoctor, getDoctors, getSalesReps, Visit, VisitStatus, pushNotification, saveRating, generateId, Rating, Appointment, getAppointments, getServerTime, isPendingExpired } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { VideoCall } from '@/components/VideoCall';
 import { Button } from '@/components/ui/button';
@@ -163,7 +163,7 @@ export function RepMyVisits() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
           { label: t('all') || 'All', value: visits.length, color: 'slate' },
-          { label: t('pending') || 'Pending', value: visits.filter(v => v.status === 'Pending').length, color: 'amber' },
+          { label: t('pending') || 'Pending', value: visits.filter(v => v.status === 'Pending' && !isPendingExpired(v)).length, color: 'amber' },
           { label: t('confirmed') || 'Confirmed', value: visits.filter(v => v.status === 'Confirmed').length, color: 'emerald' },
           { label: t('completed') || 'Completed', value: visits.filter(v => v.status === 'Completed').length, color: 'blue' },
         ].map(({ label, value }) => (
@@ -239,83 +239,85 @@ export function RepMyVisits() {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0 mt-3 sm:mt-0">
-                    {visit.status === 'Completed' && !visit.doctorRating && (
-                      <Button 
-                        size="sm" 
-                        onClick={() => {
-                          setReportModal(visit);
-                          setReportData(prev => ({ ...prev, outcomeNotes: visit.outcomeNotes || '' }));
-                        }} 
-                        className="gap-1 bg-amber-500 hover:bg-amber-600 text-white h-8 text-xs shadow-lg shadow-amber-500/20"
-                      >
-                        <Star className="h-3.5 w-3.5" /> Submit Report
-                      </Button>
-                    )}
-                    {visit.status === 'Confirmed' && visit.visitType === 'Video' && (() => {
-                      const appointment = getAppointments().find(a => 
-                        a.doctorId === visit.doctorId && 
-                        a.repId === visit.repId && 
-                        new Date(a.startTime).toDateString() === new Date(visit.date).toDateString()
-                      );
-                      
-                      if (!appointment) return null;
-                      
-                      const now = serverTime.getTime();
-                      const start = new Date(appointment.startTime).getTime();
-                      const end = new Date(appointment.endTime).getTime();
-                      const isNow = now >= start && now <= end;
-                      const isFuture = now < start;
-                      
-                      return (
-                        <div className="flex flex-col items-end gap-1">
-                          {(() => {
-                            const now = serverTime.getTime();
-                            const start = new Date(appointment.startTime).getTime();
-                            const end = new Date(appointment.endTime).getTime();
-                            const fiveMins = 5 * 60 * 1000;
-                            
-                            const isNow = now >= start && now <= end;
-                            const isEarly = now >= (start - fiveMins) && now < start;
-                            const isFuture = now < (start - fiveMins);
-                            const isEnded = now > end;
+                  <div className="flex flex-col items-end gap-2 shrink-0 mt-3 sm:mt-0">
+                    <div className="flex items-center gap-2">
+                      {visit.status === 'Pending' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleCancel(visit)}
+                          className="gap-1 text-red-600 dark:text-red-400 border-red-200 dark:border-red-500/30 hover:bg-red-50 dark:hover:bg-red-500/10 h-8 text-xs"
+                        >
+                          <XCircle className="h-3.5 w-3.5" /> {t('cancelVisit') || 'Cancel'}
+                        </Button>
+                      )}
+                      <span className={cn('px-3 py-1 text-xs rounded-full border font-medium uppercase', STATUS_COLORS[visit.status])}>
+                        {t(visit.status.toLowerCase()) || visit.status}
+                      </span>
+                    </div>
 
-                            if (isNow || isEarly) {
-                              return (
-                                <Button size="sm" onClick={() => setActiveAppointment(appointment)} className={cn("gap-1 text-white h-8 text-xs font-bold shadow-lg", isNow ? "bg-[#39b596] hover:bg-emerald-500 animate-pulse shadow-emerald-500/20" : "bg-blue-600 hover:bg-blue-700 shadow-blue-500/20")}>
+                    {(() => {
+                      const now = serverTime.getTime();
+                      const start = new Date(`${visit.date}T${visit.time}:00`).getTime();
+                      const end = start + (visit.durationMinutes || 30) * 60000;
+                      const oneHour = 60 * 60 * 1000;
+                      const fiveMins = 5 * 60 * 1000;
+
+                      const isVideo = visit.visitType === 'Video';
+                      const showsMeetingIcon = isVideo && visit.status === 'Confirmed' && now >= start - oneHour && now <= end;
+                      const canAccessMeeting = now >= start - fiveMins && now <= end;
+                      const isEnded = now > end;
+
+                      const getActiveAppt = () => {
+                        const existing = getAppointments().find(a => a.doctorId === visit.doctorId && a.repId === visit.repId && a.startTime.includes(visit.date));
+                        if (existing) return existing;
+                        return {
+                          id: `fallback_${visit.id}`,
+                          doctorId: visit.doctorId,
+                          doctorUserId: visit.doctorId,
+                          repId: visit.repId,
+                          repUserId: visit.repUserId || '',
+                          startTime: new Date(start).toISOString(),
+                          endTime: new Date(end).toISOString(),
+                          status: 'accepted',
+                          meetingId: `mtg_shared_${visit.id}`,
+                          createdAt: visit.createdAt || new Date().toISOString()
+                        } as any;
+                      };
+
+                      return (
+                        <div className="flex flex-col items-end gap-2">
+                          {showsMeetingIcon && (
+                            <div>
+                              {canAccessMeeting ? (
+                                <Button size="sm" onClick={() => setActiveAppointment(getActiveAppt())} className="gap-1 bg-[#39b596] hover:bg-emerald-500 text-white h-8 text-xs font-bold animate-pulse shadow-lg shadow-emerald-500/20">
                                   <Video className="h-3.5 w-3.5" /> {t('joinNow') || 'Join Now'}
                                 </Button>
-                              );
-                            } else if (isFuture) {
-                              return (
-                                <span className="text-[10px] text-amber-500 font-bold bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 italic">
-                                  {t('callNotAvailableYet') || 'Call not available yet'}
-                                </span>
-                              );
-                            } else {
-                              return (
-                                <span className="text-[10px] text-slate-500 font-bold bg-slate-500/10 px-2 py-1 rounded border border-slate-500/20 italic">
-                                  {t('appointmentEnded') || 'Appointment Ended'}
-                                </span>
-                              );
-                            }
-                          })()}
+                              ) : (
+                                <div className="flex flex-col items-end">
+                                  <Button size="sm" disabled className="gap-1 bg-slate-700 text-slate-300 h-8 text-xs font-bold opacity-60 cursor-not-allowed">
+                                    <Video className="h-3.5 w-3.5 text-amber-400" /> {t('meetingLinkVisible') || 'Meeting Link Ready'}
+                                  </Button>
+                                  <span className="text-[9px] text-amber-500 font-bold mt-0.5">Opens 5 min before start</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {visit.status === 'Confirmed' && isEnded && (
+                            <Button size="sm" onClick={() => { setReportModal(visit); setReportData(prev => ({ ...prev, outcomeNotes: visit.outcomeNotes || '' })); }} className="gap-1 bg-amber-500 hover:bg-amber-600 text-white h-8 text-xs font-bold shadow-md shadow-amber-500/10">
+                              <Star className="h-3.5 w-3.5" /> {t('submitReport') || 'Submit Post-Visit Report'}
+                            </Button>
+                          )}
+
+                          {visit.status === 'Completed' && !visit.doctorRating && (
+                            <Button size="sm" onClick={() => { setReportModal(visit); setReportData(prev => ({ ...prev, outcomeNotes: visit.outcomeNotes || '' })); }} className="gap-1 bg-amber-500 hover:bg-amber-600 text-white h-8 text-xs font-bold shadow-md shadow-amber-500/10">
+                              <Star className="h-3.5 w-3.5" /> {t('submitReport') || 'Submit Post-Visit Report'}
+                            </Button>
+                          )}
                         </div>
                       );
                     })()}
-                    {visit.status === 'Pending' && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleCancel(visit)}
-                        className="gap-1 text-red-600 dark:text-red-400 border-red-200 dark:border-red-500/30 hover:bg-red-50 dark:hover:bg-red-500/10 h-8 text-xs"
-                      >
-                        <XCircle className="h-3.5 w-3.5" /> {t('cancelVisit') || 'Cancel'}
-                      </Button>
-                    )}
-                    <span className={cn('px-3 py-1 text-xs rounded-full border font-medium uppercase', STATUS_COLORS[visit.status])}>
-                      {t(visit.status.toLowerCase()) || visit.status}
-                    </span>
                   </div>
                 </div>
               </div>

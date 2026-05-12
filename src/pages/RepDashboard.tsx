@@ -34,7 +34,12 @@ export function RepDashboard() {
     const myRep = reps.find(r => r.userId === userId);
     if (myRep) {
        setRepInfo({ id: myRep.id, name: myRep.name, pharmaId: myRep.pharmaId, pharmaName: myRep.pharmaName, target: myRep.target });
-       const myVisits = getVisits().filter(v => v.repId === myRep!.id);
+       
+       const myReps = reps.filter(r => r.userId === userId);
+       const myRepIds = myReps.map(r => r.id);
+       if (!myRepIds.includes(myRep.id)) myRepIds.push(myRep.id);
+       
+       const myVisits = getVisits().filter(v => myRepIds.includes(v.repId));
        setVisits(myVisits.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')));
        setBalance(myRep!.balance || 0);
        setCountry(myRep!.location?.country || user?.user_metadata?.country || 'sa');
@@ -67,9 +72,12 @@ export function RepDashboard() {
 
   const TYPE_ICONS = { 'In Person': MapPin, Video, Call: Phone, Text: Clock };
   const thisMonth = new Date().getMonth();
-  const monthVisits = visits.filter(v => new Date(v.date).getMonth() === thisMonth && v.status === 'Completed').length;
-  const pendingVisits = visits.filter(v => v.status === 'Pending');
-  const confirmedVisits = visits.filter(v => v.status === 'Confirmed');
+  const monthVisits = visits.filter(v => new Date(v.date).getMonth() === thisMonth && (v.status || '').toLowerCase() === 'completed').length;
+  const pendingVisits = visits.filter(v => (v.status || '').toLowerCase() === 'pending');
+  const today = new Date().toISOString().split('T')[0];
+  const todayVisits = visits.filter(v => v.date?.startsWith(today));
+  const upcomingVisits = visits.filter(v => new Date(v.date) >= new Date() && (v.status || '').toLowerCase() === 'confirmed');
+  const confirmedVisits = visits.filter(v => (v.status || '').toLowerCase() === 'confirmed');
   const recentVisits = visits.slice(0, 5);
 
   const statusColors: Record<string, string> = {
@@ -140,6 +148,63 @@ export function RepDashboard() {
             >
               <Video className="h-5 w-5 mr-2" /> {t('joinNow')}
             </Button>
+          </motion.div>
+        );
+      })()}
+
+      {/* Upcoming Meeting Alert (1 Hour Before) */}
+      {(() => {
+        const upcomingMeeting = visits.find(v => {
+          if (v.status !== 'Confirmed') return false;
+          const appointment = getAppointments().find(a => 
+            a.doctorId === v.doctorId && 
+            a.repId === v.repId && 
+            new Date(a.startTime).toDateString() === new Date(v.date).toDateString()
+          );
+          if (!appointment) return false;
+          const now = serverTime.getTime();
+          const start = new Date(appointment.startTime).getTime();
+          const oneHour = 60 * 60 * 1000;
+          const fiveMins = 5 * 60 * 1000;
+          return now >= (start - oneHour) && now < (start - fiveMins);
+        });
+
+        if (!upcomingMeeting) return null;
+
+        const appointment = getAppointments().find(a => 
+          a.doctorId === upcomingMeeting.doctorId && 
+          a.repId === upcomingMeeting.repId && 
+          new Date(a.startTime).toDateString() === new Date(upcomingMeeting.date).toDateString()
+        )!;
+
+        const timeDiff = new Date(appointment.startTime).getTime() - serverTime.getTime();
+        const minutesLeft = Math.ceil(timeDiff / (60 * 1000));
+
+        return (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: -20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-orange-500/30 flex flex-col md:flex-row items-center justify-between gap-6 mb-8 border border-white/20 relative overflow-hidden group"
+          >
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 group-hover:scale-110 transition-transform duration-700"></div>
+            <div className="flex items-center gap-6 relative z-10">
+              <div className="h-16 w-16 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md border border-white/30 shadow-inner">
+                <Clock className="h-8 w-8 text-white animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="h-2 w-2 rounded-full bg-white animate-ping"></span>
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-100">Starts in {minutesLeft} {t('minutes') || 'Minutes'}</span>
+                </div>
+                <h2 className="text-2xl font-black italic tracking-tighter uppercase">{t('upcomingSessionWith') || 'Upcoming Session With'} {upcomingMeeting.doctorName}</h2>
+                <p className="text-sm text-orange-100/80 font-medium">{upcomingMeeting.time} ({upcomingMeeting.durationMinutes}min) • {upcomingMeeting.hospitalName}</p>
+              </div>
+            </div>
+            <div className="relative z-10 hidden md:block">
+              <div className="h-14 px-8 rounded-2xl bg-white/10 flex items-center justify-center backdrop-blur-md border border-white/20 text-white font-black uppercase tracking-widest text-xs">
+                {t('prepareForMeeting') || 'Prepare'}
+              </div>
+            </div>
           </motion.div>
         );
       })()}

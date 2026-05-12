@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
-import { getVisits, getDoctors, saveDoctor, generateId, getAppointments, Appointment, getServerTime } from '@/lib/store';
+import { getVisits, getDoctors, saveDoctor, generateId, getAppointments, Appointment, getServerTime, useStoreListener, isDateTimePast } from '@/lib/store';
 import { Calendar, Clock, CheckCircle2, DollarSign, Video, Phone, MapPin } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -27,33 +27,43 @@ export function DoctorDashboard() {
   
   const refreshData = () => {
     const doctors = getDoctors();
-    let doc = doctors.find(d => d.userId === userId);
-    if (!doc && userId) {
-      doc = {
-        id: userId,
-        name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || t('docUser'),
-        specialty: user?.user_metadata?.specialty || t('spec_general'),
-        experienceYears: user?.user_metadata?.experienceYears || 0,
-        phone: user?.user_metadata?.mobile || '',
-        email: user?.email || '',
-        hospitalId: 'default',
-        hospitalName: user?.user_metadata?.organization || t('hospital'),
-        availability: [],
-        userId,
-        isActive: true,
-        isVerified: true,
-      };
-      saveDoctor(doc);
+    const cleanEmail = user?.email?.toLowerCase();
+    let doc = doctors.find(d => d.userId === userId || d.id === userId);
+    if (!doc && cleanEmail) {
+       doc = doctors.find(d => d.email?.toLowerCase() === cleanEmail);
     }
+    if (!doc && user?.user_metadata?.full_name) {
+       const cleanMetaName = user.user_metadata.full_name.trim().toLowerCase();
+       doc = doctors.find(d => d.name?.trim().toLowerCase() === cleanMetaName);
+    }
+    
     if (doc) {
       setMyDoc(doc);
       setDoctorId(doc.id);
       setBalance(doc.balance || 0);
       setCountry(doc.location?.country || user?.user_metadata?.country || 'sa');
-      const myVisits = getVisits().filter(v => v.doctorId === doc!.id);
+      
+      const cleanName = doc.name?.trim().toLowerCase();
+      const myDocs = doctors.filter(d => 
+        d.userId === userId || 
+        d.id === userId ||
+        (cleanEmail && d.email?.toLowerCase() === cleanEmail) ||
+        (cleanName && d.name?.trim().toLowerCase() === cleanName)
+      );
+      const myDocIds = myDocs.map(d => d.id);
+      if (!myDocIds.includes(doc.id)) myDocIds.push(doc.id);
+      
+      const myVisits = getVisits().filter(v => {
+        if (v.status === 'Pending' && isDateTimePast(v.date, v.time)) return false;
+        return myDocIds.includes(v.doctorId) || 
+               v.doctorId === userId ||
+               (cleanName && v.doctorName?.trim().toLowerCase() === cleanName);
+      });
       setVisits(myVisits.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')));
     }
   };
+
+  useStoreListener(refreshData);
 
   useEffect(() => {
     refreshData();
@@ -66,9 +76,9 @@ export function DoctorDashboard() {
   }, [userId]);
 
   const today = new Date().toISOString().split('T')[0];
-  const todayVisits = visits.filter(v => v.date === today);
-  const pendingVisits = visits.filter(v => v.status === 'Pending');
-  const confirmedToday = todayVisits.filter(v => v.status === 'Confirmed');
+  const todayVisits = visits.filter(v => v.date?.startsWith(today));
+  const pendingVisits = visits.filter(v => (v.status || '').toLowerCase() === 'pending');
+  const confirmedToday = todayVisits.filter(v => (v.status || '').toLowerCase() === 'confirmed');
 
   const TYPE_ICONS = { 'In Person': MapPin, Video, Call: Phone, Text: Clock };
 
@@ -86,10 +96,10 @@ export function DoctorDashboard() {
       {/* Live Meeting Alert */}
       {(() => {
         const liveMeeting = visits.find(v => {
-          if (v.status !== 'Confirmed' || v.visitType !== 'Video') return false;
+          if ((v.status || '').toLowerCase() !== 'confirmed' || v.visitType !== 'Video') return false;
           const appointment = getAppointments().find(a => 
             a.doctorId === v.doctorId && 
-            new Date(a.startTime).toDateString() === new Date(v.date).toDateString()
+            new Date(a.startTime).toISOString().split('T')[0] === v.date
           );
           if (!appointment) return false;
           const now = serverTime.getTime();
@@ -137,6 +147,61 @@ export function DoctorDashboard() {
         );
       })()}
 
+      {/* Upcoming Meeting Alert (1 Hour Before) */}
+      {(() => {
+        const upcomingMeeting = visits.find(v => {
+          if (v.status !== 'Confirmed') return false;
+          const appointment = getAppointments().find(a => 
+            a.doctorId === v.doctorId && 
+            new Date(a.startTime).toISOString().split('T')[0] === v.date
+          );
+          if (!appointment) return false;
+          const now = serverTime.getTime();
+          const start = new Date(appointment.startTime).getTime();
+          const oneHour = 60 * 60 * 1000;
+          const fiveMins = 5 * 60 * 1000;
+          return now >= (start - oneHour) && now < (start - fiveMins);
+        });
+
+        if (!upcomingMeeting) return null;
+
+        const appointment = getAppointments().find(a => 
+          a.doctorId === upcomingMeeting.doctorId && 
+          new Date(a.startTime).toDateString() === new Date(upcomingMeeting.date).toDateString()
+        )!;
+
+        const timeDiff = new Date(appointment.startTime).getTime() - serverTime.getTime();
+        const minutesLeft = Math.ceil(timeDiff / (60 * 1000));
+
+        return (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: -20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-orange-500/30 flex flex-col md:flex-row items-center justify-between gap-6 mb-8 border border-white/20 relative overflow-hidden group"
+          >
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 group-hover:scale-110 transition-transform duration-700"></div>
+            <div className="flex items-center gap-6 relative z-10">
+              <div className="h-16 w-16 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md border border-white/30 shadow-inner">
+                <Clock className="h-8 w-8 text-white animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="h-2 w-2 rounded-full bg-white animate-ping"></span>
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-100">Starts in {minutesLeft} {t('minutes') || 'Minutes'}</span>
+                </div>
+                <h2 className="text-2xl font-black italic tracking-tighter uppercase">{t('upcomingSessionWith') || 'Upcoming Session With'} {upcomingMeeting.repName}</h2>
+                <p className="text-sm text-orange-100/80 font-medium">{upcomingMeeting.time} ({upcomingMeeting.durationMinutes}min) • {upcomingMeeting.pharmaName}</p>
+              </div>
+            </div>
+            <div className="relative z-10 hidden md:block">
+              <div className="h-14 px-8 rounded-2xl bg-white/10 flex items-center justify-center backdrop-blur-md border border-white/20 text-white font-black uppercase tracking-widest text-xs">
+                {t('prepareForMeeting') || 'Prepare'}
+              </div>
+            </div>
+          </motion.div>
+        );
+      })()}
+
       {/* KPI Cards */}
       <div className={cn(
         "grid grid-cols-1 md:grid-cols-2 gap-8",
@@ -147,7 +212,7 @@ export function DoctorDashboard() {
         {[
           { label: t('visitsTodayLabel'), value: todayVisits.length, sub: `${confirmedToday.length} ${t('confirmed')}`, icon: Calendar, color: 'emerald' },
           { label: t('pendingRequests'), value: pendingVisits.length, sub: t('needYourAction'), icon: Clock, color: 'amber' },
-          { label: t('totalVisitsLabel'), value: visits.length, sub: `${visits.filter(v => v.status === 'Completed').length} ${t('completedVisitsStat')}`, icon: CheckCircle2, color: 'blue' },
+          { label: t('totalVisitsLabel'), value: visits.length, sub: `${visits.filter(v => (v.status || '').toLowerCase() === 'completed').length} ${t('completedVisitsStat')}`, icon: CheckCircle2, color: 'blue' },
           ...((!doctorId || (getDoctors().find(d => d.id === doctorId)?.hospitalId === 'default')) 
             ? [{ label: t('earnings'), value: formatCurrency(balance, country), sub: t('estFromVisits'), icon: DollarSign, color: 'purple' }] 
             : []

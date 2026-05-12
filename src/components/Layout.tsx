@@ -6,7 +6,7 @@ import { Topbar } from './Topbar';
 import { PendingScreen } from './PendingScreen';
 import { useTranslation } from 'react-i18next';
 import { Copilot } from './Copilot';
-import { isUserAuthorized, isRepSubscribed, getBundleRequests, useStoreListener } from '@/lib/store';
+import { isUserAuthorized, isRepSubscribed, getBundleRequests, useStoreListener, ensureUserEntityExists } from '@/lib/store';
 import { ShieldAlert, Rocket, Clock } from 'lucide-react';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
@@ -15,6 +15,7 @@ import { emailService } from '@/lib/emailService';
 import { useToast } from './ui/Toast';
 import { LogoutConfirmModal } from './LogoutConfirmModal';
 import logo from '@/assets/logo.svg';
+import { MeetingReminderPopup } from './MeetingReminderPopup';
 
 export function Layout() {
   const { user, role, loading, userId, emailVerified, signOut, refreshVerificationStatus, isPending, rejectionReason } = useAuth();
@@ -58,6 +59,10 @@ export function Layout() {
       if (!loading) setAuthorized(false);
       return;
     }
+    
+    // Repair/Ensure user profile exists on every refresh
+    ensureUserEntityExists(user);
+
     isUserAuthorized(user.id, user.user_metadata?.role)
       .then(setAuthorized)
       .catch(() => setAuthorized(false));
@@ -183,6 +188,7 @@ export function Layout() {
           <Outlet />
         </main>
         <Copilot />
+        <MeetingReminderPopup />
       </div>
       <LogoutConfirmModal 
         isOpen={showLogoutConfirm} 

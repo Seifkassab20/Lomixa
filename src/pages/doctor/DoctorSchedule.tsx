@@ -34,13 +34,22 @@ export function DoctorSchedule() {
 
   useEffect(() => {
     const doctors = getDoctors();
-    const myDoc = doctors.find(d => d.userId === userId);
+    const cleanEmail = user?.email?.toLowerCase();
+    let myDoc = doctors.find(d => d.userId === userId || d.id === userId);
+    if (!myDoc && cleanEmail) {
+      myDoc = doctors.find(d => d.email?.toLowerCase() === cleanEmail);
+    }
+    if (!myDoc && user?.user_metadata?.full_name) {
+      const cleanMetaName = user.user_metadata.full_name.trim().toLowerCase();
+      myDoc = doctors.find(d => d.name?.trim().toLowerCase() === cleanMetaName);
+    }
+
     if (myDoc) {
       setDoctorId(myDoc.id);
       setCountry(myDoc.location?.country || user?.user_metadata?.country || 'sa');
       setSlots(getDoctorAvailability(myDoc.id));
     }
-  }, [userId]);
+  }, [userId, user]);
 
   const startAsDate = new Date(`1970-01-01T${form.startTime}:00`);
   const endAsDate = new Date(`1970-01-01T${form.endTime}:00`);

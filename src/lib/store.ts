@@ -207,6 +207,7 @@ export interface Notification {
   title: string;
   message: string;
   type: 'booking' | 'confirmation' | 'cancellation' | 'info' | 'rating';
+  relatedId?: string;
   read: boolean;
   createdAt: string;
 }
@@ -306,13 +307,14 @@ function load<T>(key: string, fallback: T): T {
   return fallback;
 }
 
-function save<T>(key: string, value: T) {
+function save<T>(key: string, value: T): boolean {
   // Deep equality check to avoid redundant stringify/localStorage hits
   const current = CACHE[key];
-  if (current && JSON.stringify(current) === JSON.stringify(value)) return;
+  if (current && JSON.stringify(current) === JSON.stringify(value)) return false;
 
   CACHE[key] = value;
   localStorage.setItem(getKey(key), JSON.stringify(value));
+  return true;
 }
 
 export function notifyMutation() {
@@ -345,8 +347,7 @@ function mapVisitToDB(v: Visit) {
     price: v.price,
     notes: v.notes,
     outcome_notes: v.outcomeNotes,
-    cancelled_by_rep: v.cancelledByRep,
-    slot_id: v.slotId
+    cancelled_by_rep: v.cancelledByRep
   };
 }
 
@@ -366,13 +367,12 @@ function mapVisitFromDB(db: any): Visit {
     date: db.date,
     time: db.time,
     visitType: db.visit_type as VisitType,
-    status: db.status as VisitStatus,
+    status: (db.status ? db.status.charAt(0).toUpperCase() + db.status.slice(1).toLowerCase() : 'Pending') as VisitStatus,
     durationMinutes: db.duration_minutes,
     price: db.price,
     notes: db.notes,
     outcomeNotes: db.outcome_notes,
     cancelledByRep: db.cancelled_by_rep,
-    slotId: db.slot_id,
     createdAt: db.created_at,
   };
 }
@@ -614,7 +614,6 @@ function mapRepToDB(r: SalesRep) {
     role_title: r.roleTitle,
     target_specialties: r.targetSpecialties ? JSON.stringify(r.targetSpecialties) : null,
     products: r.products ? JSON.stringify(r.products) : null,
-    subscription: r.subscription ? JSON.stringify(r.subscription) : null,
     rejection_reason: r.rejectionReason,
     approval_status: r.approvalStatus,
     reviewed_by: r.reviewedBy,
@@ -655,7 +654,7 @@ function mapNotifToDB(n: Notification) {
 }
 
 function mapNotifFromDB(db: any): Notification {
-  return { id: db.id, userId: db.user_id, title: db.title, message: db.message, type: db.type, read: db.read, createdAt: db.created_at };
+  return { id: db.id, userId: db.user_id, title: db.title, message: db.message, type: db.type, read: db.read, relatedId: db.related_id, createdAt: db.created_at };
 }
 
 function mapBundleRequestFromDB(db: any): BundleRequest {
@@ -668,14 +667,32 @@ function mapBundleRequestFromDB(db: any): BundleRequest {
 }
 
 const mergeData = (local: any[], cloud: any[], fallbackKeys: string[] = []) => {
-  const map = new Map((local || []).filter(Boolean).map(i => [i.id || Math.random().toString(), i]));
+  const map = new Map((local || []).filter(Boolean).map(i => [i.id, i]));
   (cloud || []).filter(Boolean).forEach(i => {
     if (!i.id) return;
     const existing = map.get(i.id);
     if (existing) {
-      fallbackKeys.forEach(k => {
-        if (existing[k] !== undefined && existing[k] !== null) {
+      // Local-First: Preserve ANY field that exists locally but is missing/null in cloud
+      Object.keys(existing).forEach(k => {
+        if (i[k] === undefined || i[k] === null) {
           i[k] = existing[k];
+        }
+      });
+      // Explicit Fallbacks: Always use local for these even if cloud has a value (e.g. status)
+      // This is critical for keeping "Confirmed" visits even if the cloud update is slow/failing
+      fallbackKeys.forEach(k => {
+        const localVal = existing[k];
+        const cloudVal = i[k];
+        if (localVal !== undefined && localVal !== null) {
+          // Special case: status should be case-insensitive in comparison
+          if (k === 'status' && typeof localVal === 'string' && typeof cloudVal === 'string') {
+            if (localVal.toLowerCase() !== cloudVal.toLowerCase()) {
+               console.debug(`[Sync] Preserving local ${k}: ${localVal} (Cloud has: ${cloudVal})`);
+               i[k] = localVal;
+            }
+          } else if (localVal !== cloudVal) {
+            i[k] = localVal;
+          }
         }
       });
     }
@@ -685,21 +702,33 @@ const mergeData = (local: any[], cloud: any[], fallbackKeys: string[] = []) => {
 };
 
 // BACKGROUND SYNC POLLER
+let IS_SYNCING = false;
+
 export async function syncCloudData() {
-  if (!isSupabaseConfigured) return;
+  if (!isSupabaseConfigured || IS_SYNCING) return;
+  IS_SYNCING = true;
+
+  const safeQuery = async (query: Promise<any>) => {
+    try {
+      const res = await query;
+      return res;
+    } catch (e) {
+      return { data: null, error: e };
+    }
+  };
 
   try {
     const [hospitals, doctors, reps, pharma, visits, notifications, bundleReqs, transactions, finance, appointments] = await Promise.all([
-      supabase.from('hospitals').select('*'),
-      supabase.from('doctors').select('*'),
-      supabase.from('sales_reps').select('*'),
-      supabase.from('pharma_companies').select('*'),
-      supabase.from('visits').select('*'),
-      supabase.from('notifications').select('*'),
-      supabase.from('bundle_requests').select('*'),
-      supabase.from('transactions').select('*'),
-      supabase.from('platform_finance').select('*').limit(1),
-      supabase.from('appointments').select('*'),
+      safeQuery(supabase.from('hospitals').select('id, user_id, hospital_id, hospital_name, name, specialty, experience_years, phone, email, is_active, is_verified, balance, location, avatar, title, rejection_reason, approval_status, reviewed_by, reviewed_at') as any),
+      safeQuery(supabase.from('doctors').select('id, user_id, hospital_id, hospital_name, name, specialty, experience_years, phone, email, is_active, is_verified, balance, location, avatar, title, rejection_reason, approval_status, reviewed_by, reviewed_at') as any),
+      safeQuery(supabase.from('sales_reps').select('id, user_id, pharma_id, pharma_name, name, email, phone, target, visits_this_month, balance, is_active, is_verified, location, avatar, first_name, last_name, role_title, target_specialties, products, rejection_reason, approval_status, reviewed_by, reviewed_at') as any),
+      safeQuery(supabase.from('pharma_companies').select('id, name, email, phone, location, avatar, balance, is_active, is_verified, reviewed_by, reviewed_at') as any),
+      safeQuery(supabase.from('visits').select('id, doctor_id, doctor_name, rep_id, rep_name, rep_user_id, pharma_id, pharma_name, hospital_id, hospital_name, date, time, visit_type, status, duration_minutes, price, notes, outcome_notes, cancelled_by_rep, created_at') as any),
+      safeQuery(supabase.from('notifications').select('id, user_id, title, message, type, read, created_at') as any),
+      safeQuery(supabase.from('bundle_requests').select('id, pharma_id, pharma_name, bundle_id, bundle_name, balance, price, card_number, card_holder, status, created_at') as any),
+      safeQuery(supabase.from('transactions').select('id, type, amount, currency, from_id, from_name, to_id, to_name, related_id, created_at') as any),
+      safeQuery(supabase.from('platform_finance').select('*').limit(1) as any),
+      safeQuery(supabase.from('appointments').select('id, doctor_id, doctor_user_id, rep_id, rep_user_id, start_time, end_time, status, meeting_id, created_at') as any),
     ]);
 
     // Only skip merging local-to-cloud push if mutation was VERY recent
@@ -713,53 +742,65 @@ export async function syncCloudData() {
     const pharmaMap = new Map((pharma.data || []).map(p => [p.id, p.name]));
     const hospitalMap = new Map((hospitals.data || []).map(h => [h.id, h.name]));
 
-    if (hospitals.data) {
-      // Profile fields are local-first — never let cloud downgrade an edited entity
-      const merged = mergeData(getHospitals(), hospitals.data.map(mapHospitalFromDB), ['balance', 'name', 'phone', 'location', 'avatar']);
-      save('hospitals', merged);
-    }
-    if (doctors.data) {
-      const dbDoctors = doctors.data.map(dbDoc => {
-        const freshHospitalName = hospitalMap.get(dbDoc.hospital_id);
-        if (freshHospitalName) dbDoc.hospital_name = freshHospitalName;
-        return mapDoctorFromDB(dbDoc);
-      });
-      const merged = mergeData(getDoctors(), dbDoctors, ['balance', 'name', 'phone', 'location', 'avatar', 'title', 'specialty', 'experienceYears']);
-      save('doctors', merged);
-    }
-    if (reps.data) {
-      const dbReps = reps.data.map(dbRep => {
-        const freshPharmaName = pharmaMap.get(dbRep.pharma_id);
-        if (freshPharmaName) dbRep.pharma_name = freshPharmaName;
-        return mapRepFromDB(dbRep);
-      });
-      const merged = mergeData(getSalesReps(), dbReps, ['balance', 'target', 'visitsThisMonth', 'name', 'phone', 'location', 'avatar', 'firstName', 'lastName', 'roleTitle']);
-      save('sales_reps', merged);
-    }
-    if (pharma.data) {
-      const merged = mergeData(getPharmaCompanies(), pharma.data.map(mapPharmaFromDB), ['balance', 'name', 'phone', 'location', 'avatar']);
-      save('pharma_companies', merged);
-    }
-    if (visits.data) {
-      const dbVisits = visits.data.map(dbVisit => {
-        const freshPharmaName = pharmaMap.get(dbVisit.pharma_id);
-        if (freshPharmaName) dbVisit.pharma_name = freshPharmaName;
-        const freshHospitalName = hospitalMap.get(dbVisit.hospital_id);
-        if (freshHospitalName) dbVisit.hospital_name = freshHospitalName;
-        return mapVisitFromDB(dbVisit);
-      });
-      const merged = mergeData(getVisits(), dbVisits, ['status', 'price', 'outcomeNotes']);
-      save('visits', merged);
-    }
+    try {
+      if (hospitals.data) {
+        // Profile fields are local-first — never let cloud downgrade an edited entity
+        const merged = mergeData(getHospitals(), hospitals.data.map(mapHospitalFromDB), ['balance', 'name', 'phone', 'location', 'avatar']);
+        save('hospitals', merged);
+      }
+      if (doctors.data) {
+        const dbDoctors = doctors.data.map(dbDoc => {
+          const freshHospitalName = hospitalMap.get(dbDoc.hospital_id);
+          if (freshHospitalName) dbDoc.hospital_name = freshHospitalName;
+          return mapDoctorFromDB(dbDoc);
+        });
+        const merged = mergeData(getDoctors(), dbDoctors, ['balance', 'name', 'phone', 'location', 'avatar', 'title', 'specialty', 'experienceYears']);
+        save('doctors', merged);
+      }
+    } catch (e) { console.error("Sync Error [Profiles]:", e); }
+
+    try {
+      if (reps.data) {
+        const dbReps = reps.data.map(dbRep => {
+          const freshPharmaName = pharmaMap.get(dbRep.pharma_id);
+          if (freshPharmaName) dbRep.pharma_name = freshPharmaName;
+          return mapRepFromDB(dbRep);
+        });
+        const merged = mergeData(getSalesReps(), dbReps, ['balance', 'target', 'visitsThisMonth', 'name', 'phone', 'location', 'avatar', 'firstName', 'lastName', 'roleTitle']);
+        save('sales_reps', merged);
+      }
+      if (pharma.data) {
+        const merged = mergeData(getPharmaCompanies(), pharma.data.map(mapPharmaFromDB), ['balance', 'name', 'phone', 'location', 'avatar']);
+        save('pharma_companies', merged);
+      }
+    } catch (e) { console.error("Sync Error [Entities]:", e); }
+    try {
+      if (visits.data) {
+        const dbVisits = visits.data.map(dbVisit => {
+          const freshPharmaName = pharmaMap.get(dbVisit.pharma_id);
+          if (freshPharmaName) dbVisit.pharma_name = freshPharmaName;
+          const freshHospitalName = hospitalMap.get(dbVisit.hospital_id);
+          if (freshHospitalName) dbVisit.hospital_name = freshHospitalName;
+          return mapVisitFromDB(dbVisit);
+        });
+
+        const merged = mergeData(getVisits(), dbVisits, ['status', 'price', 'outcomeNotes']);
+        save('visits', merged);
+      }
+    } catch (e) { console.error("Sync Error [Visits]:", e); }
     if (notifications.data) {
-      const merged = mergeData(load('notifications', []), notifications.data.map(mapNotifFromDB).slice(0, 100), ['read']);
-      save('notifications', merged);
+      try {
+        const merged = mergeData(load('notifications', []), notifications.data.map(mapNotifFromDB).slice(0, 100), ['read']);
+        save('notifications', merged);
+      } catch (e) { console.error("Sync Error [Notifications]:", e); }
     }
 
-    if (bundleReqs.data) save('bundle_requests', mergeData(getBundleRequests(), bundleReqs.data.map(mapBundleRequestFromDB)));
-    if (transactions.data) save('transactions', mergeData(getTransactions(), transactions.data.map(mapTransactionFromDB)));
-    if (finance.data && finance.data[0]) save('admin_balance', finance.data[0].admin_balance);
-    if (appointments.data) save('appointments', mergeData(getAppointments(), appointments.data.map(mapAppointmentFromDB)));
+    try {
+      if (bundleReqs.data) save('bundle_requests', mergeData(getBundleRequests(), bundleReqs.data.map(mapBundleRequestFromDB)));
+      if (transactions.data) save('transactions', mergeData(getTransactions(), transactions.data.map(mapTransactionFromDB)));
+      if (finance.data && finance.data[0]) save('admin_balance', finance.data[0].admin_balance);
+      if (appointments.data) save('appointments', mergeData(getAppointments(), appointments.data.map(mapAppointmentFromDB)));
+    } catch (e) { console.error("Sync Error [Misc]:", e); }
 
 
     const slots = await supabase.from('availability_slots').select('*');
@@ -787,11 +828,11 @@ export async function syncCloudData() {
       }
     }
 
-    // Also purge expired appointments from cloud
+    // Also purge expired appointments from cloud (keep for 24 hours post-end time to protect live sessions/feedback)
     if (appointments.data) {
       const now = Date.now();
       const expiredApptIds = appointments.data
-        .filter((a: any) => new Date(a.start_time).getTime() < now)
+        .filter((a: any) => new Date(a.end_time || a.start_time).getTime() + 24 * 3600 * 1000 < now)
         .map((a: any) => a.id);
       
       if (expiredApptIds.length > 0) {
@@ -802,6 +843,8 @@ export async function syncCloudData() {
 
   } catch (err) {
     console.warn("Cloud sync failed:", err);
+  } finally {
+    IS_SYNCING = false;
   }
 }
 
@@ -820,6 +863,16 @@ if ((window as any).__storeIntervals) {
 setTimeout(syncCloudData, 1000);
 
 
+// ── DB PUSH CONCURRENCY CONTROL ──────────────────────────────────
+const PUSH_LOCKS = new Set<string>();
+
+const withLock = async (key: string, fn: () => Promise<any>) => {
+  if (PUSH_LOCKS.has(key)) return;
+  PUSH_LOCKS.add(key);
+  try { return await fn(); }
+  finally { PUSH_LOCKS.delete(key); }
+};
+
 // ── DATA ACCESS & MUTATION FUNCTIONS ─────────────────────────────
 export function getHospitals(): Hospital[] { 
   const raw = load<Hospital[]>('hospitals', []);
@@ -832,15 +885,18 @@ export function saveHospital(hospital: Hospital) {
   const list = getHospitals();
   const idx = list.findIndex(h => h.id === hospital.id);
   if (idx >= 0) list[idx] = hospital; else list.push(hospital);
-  save('hospitals', list);
-  notifyMutation();
+  const changed = save('hospitals', list);
+  if (changed) notifyMutation();
   if (isSupabaseConfigured && !hospital.id.startsWith('demo_')) {
-    supabase.from('hospitals').upsert(mapHospitalToDB(hospital)).then(({error}) => {
-      if (error) {
-        console.error("Hospital Cloud Push Failed:", error);
-        window.dispatchEvent(new CustomEvent('lomixa_error', { detail: `Cloud Push Failed: ${error.message}` }));
-      }
-    });
+    withLock(`hospital_${hospital.id}`, () => 
+      (supabase.from('hospitals').upsert(mapHospitalToDB(hospital)) as any).then(({error}) => {
+        if (error) {
+          if (error.name === 'AbortError' || error.message?.includes('Lock broken')) return;
+          console.error("Hospital Cloud Push Failed:", error);
+          window.dispatchEvent(new CustomEvent('lomixa_error', { detail: `Cloud Push Failed: ${error.message}` }));
+        }
+      })
+    );
   }
 }
 export function deleteHospital(id: string) {
@@ -866,11 +922,38 @@ export function saveDoctor(doctor: Doctor) {
   const list = getDoctors();
   const idx = list.findIndex(d => d.id === doctor.id);
   if (idx >= 0) list[idx] = doctor; else list.push(doctor);
-  save('doctors', list);
-  notifyMutation();
-  if (isSupabaseConfigured && !doctor.id.startsWith('demo_')) {
-    supabase.from('doctors').upsert(mapDoctorToDB(doctor)).then(({error}) => error && console.error("Doctor Cloud Push Failed:", error));
-  }
+  const changed = save('doctors', list);
+  if (changed) notifyMutation();
+    if (isSupabaseConfigured && !doctor.id.startsWith('demo_')) {
+      const push = (data: any) => supabase.from('doctors').upsert(data);
+      
+      withLock(`doctor_${doctor.id}`, () => 
+        (push(mapDoctorToDB(doctor)) as any).then(({error}) => {
+          if (error) {
+            if (error.name === 'AbortError' || error.message?.includes('Lock broken')) return;
+            const isFkError = error.message.toLowerCase().includes('foreign key') || error.code === '23503';
+            if (isFkError && error.message.includes('hospital_id')) {
+              console.warn("Ghost hospital detected. Self-healing to Independent...");
+              doctor.hospitalId = 'default';
+              doctor.hospitalName = 'Independent / No Hospital';
+              const updatedList = getDoctors();
+              const i = updatedList.findIndex(d => d.id === doctor.id);
+              if (i >= 0) updatedList[i] = doctor;
+              save('doctors', updatedList);
+              notifyMutation();
+              push(mapDoctorToDB(doctor)).then(({error: retryErr}) => {
+                if (retryErr) {
+                  window.dispatchEvent(new CustomEvent('lomixa_error', { detail: `Doctor DB Fix Failed: ${retryErr.message}` }));
+                }
+              });
+              return;
+            }
+            console.error("Doctor Cloud Push Failed:", error);
+            window.dispatchEvent(new CustomEvent('lomixa_error', { detail: `Doctor DB Error: ${error.message}` }));
+          }
+        })
+      );
+    }
 }
 export function deleteDoctor(id: string) {
   save('visits', getVisits().filter(v => v.doctorId !== id));
@@ -894,9 +977,35 @@ export function saveSalesRep(rep: SalesRep) {
   const list = getSalesReps();
   const idx = list.findIndex(r => r.id === rep.id);
   if (idx >= 0) list[idx] = rep; else list.push(rep);
-  save('sales_reps', list);
-  notifyMutation();
-  if (isSupabaseConfigured && !rep.id.startsWith('demo_')) supabase.from('sales_reps').upsert(mapRepToDB(rep)).then(({error}) => error && console.error("Cloud push failed:", error));
+  const changed = save('sales_reps', list);
+  if (changed) notifyMutation();
+  if (isSupabaseConfigured && !rep.id.startsWith('demo_')) {
+    withLock(`rep_${rep.id}`, () => 
+      (supabase.from('sales_reps').upsert(mapRepToDB(rep)) as any).then(({error}) => {
+        if (error) {
+          if (error.name === 'AbortError' || error.message?.includes('Lock broken')) return;
+          if (error.message.includes('sales_reps_pharma_id_fkey')) {
+            console.warn("Ghost pharma detected. Self-healing to Independent...");
+            rep.pharmaId = 'default';
+            rep.pharmaName = 'Independent / No Pharma';
+            const updatedList = getSalesReps();
+            const i = updatedList.findIndex(r => r.id === rep.id);
+            if (i >= 0) updatedList[i] = rep;
+            save('sales_reps', updatedList);
+            notifyMutation();
+            supabase.from('sales_reps').upsert(mapRepToDB(rep)).then(({error: retryErr}) => {
+              if (retryErr) {
+                window.dispatchEvent(new CustomEvent('lomixa_error', { detail: `Sales Rep DB Error: ${retryErr.message}` }));
+              }
+            });
+            return;
+          }
+          console.error("Sales Rep Cloud Push Failed:", error);
+          window.dispatchEvent(new CustomEvent('lomixa_error', { detail: `Sales Rep DB Error: ${error.message}` }));
+        }
+      })
+    );
+  }
 }
 export function deleteSalesRep(id: string) {
   save('visits', getVisits().filter(v => v.repId !== id));
@@ -952,7 +1061,7 @@ export function savePharmaCompany(company: PharmaCompany) {
   const oldName = idx >= 0 ? list[idx].name : null;
   
   if (idx >= 0) list[idx] = company; else list.push(company);
-  save('pharma_companies', list);
+  const changed = save('pharma_companies', list);
   
   // Cascade name change to reps and visits if name changed
   if (oldName && oldName !== company.name) {
@@ -979,9 +1088,17 @@ export function savePharmaCompany(company: PharmaCompany) {
     }
   }
 
-  notifyMutation();
+  if (changed) notifyMutation();
   if (isSupabaseConfigured && !company.id.startsWith('demo_')) {
-    supabase.from('pharma_companies').upsert(mapPharmaToDB(company)).then(({error}) => error && console.error("Pharma Cloud Push Failed:", error));
+    withLock(`pharma_${company.id}`, () => 
+      (supabase.from('pharma_companies').upsert(mapPharmaToDB(company)) as any).then(({error}) => {
+        if (error) {
+          if (error.name === 'AbortError' || error.message?.includes('Lock broken')) return;
+          console.error("Pharma Cloud Push Failed:", error);
+          window.dispatchEvent(new CustomEvent('lomixa_error', { detail: `Pharma DB Error: ${error.message}` }));
+        }
+      })
+    );
   }
 }
 export function deletePharma(id: string) {
@@ -1011,7 +1128,28 @@ export function saveVisit(visit: Visit) {
   if (idx >= 0) list[idx] = visit; else list.push(visit);
   save('visits', list);
   notifyMutation();
-  if (isSupabaseConfigured) supabase.from('visits').upsert(mapVisitToDB(visit)).then(({error}) => error && console.error("Cloud push failed:", error));
+  if (isSupabaseConfigured && !visit.doctorId.startsWith('demo_') && !visit.repId.startsWith('demo_')) {
+    supabase.from('visits').upsert(mapVisitToDB(visit)).then(({error}) => {
+      if (error) {
+        if (error.name === 'AbortError' || error.message?.includes('Lock broken')) return;
+        console.error("Cloud push failed for visit:", error);
+        // If it's a foreign key error, it likely means the Doctor/Rep profile isn't in Supabase yet.
+        // We'll show a more helpful message.
+        const isFkError = error.message.toLowerCase().includes('foreign key') || error.code === '23503';
+        if (isFkError) {
+          window.dispatchEvent(new CustomEvent('lomixa_error', { 
+            detail: `Database Sync Pending: Your profile is not yet fully synchronized. We are attempting to fix this now. Please try again in 5 seconds.` 
+          }));
+          // Proactive fix: Force-push current user's entity
+          supabase.auth.getUser().then(({data: {user}}) => {
+            if (user) ensureUserEntityExists(user);
+          });
+        } else {
+          window.dispatchEvent(new CustomEvent('lomixa_error', { detail: `Failed to save visit to database: ${error.message}` }));
+        }
+      }
+    });
+  }
 }
 export function updateVisitStatus(id: string, status: VisitStatus, extra?: Partial<Visit>) {
   const list = getVisits();
@@ -1260,13 +1398,18 @@ export function saveProfile(userId: string, profile: Record<string, any>) {
  */
 export function isDateTimePast(dateStr: string, timeStr: string): boolean {
   try {
+    const [year, month, day] = dateStr.split('-').map(Number);
     const [hours, minutes] = timeStr.split(':').map(Number);
-    const date = new Date(dateStr);
-    date.setHours(hours, minutes, 0, 0);
+    const date = new Date(year, month - 1, day, hours, minutes, 0, 0);
     return date.getTime() < Date.now();
   } catch (e) {
     return false;
   }
+}
+
+/** Returns true when a pending visit’s scheduled time is already past */
+export function isPendingExpired(v: Visit): boolean {
+  return v.status === 'Pending' && isDateTimePast(v.date, v.time);
 }
 
 /**
@@ -1306,7 +1449,7 @@ export async function purgeExpiredAppointments() {
   const now = Date.now();
   const remaining = appointments.filter(a => {
     try {
-      return new Date(a.startTime).getTime() > now;
+      return new Date(a.endTime || a.startTime).getTime() + 24 * 3600 * 1000 > now;
     } catch (e) { return true; }
   });
 
@@ -1331,15 +1474,27 @@ export function saveDoctorAvailability(doctorId: string, slots: AvailabilitySlot
   save(`availability_${doctorId}`, slots);
   notifyMutation();
   if (isSupabaseConfigured) {
-    supabase.from('availability_slots').delete().eq('doctor_id', doctorId).then(() => {
+    // Use upsert instead of full delete to prevent cascade deletion of visits
+    supabase.from('availability_slots').select('id').eq('doctor_id', doctorId).then(({ data: currentSlots }) => {
+      const newSlotIds = slots.map(s => s.id);
+      const deletedIds = (currentSlots || []).filter(s => !newSlotIds.includes(s.id)).map(s => s.id);
+      
+      const updatePromises = [];
+      
+      if (deletedIds.length > 0) {
+        updatePromises.push(supabase.from('availability_slots').delete().in('id', deletedIds));
+      }
+      
       if (slots.length > 0) {
-        supabase.from('availability_slots').insert(
+        updatePromises.push(supabase.from('availability_slots').upsert(
           slots.map(s => ({
             id: s.id, doctor_id: doctorId, date: s.date, time: s.time, 
             appointment_type: s.appointmentType, duration: s.duration, is_booked: s.isBooked, price: s.price
           }))
-        ).then();
+        ));
       }
+
+      Promise.all(updatePromises).catch(err => console.error("Failed to sync availability slots:", err));
     });
   }
 }
@@ -1378,6 +1533,7 @@ export function pushNotification(params: {
   title: string;
   message: string;
   type: Notification['type'];
+  relatedId?: string;
 }) {
   saveNotification({
     id: generateId(),
@@ -1385,6 +1541,18 @@ export function pushNotification(params: {
     read: false,
     createdAt: new Date().toISOString(),
   });
+}
+
+export function deleteNotificationsByRelatedId(relatedId: string | undefined) {
+  if (!relatedId) return;
+  const notifs = load<Notification[]>('notifications', []);
+  const toDelete = notifs.filter(n => n.relatedId === relatedId).map(n => n.id);
+  if (toDelete.length === 0) return;
+  save('notifications', notifs.filter(n => n.relatedId !== relatedId));
+  notifyMutation();
+  if (isSupabaseConfigured) {
+    supabase.from('notifications').delete().in('id', toDelete).then();
+  }
 }
 
 export function getBundleRequests(): BundleRequest[] {
@@ -1439,10 +1607,10 @@ export async function isUserAuthorized(uid?: string, role?: string): Promise<boo
     if (!role) return false;
     const checkLocal = () => {
       let entity: any;
-      if (role === 'doctor') entity = getDoctors().find(d => d.userId === uid);
-      else if (role === 'pharma') entity = getPharmaCompanies().find(p => p.userId === uid);
-      else if (role === 'hospital') entity = getHospitals().find(h => h.userId === uid);
-      else if (role === 'rep') entity = getSalesReps().find(r => r.userId === uid);
+      if (role === 'doctor') entity = getDoctors().find(d => d.userId === uid || d.id === uid);
+      else if (role === 'pharma') entity = getPharmaCompanies().find(p => p.userId === uid || p.id === uid);
+      else if (role === 'hospital') entity = getHospitals().find(h => h.userId === uid || h.id === uid);
+      else if (role === 'rep') entity = getSalesReps().find(r => r.userId === uid || r.id === uid);
       return entity;
     };
     const local = checkLocal();
@@ -1472,10 +1640,10 @@ export async function getAuthorizationDetails(uid: string, role: string): Promis
 
     const checkLocal = () => {
       let entity: any;
-      if (role === 'doctor') entity = getDoctors().find(d => d.userId === uid);
-      else if (role === 'pharma') entity = getPharmaCompanies().find(p => p.userId === uid);
-      else if (role === 'hospital') entity = getHospitals().find(h => h.userId === uid);
-      else if (role === 'rep') entity = getSalesReps().find(r => r.userId === uid);
+      if (role === 'doctor') entity = getDoctors().find(d => d.userId === uid || d.id === uid);
+      else if (role === 'pharma') entity = getPharmaCompanies().find(p => p.userId === uid || p.id === uid);
+      else if (role === 'hospital') entity = getHospitals().find(h => h.userId === uid || h.id === uid);
+      else if (role === 'rep') entity = getSalesReps().find(r => r.userId === uid || r.id === uid);
       return entity;
     };
 
@@ -1577,6 +1745,8 @@ export async function deletePharmaBundle(pharmaId: string, bundleId: string) {
   }
 }
 
+const REPAIR_LOCKS = new Set<string>();
+
 export async function ensureUserEntityExists(user: any) {
   if (!user || !isSupabaseConfigured) return;
   const role = user.user_metadata?.role;
@@ -1592,15 +1762,38 @@ export async function ensureUserEntityExists(user: any) {
   const table = tableMap[role];
   if (!table || user.id.startsWith('demo_')) return;
 
+  const lockKey = `${role}_${user.id}`;
+  if (REPAIR_LOCKS.has(lockKey)) return;
+  REPAIR_LOCKS.add(lockKey);
+
   try {
-    const { data, error } = await supabase.from(table).select('*').eq('user_id', user.id).single();
+    let { data, error } = await supabase.from(table).select('*').eq('user_id', user.id).single();
     
-    // If no record is found in DB (often due to RLS blocking creation by another user)
-    // we can self-heal using the metadata attached during signup.
+    // Fallback: Check if an orphan record exists with the same email but NO user_id
+    if ((error && error.code === 'PGRST116') || !data) {
+      const email = user.email?.toLowerCase();
+      if (email) {
+        const { data: orphan } = await supabase.from(table).select('*').eq('email', email).is('user_id', null).maybeSingle();
+        if (orphan) {
+          console.info(`Found orphan ${role} record for ${email}. Linking to user ${user.id}...`);
+          const { data: linked, error: linkErr } = await supabase.from(table).update({ user_id: user.id }).eq('id', orphan.id).select().single();
+          if (!linkErr && linked) {
+            data = linked;
+            error = null;
+          }
+        }
+      }
+    }
+
     if ((error && error.code === 'PGRST116') || !data) {
       const m = user.user_metadata;
+      const cleanEmail = user.email?.toLowerCase();
       if (role === 'doctor' && m) {
-        const existingDoctor = getDoctors().find(d => d.userId === user.id);
+        const existingDoctor = getDoctors().find(d => 
+          d.userId === user.id || 
+          d.id === user.id ||
+          (cleanEmail && d.email?.toLowerCase() === cleanEmail)
+        );
         const updatedDoc = {
           ...existingDoctor,
           id: user.id,
@@ -1621,13 +1814,13 @@ export async function ensureUserEntityExists(user: any) {
           approvalStatus: existingDoctor?.approvalStatus || (existingDoctor?.isVerified ? 'approved' : 'pending_approval'),
           rejectionReason: existingDoctor?.rejectionReason
         };
-        const list = getDoctors();
-        const idx = list.findIndex(d => d.id === updatedDoc.id);
-        if (idx >= 0) list[idx] = updatedDoc; else list.push(updatedDoc);
-        save('doctors', list);
-        notifyMutation();
+        saveDoctor(updatedDoc);
       } else if (role === 'rep' && m) {
-        const existingRep = getSalesReps().find(r => r.userId === user.id);
+        const existingRep = getSalesReps().find(r => 
+          r.userId === user.id || 
+          r.id === user.id ||
+          (cleanEmail && r.email?.toLowerCase() === cleanEmail)
+        );
         const updatedRep = {
           ...existingRep,
           id: user.id,
@@ -1647,13 +1840,9 @@ export async function ensureUserEntityExists(user: any) {
           approvalStatus: existingRep?.approvalStatus || (existingRep?.isVerified ? 'approved' : 'pending_approval'),
           rejectionReason: existingRep?.rejectionReason
         };
-        const list = getSalesReps();
-        const idx = list.findIndex(r => r.id === updatedRep.id);
-        if (idx >= 0) list[idx] = updatedRep; else list.push(updatedRep);
-        save('sales_reps', list);
-        notifyMutation();
+        saveSalesRep(updatedRep);
       } else if (role === 'pharma' && m) {
-        const existingPharma = getPharmaCompanies().find(p => p.userId === user.id);
+        const existingPharma = getPharmaCompanies().find(p => p.userId === user.id || p.id === user.id);
         const updatedPharma = {
           ...existingPharma,
           id: user.id,
@@ -1666,13 +1855,9 @@ export async function ensureUserEntityExists(user: any) {
           approvalStatus: existingPharma?.approvalStatus || (existingPharma?.isVerified ? 'approved' : 'pending_approval'),
           rejectionReason: existingPharma?.rejectionReason
         };
-        const list = getPharmaCompanies();
-        const idx = list.findIndex(p => p.id === updatedPharma.id);
-        if (idx >= 0) list[idx] = updatedPharma; else list.push(updatedPharma);
-        save('pharma_companies', list);
-        notifyMutation();
+        savePharmaCompany(updatedPharma);
       } else if (role === 'hospital' && m) {
-        const existingHospital = getHospitals().find(h => h.userId === user.id);
+        const existingHospital = getHospitals().find(h => h.userId === user.id || h.id === user.id);
         const updatedHosp = {
           ...existingHospital,
           id: user.id,
@@ -1685,11 +1870,7 @@ export async function ensureUserEntityExists(user: any) {
           approvalStatus: existingHospital?.approvalStatus || (existingHospital?.isVerified ? 'approved' : 'pending_approval'),
           rejectionReason: existingHospital?.rejectionReason
         };
-        const list = getHospitals();
-        const idx = list.findIndex(h => h.id === updatedHosp.id);
-        if (idx >= 0) list[idx] = updatedHosp; else list.push(updatedHosp);
-        save('hospitals', list);
-        notifyMutation();
+        saveHospital(updatedHosp);
       }
       return;
     }
@@ -1712,11 +1893,11 @@ export async function ensureUserEntityExists(user: any) {
       const cloud = mapRepFromDB(data);
       saveSalesRep(mergeData(getSalesReps(), [cloud], ['balance', 'target', 'visitsThisMonth']).find(r => r.id === cloud.id) || cloud);
     }
-    
-    notifyMutation();
 
   } catch (err) {
     console.error("Failed to ensure user entity exists:", err);
+  } finally {
+    REPAIR_LOCKS.delete(lockKey);
   }
 }
 

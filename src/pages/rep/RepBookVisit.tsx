@@ -187,7 +187,12 @@ export function RepBookVisit() {
 
     const totalPrice = slotsToBook.reduce((sum, s) => sum + (s.price || 150), 0);
 
-    if (slotsToBook.length === 0 || balance < totalPrice) return;
+    if (slotsToBook.length === 0) return;
+    
+    if (balance < totalPrice) {
+      window.dispatchEvent(new CustomEvent('lomixa_error', { detail: `Insufficient balance. Required: $${totalPrice}, Available: $${balance}` }));
+      return;
+    }
 
     setBookedCount(slotsToBook.length);
 
@@ -251,7 +256,18 @@ export function RepBookVisit() {
           ? `Meeting with ${selectedDoctor.name} on ${new Date(slotsToBook[0].date).toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-SA', { month: 'short', day: 'numeric' })} at ${slotsToBook[0].time} (${selectedType}). Awaiting doctor confirmation.`
           : `Bulk booking confirmed: ${slotsToBook.length} sessions scheduled with ${selectedDoctor.name}. Awaiting doctor confirmation.`,
         type: 'booking',
+        relatedId: slotsToBook[0].id
       });
+      
+      if (selectedDoctor.userId) {
+        pushNotification({
+          userId: selectedDoctor.userId,
+          title: 'New Visit Request',
+          message: `${repData?.name || 'A Sales Rep'} has requested a ${selectedType} visit on ${slotsToBook[0].date} at ${slotsToBook[0].time}.`,
+          type: 'booking',
+          relatedId: slotsToBook[0].id
+        });
+      }
 
       // Send Real-time Email to Doctor
       if (selectedDoctor.email) {

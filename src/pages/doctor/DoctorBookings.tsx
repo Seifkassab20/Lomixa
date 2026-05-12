@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  getVisits, saveVisit, getDoctors, Visit, VisitStatus, pushNotification,
+  getVisits, saveVisit, getDoctors, Visit, VisitStatus, pushNotification, deleteNotificationsByRelatedId,
   processVisitPayment, getSalesReps, saveSalesRep, saveDoctorAvailability, getDoctorAvailability,
   refundVisitPayment, saveRating, generateId, Rating,
-  Appointment, saveAppointment, getAppointments, getServerTime
+  Appointment, saveAppointment, getAppointments, getServerTime, useStoreListener, isDateTimePast
 } from '@/lib/store';
 import { VideoCall } from '@/components/VideoCall';
 import { useAuth } from '@/lib/auth';
@@ -24,7 +24,7 @@ const STATUS_COLORS: Record<VisitStatus, string> = {
 const TYPE_ICONS = { 'In Person': MapPin, Video, Call: Phone, Text: MessageSquare };
 
 export function DoctorBookings() {
-  const { userId } = useAuth();
+  const { userId, user } = useAuth();
   const { t, i18n } = useTranslation();
   const [visits, setVisits] = useState<Visit[]>([]);
   const [filter, setFilter] = useState('All');
@@ -38,13 +38,39 @@ export function DoctorBookings() {
 
   const loadVisits = () => {
     const doctors = getDoctors();
-    const myDoc = doctors.find(d => d.userId === userId);
-    setDoctorId(myDoc?.id || '');
+    const cleanEmail = user?.email?.toLowerCase();
+    let myDoc = doctors.find(d => d.userId === userId || d.id === userId);
+    if (!myDoc && cleanEmail) {
+      myDoc = doctors.find(d => d.email?.toLowerCase() === cleanEmail);
+    }
+    // Also find by name match if user profile has full_name
+    if (!myDoc && user?.user_metadata?.full_name) {
+      const cleanMetaName = user.user_metadata.full_name.trim().toLowerCase();
+      myDoc = doctors.find(d => d.name?.trim().toLowerCase() === cleanMetaName);
+    }
+    
     if (myDoc) {
-      const allVisits = getVisits().filter(v => v.doctorId === myDoc.id);
+      setDoctorId(myDoc.id);
+      const cleanName = myDoc.name?.trim().toLowerCase();
+      const myDocs = doctors.filter(d => 
+        d.userId === userId || 
+        d.id === userId ||
+        (cleanEmail && d.email?.toLowerCase() === cleanEmail) ||
+        (cleanName && d.name?.trim().toLowerCase() === cleanName)
+      );
+      const myDocIds = myDocs.map(d => d.id);
+      if (!myDocIds.includes(myDoc.id)) myDocIds.push(myDoc.id);
+
+      const allVisits = getVisits().filter(v => 
+        myDocIds.includes(v.doctorId) || 
+        v.doctorId === userId ||
+        (cleanName && v.doctorName?.trim().toLowerCase() === cleanName)
+      );
       setVisits(allVisits.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')));
     }
   };
+
+  useStoreListener(loadVisits);
 
   useEffect(() => {
     loadVisits();
@@ -81,7 +107,7 @@ export function DoctorBookings() {
           startTime: start.toISOString(),
           endTime: end.toISOString(),
           status: 'accepted',
-          meetingId: `mtg_${generateId().split('-')[0]}_${visit.id.split('-')[0]}`,
+          meetingId: `mtg_shared_${visit.id}`,
           createdAt: new Date().toISOString()
         };
         saveAppointment(newAppointment);
@@ -113,6 +139,9 @@ export function DoctorBookings() {
     const updated = { ...visit, status: action };
     saveVisit(updated);
     setVisits(prev => prev.map(v => v.id === visit.id ? updated : v));
+
+    // Remove the original "New Visit Request" notification
+    deleteNotificationsByRelatedId(visit.slotId);
 
     // Notify the REP
     const repsList = getSalesReps();
@@ -206,8 +235,15 @@ export function DoctorBookings() {
     loadVisits();
   };
 
+  const activeVisits = visits.filter(v => {
+    if (v.status === 'Pending' && isDateTimePast(v.date, v.time)) {
+      return false;
+    }
+    return true;
+  });
+
   const tabs = ['All', 'Pending', 'Confirmed', 'Completed', 'Cancelled'];
-  const filtered = visits.filter(v => filter === 'All' || v.status === filter);
+  const filtered = activeVisits.filter(v => filter === 'All' || v.status === filter);
 
   return (
     <div className="space-y-6">
@@ -288,7 +324,7 @@ export function DoctorBookings() {
               filter === tab ? 'bg-emerald-600 text-white' : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-700'
             )}
           >
-            {t(tab.toLowerCase())} ({tab === 'All' ? visits.length : visits.filter(v => v.status === tab).length})
+            {t(tab.toLowerCase())} ({tab === 'All' ? activeVisits.length : activeVisits.filter(v => v.status === tab).length})
           </button>
         ))}
       </div>
@@ -358,46 +394,70 @@ export function DoctorBookings() {
                         </Button>
                       </div>
                     )}
-                    {visit.status === 'Confirmed' && (
-                      <div className="flex gap-2">
-                        {visit.visitType === 'Video' && (() => {
-                          const appointment = getAppointments().find(a => 
-                             a.doctorId === visit.doctorId && 
-                             a.repId === visit.repId && 
-                             a.startTime.includes(visit.date)
-                          );
-                          
-                          if (!appointment) return null;
-                          
-                          const now = serverTime.getTime();
-                          const start = new Date(appointment.startTime).getTime();
-                          const end = new Date(appointment.endTime).getTime();
-                          const isNow = now >= start && now <= end;
-                          const isFuture = now < start;
-                          
-                          return (
-                            <div className="flex flex-col items-end gap-1">
-                              {isNow ? (
-                                <Button size="sm" onClick={() => setActiveAppointment(appointment)} className="gap-1 bg-[#39b596] hover:bg-emerald-500 text-white h-8 text-xs font-bold animate-pulse">
-                                  <Video className="h-3.5 w-3.5" /> {t('joinCall')}
+                    {(() => {
+                      const now = serverTime.getTime();
+                      const start = new Date(`${visit.date}T${visit.time}:00`).getTime();
+                      const end = start + (visit.durationMinutes || 30) * 60000;
+                      const oneHour = 60 * 60 * 1000;
+                      const fiveMins = 5 * 60 * 1000;
+
+                      const isVideo = visit.visitType === 'Video';
+                      const showsMeetingIcon = isVideo && visit.status === 'Confirmed' && now >= start - oneHour && now <= end;
+                      const canAccessMeeting = now >= start - fiveMins && now <= end;
+                      const isEnded = now > end;
+
+                      const getActiveAppt = () => {
+                        const existing = getAppointments().find(a => a.doctorId === visit.doctorId && a.repId === visit.repId && a.startTime.includes(visit.date));
+                        if (existing) return existing;
+                        return {
+                          id: `fallback_${visit.id}`,
+                          doctorId: visit.doctorId,
+                          doctorUserId: visit.doctorId,
+                          repId: visit.repId,
+                          repUserId: visit.repUserId || '',
+                          startTime: new Date(start).toISOString(),
+                          endTime: new Date(end).toISOString(),
+                          status: 'accepted',
+                          meetingId: `mtg_shared_${visit.id}`,
+                          createdAt: visit.createdAt || new Date().toISOString()
+                        } as any;
+                      };
+
+                      return (
+                        <div className="flex flex-col items-end gap-2 mt-2 sm:mt-0">
+                          {showsMeetingIcon && (
+                            <div>
+                              {canAccessMeeting ? (
+                                <Button size="sm" onClick={() => setActiveAppointment(getActiveAppt())} className="gap-1 bg-[#39b596] hover:bg-emerald-500 text-white h-8 text-xs font-bold animate-pulse shadow-lg shadow-emerald-500/20">
+                                  <Video className="h-3.5 w-3.5" /> {t('joinCall') || 'Join Call'}
                                 </Button>
-                              ) : isFuture ? (
-                                <span className="text-[10px] text-amber-500 font-bold bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 italic">
-                                  {t('callNotAvailableYet') || 'Call not available yet'}
-                                </span>
                               ) : (
-                                <span className="text-[10px] text-slate-500 font-bold bg-slate-500/10 px-2 py-1 rounded border border-slate-500/20 italic">
-                                  {t('appointmentEnded') || 'Appointment انتهت'}
-                                </span>
+                                <div className="flex flex-col items-end">
+                                  <Button size="sm" disabled className="gap-1 bg-slate-700 text-slate-300 h-8 text-xs font-bold opacity-60 cursor-not-allowed">
+                                    <Video className="h-3.5 w-3.5 text-amber-400" /> {t('meetingLinkVisible') || 'Meeting Link Ready'}
+                                  </Button>
+                                  <span className="text-[9px] text-amber-500 font-bold mt-0.5">Opens 5 min before start</span>
+                                </div>
                               )}
                             </div>
-                          );
-                        })()}
-                        <Button size="sm" variant="outline" onClick={() => { setOutcomeModal(visit); setOutcomeNotes(''); }} className="gap-1 h-8 text-xs dark:border-slate-600 dark:text-slate-300">
-                          <CheckCircle2 className="h-3.5 w-3.5" /> {t('markDone')}
-                        </Button>
-                      </div>
-                    )}
+                          )}
+
+                          {visit.status === 'Confirmed' && isEnded && (
+                            <div className="flex gap-2 items-center">
+                              <Button size="sm" onClick={() => { setOutcomeModal(visit); setOutcomeNotes(''); }} className="gap-1 bg-amber-500 hover:bg-amber-600 text-white h-8 text-xs font-bold shadow-md shadow-amber-500/10">
+                                <Star className="h-3.5 w-3.5" /> {t('giveFeedbackRating') || 'Give Feedback & Rating'}
+                              </Button>
+                            </div>
+                          )}
+
+                          {visit.status === 'Completed' && !visit.repRating && (
+                            <Button size="sm" onClick={() => { setOutcomeModal(visit); setOutcomeNotes(''); }} className="gap-1 bg-amber-500 hover:bg-amber-600 text-white h-8 text-xs font-bold shadow-md shadow-amber-500/10">
+                              <Star className="h-3.5 w-3.5" /> {t('giveFeedbackRating') || 'Give Feedback & Rating'}
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
